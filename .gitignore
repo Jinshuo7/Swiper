@@ -1,0 +1,16 @@
+# Build output
+.build-kit-tests/
+.build-ios-typecheck/
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
