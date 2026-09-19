@@ -16,7 +16,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   installed iOS platform (`xcodebuild -downloadPlatform iOS`, ~8.5 GB). A build
   that reports `iOS ... is not installed` is missing the runtime, not the SDK.
   When those are unavailable, the raw compiler inside `Xcode.app` still works:
-  - `Scripts/run-kit-tests.sh` builds and runs `SwiperKitTests` on macOS.
+  - `Scripts/run-kit-tests.sh` builds and runs `SwiperKitTests` on macOS
+    (see `docs/TESTING.md` for the exact command and pass count).
   - `Scripts/typecheck-ios.sh` compile-checks `SwiperKit` and the app for iOS.
 - After adding, renaming or deleting source files, run
   `ruby Scripts/generate_project.rb` and commit `Swiper.xcodeproj`.

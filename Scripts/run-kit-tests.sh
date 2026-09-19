@@ -12,13 +12,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-XCODE_DIR="${XCODE_DIR:-/Applications/Xcode.app/Contents/Developer}"
+XCODE_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 SWIFTC="$XCODE_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
 MACSDK="$XCODE_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 XCTEST_FW="$XCODE_DIR/Platforms/MacOSX.platform/Developer/Library/Frameworks"
 XCTEST_LIB="$XCODE_DIR/Platforms/MacOSX.platform/Developer/usr/lib"
 XCTEST_RUN="$XCODE_DIR/usr/bin/xctest"
-TARGET="${TARGET:-arm64-apple-macosx26.0}"
+ARCH="$(uname -m)"
+SDK_VERSION="$(plutil -extract Version raw "$MACSDK/SDKSettings.plist")"
+TARGET="${TARGET:-$ARCH-apple-macosx$SDK_VERSION}"
 BUILD="$ROOT/.build-kit-tests"
 
 if [[ ! -x "$SWIFTC" ]]; then
