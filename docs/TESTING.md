@@ -19,3 +19,24 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.s
   version from `MacOSX.sdk/SDKSettings.plist`; the target triple is built from
   those, so no version is hardcoded.
 - `/usr/bin/plutil` (a system tool) is used to read the SDK version.
+
+## iOS typecheck
+
+Compile-checks `SwiperKit` and the whole `Swiper` app against the iOS Simulator
+SDK without `xcodebuild`. Same `DEVELOPER_DIR` shape as above:
+
+```
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/typecheck-ios.sh
+```
+
+- Result on this machine: green, exit 0. Output:
+
+  ```
+  ==> Building SwiperKit for iOS (arm64-apple-ios27.0-simulator)
+  ==> Type-checking the Swiper app
+  OK
+  ```
+
+- The script honours `$DEVELOPER_DIR` (else `xcode-select -p`) and derives the
+  target triple from `uname -m` and the installed SDK version, so no SDK
+  version is hardcoded.

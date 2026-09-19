@@ -11,10 +11,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-XCODE_DIR="${XCODE_DIR:-/Applications/Xcode.app/Contents/Developer}"
+XCODE_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 SWIFTC="$XCODE_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
 IOSSDK="$XCODE_DIR/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
-TARGET="${TARGET:-arm64-apple-ios26.5-simulator}"
+ARCH="$(uname -m)"
+SDK_VERSION="$(plutil -extract Version raw "$IOSSDK/SDKSettings.plist")"
+TARGET="${TARGET:-$ARCH-apple-ios$SDK_VERSION-simulator}"
 BUILD="$ROOT/.build-ios-typecheck"
 
 if [[ ! -x "$SWIFTC" ]]; then
