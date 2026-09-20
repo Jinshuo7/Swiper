@@ -170,6 +170,7 @@ public struct SessionEngine: Equatable, Sendable {
         keptIDs.remove(entry.assetID)
         if mode == .tumbler, let displacedAssetID = entry.displacedAssetID {
             tumbler?.requeue(displacedAssetID)
+            tumbler?.requeue(entry.assetID)
         }
         if order.contains(id: entry.assetID) {
             cursorID = entry.assetID

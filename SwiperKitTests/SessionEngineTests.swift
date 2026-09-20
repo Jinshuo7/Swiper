@@ -135,17 +135,24 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertEqual(expected, [first, second].compactMap { $0 })
     }
 
-    func testTumblerUndoRequeuesTheDisplacedPhoto() {
+    func testTumblerUndoRequeuesTheUndoneAndDisplacedPhotos() {
         var engine = SessionEngine(order: TestLibrary.order(), mode: .tumbler, tumblerSeed: 17)
         engine.start()
-        let first = engine.current?.id
+        engine.apply(.keep)
+        let undone = engine.current!.id
         engine.apply(.keep)
         let displaced = engine.current?.id
 
         engine.undo()
-        XCTAssertEqual(engine.current?.id, first)
+        XCTAssertEqual(engine.current?.id, undone)
+        XCTAssertFalse(engine.tumbler!.handled.contains(undone))
         engine.apply(.keep)
         XCTAssertEqual(engine.current?.id, displaced)
+
+        while !engine.isFinished {
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(engine.keptIDs, engine.order.idSet)
     }
 
     func testRestoreReturnsQueuedAssetsToKept() {
