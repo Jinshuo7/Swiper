@@ -57,10 +57,26 @@ From the Pi session records since Round 2 began: 25 Sol calls, approximately $1.
 2,431,616 cached-input tokens. This includes reading orchestration skills and attempting
 to discover `bb`, not just implementation. OpenAI's usage page is authoritative.
 
+## Xcode availability (corrected)
+
+The earlier assumption that `xcodebuild` was unusable was stale. Verified 2026-09-20:
+Xcode 27.0, first-launch status exit 0 (licence accepted), iOS 26.5 Simulator runtime
+installed. No 8.5 GB download is needed.
+
+Full suite ran green on the iPhone 17 Pro Simulator: 66 `SwiperKitTests` + 4
+`SwiperUITests`, 0 failures, `TEST SUCCEEDED`, ~75 s.
+
+No physical iPhone was visible (`devicectl`/`xctrace` list only Simulators). A device
+must be connected, trusted, and in Developer Mode to appear. `AGENTS.md`, `README.md`
+and `docs/TESTING.md` were corrected to match.
+
 ## Workflow observations
 
 - `bb` is not installed or visible in this shell, so no isolated workers or independent
   reviewer could be launched from here.
+- The three David Ondrej skills that assume `bb` (`bb-cli`, `nagent`, `gpt-review`,
+  `fable-review`, `total-review`, `launch-subagent`, `herdr`, `box-ascii`, `cmux`) are
+  archived, so the routing/orchestration gap is now explicit rather than a silent trap.
 - Reading the full `bb-cli` skill before discovering that the executable was absent was
   avoidable context cost. Future runs should check tool availability first when possible.
 - The bounded product work itself required only the named implementation files and their

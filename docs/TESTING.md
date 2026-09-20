@@ -3,11 +3,27 @@
 This document records the exact commands used to verify Swiper and what a future
 agent needs to re-run them. Keep it in sync when the test setup changes.
 
-## Pure-logic suite (`SwiperKitTests`)
+## Full suite (Xcode)
 
-The `SwiperKit` unit tests run on macOS without `xcodebuild`, using the raw
-compiler inside `Xcode.app`. On this machine the global developer directory
-points at Command Line Tools, so set `DEVELOPER_DIR`:
+Verified working 2026-09-20: Xcode 27.0, iOS 26.5 Simulator runtime, licence
+accepted. `xcode-select -p` still points at Command Line Tools, so set
+`DEVELOPER_DIR`:
+
+```
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
+  -project Swiper.xcodeproj -scheme Swiper \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+- Result: **66 `SwiperKitTests` + 4 `SwiperUITests`, 0 failures**, `TEST SUCCEEDED`
+  (about 75 s on the iPhone 17 Pro Simulator).
+- A physical iPhone is *not* required; `devicectl`/`xctrace` list only Simulators
+  unless a device is connected, trusted and in Developer Mode.
+
+## Pure-logic suite (`SwiperKitTests`, fallback)
+
+The `SwiperKit` unit tests also run on macOS without `xcodebuild`, using the raw
+compiler inside `Xcode.app`. Set `DEVELOPER_DIR` for the same reason:
 
 ```
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh

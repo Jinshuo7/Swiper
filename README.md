@@ -72,8 +72,10 @@ sudo xcodebuild -license accept
 sudo xcodebuild -runFirstLaunch           # installs/repairs Xcode's system components
 ```
 
-When none of that is possible, the raw compiler inside `Xcode.app` still works,
-which is why the fallback scripts below exist.
+On this machine all three are already satisfied (verified 2026-09-20); only the
+`DEVELOPER_DIR` prefix is still needed. If they are ever missing, the raw
+compiler inside `Xcode.app` still works, which is why the fallback scripts below
+exist.
 
 ## Building and running in the Simulator
 
@@ -173,8 +175,10 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-Without a working `xcodebuild` (this machine today), the logic tests still run
-on macOS directly:
+Verified 2026-09-20 on Xcode 27.0 / iOS 26.5: **66 unit tests + 4 UI tests,
+all green** on the iPhone 17 Pro Simulator.
+
+If `xcodebuild` is unavailable, the logic tests still run on macOS directly:
 
 ```sh
 Scripts/run-kit-tests.sh        # builds and runs SwiperKitTests on macOS

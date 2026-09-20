@@ -11,14 +11,14 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - If the global developer directory points at Command Line Tools, use
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` on commands rather
   than changing the machine selection.
-- `xcodebuild`/`simctl` require the Xcode licence accepted for the current user
-  (`sudo xcodebuild -license accept`, `sudo xcodebuild -runFirstLaunch`) and an
-  installed iOS platform (`xcodebuild -downloadPlatform iOS`, ~8.5 GB). A build
-  that reports `iOS ... is not installed` is missing the runtime, not the SDK.
-  When those are unavailable, the raw compiler inside `Xcode.app` still works:
-  - `Scripts/run-kit-tests.sh` builds and runs `SwiperKitTests` on macOS
-    (see `docs/TESTING.md` for the exact command and pass count).
-  - `Scripts/typecheck-ios.sh` compile-checks `SwiperKit` and the app for iOS.
+- `xcode-select -p` still points at Command Line Tools, so prefix `xcodebuild`
+  with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- Verified working 2026-09-20: Xcode 27.0, iOS 26.5 Simulator runtime, licence
+  accepted. Full suite on the Simulator:
+  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`
+  → 66 `SwiperKitTests` + 4 `SwiperUITests`, all green (see `docs/TESTING.md`).
+- Raw-compiler fallbacks when `xcodebuild` is unavailable:
+  `Scripts/run-kit-tests.sh` (macOS) and `Scripts/typecheck-ios.sh` (iOS check).
 - After adding, renaming or deleting source files, run
   `ruby Scripts/generate_project.rb` and commit `Swiper.xcodeproj`.
 
