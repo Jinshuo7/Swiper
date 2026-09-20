@@ -23,6 +23,7 @@ struct ViewerView: View {
                         .onTapGesture {
                             if preset == .deleteOnly { model.apply(.keep) }
                         }
+                        .allowsHitTesting(!model.isDecisionInputBlocked)
                         .accessibilityIdentifier("viewer.photo")
                 } else if model.engine?.isFinished == true {
                     finishedOverlay
@@ -83,9 +84,11 @@ struct ViewerView: View {
                 TopBarButton(systemImage: "heart", label: "Favorite") {
                     model.apply(.favorite)
                 }
+                .disabled(model.isDecisionInputBlocked)
                 TopBarButton(systemImage: "arrow.uturn.backward", label: "Undo") {
                     model.apply(.undo)
                 }
+                .disabled(model.isDecisionInputBlocked)
             }
         }
         .padding(.horizontal, 16)
@@ -94,6 +97,7 @@ struct ViewerView: View {
 
     private var controlCluster: some View {
         ControlCluster()
+            .disabled(model.isDecisionInputBlocked)
             .padding(.bottom, 28)
             .padding(placement == .center ? 0 : 20)
     }

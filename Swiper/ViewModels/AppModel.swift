@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var resumableSession: PersistedSession?
     @Published private(set) var lastDeletion: DeletionOutcome = .empty
     @Published private(set) var isBusy = false
+    @Published private(set) var isDecisionInputBlocked = false
     @Published var errorMessage: String?
 
     let library: SwiperPhotoLibrary
@@ -188,6 +189,7 @@ final class AppModel: ObservableObject {
             applyFavorite()
             return
         }
+        // Block decision gestures and controls during favorite writes rather than silently dropping input.
         guard favoriteTask == nil else { return }
         guard var engine else { return }
         let effects = engine.apply(action)
@@ -274,13 +276,15 @@ final class AppModel: ObservableObject {
 
     private func applyFavorite() {
         guard favoriteTask == nil, let assetID = engine?.current?.id else { return }
+        isDecisionInputBlocked = true
         favoriteTask = Task {
+            defer {
+                favoriteTask = nil
+                isDecisionInputBlocked = false
+            }
             do {
                 try await library.setFavorite(true, forID: assetID)
-                guard var engine, engine.current?.id == assetID else {
-                    favoriteTask = nil
-                    return
-                }
+                guard var engine, engine.current?.id == assetID else { return }
                 let effects = engine.apply(.favorite).filter {
                     if case .setFavorite = $0 { return false }
                     return true
@@ -291,7 +295,6 @@ final class AppModel: ObservableObject {
             } catch {
                 errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
             }
-            favoriteTask = nil
         }
     }
 
@@ -299,13 +302,17 @@ final class AppModel: ObservableObject {
         for effect in effects {
             switch effect {
             case .setFavorite(let id, let isFavorite):
+                isDecisionInputBlocked = true
                 favoriteTask = Task {
+                    defer {
+                        self.favoriteTask = nil
+                        self.isDecisionInputBlocked = false
+                    }
                     do {
                         try await library.setFavorite(isFavorite, forID: id)
                     } catch {
                         self.errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
                     }
-                    self.favoriteTask = nil
                 }
             case .queuedDeletion, .unqueuedDeletion, .advanced, .undoApplied, .sessionFinished, .noOp:
                 break
