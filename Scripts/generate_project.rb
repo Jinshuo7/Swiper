@@ -16,6 +16,10 @@ require "fileutils"
 ROOT = File.expand_path("..", __dir__)
 PROJECT_PATH = File.join(ROOT, "Swiper.xcodeproj")
 DEPLOYMENT_TARGET = "17.0"
+# Personal team used for device builds. "com.swiper.app" is globally taken, so
+# the app needs a team-unique bundle identifier to install on a physical phone.
+DEVELOPMENT_TEAM = "47926SW685"
+APP_BUNDLE_ID = "com.zhangjinshuo.swiper"
 
 FileUtils.rm_rf(PROJECT_PATH)
 project = Xcodeproj::Project.new(PROJECT_PATH)
@@ -50,6 +54,7 @@ end
 add_sources(project, kit, "SwiperKit")
 settings(kit, {
   "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperKit",
+  "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
   "PRODUCT_NAME" => "SwiperKit",
   "DEFINES_MODULE" => "YES",
   "SKIP_INSTALL" => "YES",
@@ -66,7 +71,8 @@ add_sources(project, app, "Swiper")
 assets = project.main_group.new_file("Swiper/Resources/Assets.xcassets")
 app.resources_build_phase.add_file_reference(assets)
 settings(app, {
-  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.app",
+  "PRODUCT_BUNDLE_IDENTIFIER" => APP_BUNDLE_ID,
+  "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
   "PRODUCT_NAME" => "Swiper",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "INFOPLIST_KEY_CFBundleDisplayName" => "Swiper",
@@ -96,6 +102,7 @@ embed_build_file.settings = { "ATTRIBUTES" => %w[CodeSignOnCopy RemoveHeadersOnC
 add_sources(project, unit_tests, "SwiperKitTests")
 settings(unit_tests, {
   "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperKitTests",
+  "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
   "PRODUCT_NAME" => "SwiperKitTests",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "CODE_SIGN_STYLE" => "Automatic",
@@ -112,6 +119,7 @@ unit_tests.frameworks_build_phase.add_file_reference(kit.product_reference)
 add_sources(project, ui_tests, "SwiperUITests")
 settings(ui_tests, {
   "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperUITests",
+  "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
   "PRODUCT_NAME" => "SwiperUITests",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "CODE_SIGN_STYLE" => "Automatic",

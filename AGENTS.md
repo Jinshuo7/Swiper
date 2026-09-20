@@ -6,17 +6,20 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## Build and test
 
-- Xcode 26.x, iOS deployment target 17.0. The scheme is `Swiper`; the project is
+- Xcode 27.x, iOS deployment target 17.0. The scheme is `Swiper`; the project is
   `Swiper.xcodeproj`.
 - If the global developer directory points at Command Line Tools, use
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` on commands rather
   than changing the machine selection.
 - `xcode-select -p` still points at Command Line Tools, so prefix `xcodebuild`
   with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- Verified working 2026-09-20: Xcode 27.0, iOS 26.5 Simulator runtime, licence
-  accepted. Full suite on the Simulator:
-  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`
+- Verified working 2026-09-20: Xcode 27.0, licence accepted. The iOS Simulator
+  runtime was removed to save disk; the full suite runs on a connected iPhone:
+  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS,id=<UDID>'`
   → 66 `SwiperKitTests` + 4 `SwiperUITests`, all green (see `docs/TESTING.md`).
+- Device builds sign with the personal team and a unique app bundle id set in
+  `Scripts/generate_project.rb`; `com.swiper.app` is globally taken, so it cannot
+  be registered. Personal-team provisioning profiles expire after 7 days.
 - Raw-compiler fallbacks when `xcodebuild` is unavailable:
   `Scripts/run-kit-tests.sh` (macOS) and `Scripts/typecheck-ios.sh` (iOS check).
 - After adding, renaming or deleting source files, run

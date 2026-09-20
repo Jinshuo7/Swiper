@@ -5,20 +5,25 @@ agent needs to re-run them. Keep it in sync when the test setup changes.
 
 ## Full suite (Xcode)
 
-Verified working 2026-09-20: Xcode 27.0, iOS 26.5 Simulator runtime, licence
-accepted. `xcode-select -p` still points at Command Line Tools, so set
-`DEVELOPER_DIR`:
+Verified working 2026-09-20: Xcode 27.0, licence accepted. The iOS Simulator
+runtime was removed to save disk, so the full suite runs on a connected iPhone.
+`xcode-select -p` still points at Command Line Tools, so set `DEVELOPER_DIR`:
 
 ```
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
   -project Swiper.xcodeproj -scheme Swiper \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+  -destination 'platform=iOS,id=<device UDID>'
 ```
 
+- Find the UDID with `xcrun devicectl list devices`.
 - Result: **66 `SwiperKitTests` + 4 `SwiperUITests`, 0 failures**, `TEST SUCCEEDED`
-  (about 75 s on the iPhone 17 Pro Simulator).
-- A physical iPhone is *not* required; `devicectl`/`xctrace` list only Simulators
-  unless a device is connected, trusted and in Developer Mode.
+  (~250 s on an iPhone 11 Pro, iOS 26.2.1).
+- The device must be connected, unlocked and in Developer Mode, with its developer
+  profile trusted under Settings → General → VPN & Device Management. Personal
+  Team profiles expire after 7 days; rebuild to re-trust.
+- Device builds sign with the personal team and a unique app bundle id set in
+  `Scripts/generate_project.rb`; `com.swiper.app` is globally taken and cannot be
+  registered to the team.
 
 ## Pure-logic suite (`SwiperKitTests`, fallback)
 
