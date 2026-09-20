@@ -247,9 +247,10 @@ final class AppModel: ObservableObject {
                 stillPresentIDs: stillPresent
             )
 
-            var updated = engine
+            let refreshedOrder = LibraryOrder(await library.fetchAllDescriptors())
+            guard var updated = self.engine else { return }
             updated.commitDeletion(outcome: outcome)
-            order = LibraryOrder(await library.fetchAllDescriptors())
+            order = refreshedOrder
             let session = reconcile(updated.persisted(), restoreEngine: true)
 
             if session.isFinished && session.queueIDs.isEmpty {
