@@ -5,6 +5,12 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
+            .multilineTextAlignment(.center)
+            // At accessibility text sizes a one-line label like "Delete 1 photo"
+            // is wider than the screen, so it wraps before it scales — a
+            // truncated primary action says less than nothing.
+            .lineLimit(2)
+            .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(configuration.isPressed ? Color.white.opacity(0.85) : Color.white)
@@ -18,6 +24,9 @@ struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(Color.white.opacity(configuration.isPressed ? 0.18 : 0.1))

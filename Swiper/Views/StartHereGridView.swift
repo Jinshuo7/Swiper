@@ -78,9 +78,11 @@ struct StartHereGridView: View {
     }
 
     /// Says what the screen is for. Without this the grid is just a photo library
-    /// with no explanation of what tapping a photo does.
+    /// with no explanation of what tapping a photo does. The direction is named
+    /// from the preference, because a session started here really does walk
+    /// whichever way the user chose.
     private var explanation: some View {
-        Text("Pick the photo you want to start from. Swiper begins there and walks toward older photos, skipping anything you have already decided or marked for deletion.")
+        Text("Pick the photo you want to start from. Swiper begins there and walks toward \(walkDirectionWord) photos, skipping anything you have already decided or marked for deletion.")
             .font(.footnote)
             .multilineTextAlignment(.leading)
             .foregroundStyle(.white.opacity(0.65))
@@ -89,6 +91,10 @@ struct StartHereGridView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
             .accessibilityIdentifier("startHere.explanation")
+    }
+
+    private var walkDirectionWord: String {
+        model.preferences.defaultDirection == .older ? "older" : "newer"
     }
 
     private func jumpBar(_ proxy: ScrollViewProxy) -> some View {
@@ -193,41 +199,45 @@ private struct StartHereCell: View {
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Color.white.opacity(0.05)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(isMarked ? 0.35 : 1)
+        // The cell owns the size and the thumbnail is an overlay on it. Left to
+        // size itself, a 4:1 panorama in a 92pt-tall cell asks for 368pt of width
+        // and draws straight across its neighbours' columns, so the grid stops
+        // looking like a grid.
+        Color.white.opacity(0.05)
+            .frame(maxWidth: .infinity)
+            .frame(height: 92)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(isMarked ? 0.35 : 1)
+                }
             }
-            if isMarked {
-                Text("MARKED")
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(.black.opacity(0.75), in: Capsule())
-                    .foregroundStyle(.white)
-                    .padding(4)
-                    .accessibilityHidden(true)
-            } else if asset.isLivePhoto {
-                Text("LIVE")
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(.black.opacity(0.6), in: Capsule())
-                    .foregroundStyle(.white)
-                    .padding(4)
-                    .accessibilityHidden(true)
+            .clipped()
+            .overlay(alignment: .bottomTrailing) {
+                if isMarked {
+                    badge("MARKED", background: 0.75)
+                } else if asset.isLivePhoto {
+                    badge("LIVE", background: 0.6)
+                }
             }
-        }
-        .frame(height: 92)
-        .clipped()
-        .contentShape(Rectangle())
-        .task(id: asset.id) {
-            image = await model.library.thumbnail(for: asset.id, targetSize: CGSize(width: 184, height: 184))
-        }
-        .accessibilityIdentifier("startHere.cell.\(asset.id)")
-        .accessibilityLabel(isMarked ? "\(asset.id), marked for deletion" : asset.id)
+            .contentShape(Rectangle())
+            .task(id: asset.id) {
+                image = await model.library.thumbnail(for: asset.id, targetSize: CGSize(width: 184, height: 184))
+            }
+            .accessibilityIdentifier("startHere.cell.\(asset.id)")
+            .accessibilityLabel(isMarked ? "\(asset.id), marked for deletion" : asset.id)
+    }
+
+    private func badge(_ text: String, background: Double) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(.black.opacity(background), in: Capsule())
+            .foregroundStyle(.white)
+            .padding(4)
+            .accessibilityHidden(true)
     }
 }

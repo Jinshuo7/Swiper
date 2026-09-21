@@ -276,8 +276,21 @@ struct ViewerView: View {
             Spacer()
             reviewControl
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16 + topBarLeadingInset)
+        .padding(.trailing, 16 + topBarTrailingInset)
         .padding(.top, 6)
+    }
+
+    /// A side rail anchored at its start and the top strip both want the same
+    /// corner, and the rail is drawn last, so Close would sit on top of the Live
+    /// Photo badge or the Review entry and swallow the tap. The strip steps
+    /// around the rail's lane instead of under it.
+    private var topBarLeadingInset: CGFloat {
+        model.preferences.rail == .leading && model.preferences.anchor == .start ? railLaneWidth : 0
+    }
+
+    private var topBarTrailingInset: CGFloat {
+        model.preferences.rail == .trailing && model.preferences.anchor == .start ? railLaneWidth : 0
     }
 
     /// Says plainly that this asset has motion, so nobody has to guess why a

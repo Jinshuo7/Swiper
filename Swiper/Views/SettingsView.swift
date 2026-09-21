@@ -130,7 +130,7 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.segmented)
                         .accessibilityIdentifier("settings.direction")
-                        Text("Swiper starts toward older photos and remembers your choice for the next session.")
+                        Text("Start Here walks in this direction, and Swiper remembers it. Recent always begins at the newest photo.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                     }

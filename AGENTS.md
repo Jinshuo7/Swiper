@@ -18,6 +18,11 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   `SwiperAppTests` and `SwiperUITests` need a connected, unlocked iPhone:
   `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS,id=<UDID>'`.
   See `docs/TESTING.md` for commands, results and what is currently blocked.
+- Running the device suite from a sandboxed agent session needs **full file
+  access**. Xcode launches the test host through a pseudo-terminal, so a
+  restricted sandbox fails before any test runs with
+  `IDEPseudoTerminalDomain … ErrorCode: 7 Errno: 1 (Operation not permitted)`.
+  With full access the whole suite runs green on the connected iPhone.
 - Device builds sign with the personal team and a unique app bundle id set in
   `Scripts/generate_project.rb`; `com.swiper.app` is globally taken, so it cannot
   be registered. Personal-team provisioning profiles expire after 7 days.

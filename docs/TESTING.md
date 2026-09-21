@@ -9,7 +9,7 @@ There are three test targets:
 | --- | --- | --- |
 | `SwiperKitTests` | Pure logic: ordering, marks, undo, persistence and migration, reconciliation, statistics, layout | macOS **or** device |
 | `SwiperAppTests` | `AppModel` against `FakePhotoLibrary` and a controllable `InMemorySessionStore`: acknowledgement, failure/retry, restart, recovery, deletion outcomes | Device only |
-| `SwiperUITests` | Real UI against the fake library: viewer bounds, drag feedback, tutorial, home/review navigation, screenshots | Device only |
+| `SwiperUITests` | Real UI against the fake library: viewer bounds, drag feedback, tutorial, home/review navigation, screenshots — plus the exploratory `PlaySessionUITests` "play like a user" suite | Device only |
 
 Automated tests never touch a real photo library: unit tests use fakes, and every
 UI test launches with `-uiTestingFakeLibrary`.
@@ -20,7 +20,7 @@ UI test launches with `-uiTestingFakeLibrary`.
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
 ```
 
-- Latest result (2026-09-21, Xcode 27.0): **111 tests, 0 failures**, exit 0.
+- Latest result (2026-09-22, Xcode 27.0): **126 tests, 0 failures**, exit 0.
 - The same suite also passed **on the device** in the full run below.
 - The script honours `$DEVELOPER_DIR` if set, otherwise uses `xcode-select -p`.
 - It detects the host architecture with `uname -m` and the installed macOS SDK
@@ -71,16 +71,19 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 - The device must be connected, unlocked and in Developer Mode, with its
   developer profile trusted under Settings → General → VPN & Device Management.
   Personal Team profiles expire after 7 days; rebuild to re-trust.
-- **Status 2026-09-21 21:09: RUN GREEN.** The full suite ran on the iPhone 11 Pro
+- **Status 2026-09-22 02:30: RUN GREEN.** The full suite ran on the iPhone 11 Pro
   (`00008030-000669DE3408802E`, iOS 26.2.1), `** TEST SUCCEEDED **`:
 
   | Target | Tests | Result |
   | --- | --- | --- |
   | `SwiperKitTests` | 126 | 0 failures |
   | `SwiperAppTests` | 31 | 0 failures |
-  | `SwiperUITests` | 31 | 0 failures |
+  | `SwiperUITests` | 45 | 0 failures |
 
-  188 tests, 0 failures. Result bundle: `.derivedData/final4.xcresult`.
+  202 tests, 0 failures. `SwiperUITests` is the original 31 plus the 14
+  `PlaySessionUITests` cases described below.
+- Previously, 2026-09-21 21:09: **188 tests, 0 failures** (126 + 31 + 31), result
+  bundle `.derivedData/final4.xcresult`.
 - The interrupted-session case runs on the device too:
   `testKillingTheAppMidSessionRestoresPositionMarksAndUndo` terminates the app
   mid-flow, relaunches it, and checks that Continue sorting, the mark and Undo all
@@ -94,11 +97,61 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
     showing `available (paired)` was followed by automation-mode timeouts;
     `xcrun devicectl device info details --device <udid>` brought it to
     `connected` and the run then worked.
-- `SwiperUITests` takes about 3.5 minutes (212 s) because each test relaunches the
-  app and several hold a drag for 1.5 s.
-- Inside a restricted sandbox, launching a device test host needs a
-  pseudo-terminal; without full file access Xcode fails with
-  `IDEPseudoTerminalDomain … Errno: 1` (EPERM) before any test runs.
+- The original `SwiperUITests` cases take about 6 minutes because each test
+  relaunches the app and several hold a drag for 1.5 s; the play suite below adds
+  about 10 minutes.
+- Inside a restricted sandbox the run fails before any test starts:
+  launching a device test host needs a pseudo-terminal, so without full file
+  access Xcode reports
+  `IDEPseudoTerminalDomain … ErrorCode: 7 Errno: 1` (EPERM). Full file access is
+  the only thing that unblocks it.
+
+## Playing the app like a user (device)
+
+`SwiperUITests/PlaySessionUITests.swift` walks the app the way a curious person
+would, entirely against the fake library: every preset, every rail edge and
+anchor, marking, review (including select mode and restoring several marks at
+once), deletion, the empty library, Tumbler played to the end, preferences across
+a relaunch, the persistence banners, and every screen at the largest
+accessibility text size. It asserts the invariants that must hold in all of those
+states — controls on screen, tappable, and never covering each other or the top
+strip — and attaches a screenshot of each arrangement.
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+TMPDIR=$PWD/.tmp \
+xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
+  -destination 'platform=iOS,id=00008030-000669DE3408802E' \
+  -derivedDataPath ./.derivedData -allowProvisioningUpdates \
+  OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox' \
+  -only-testing:SwiperUITests/PlaySessionUITests
+```
+
+- Latest result (2026-09-22): **14 tests, 0 failures**, about 10 minutes. The rail
+  matrix needs ~3 minutes of that; the largest-text walk ~1.5 minutes.
+- `testPlayEveryScreenAtTheLargestAccessibilityTextSize` launches the app with
+  `-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL`.
+  That argument **does** take effect on the device — the attached screenshot is
+  genuinely the app at AX5, not a normal-size run. Screenshots matter here:
+  assertions cannot see truncated text, because the accessibility label stays
+  whole while the glyphs are cut.
+- What playing found, and what changed:
+  * A side rail anchored at its start sat *over* the top strip, and the rail is
+    drawn last: with the rail on the right, tapping "Review · 1" pressed Close.
+    The top strip now steps around the rail's lane, so both stay tappable.
+  * Start Here promised "walks toward older photos" whatever direction the user
+    had chosen, and Settings described the direction choice as applying to the
+    next session when Recent deliberately ignores it. Both now say what actually
+    happens (`docs/SPEC.md` §2 and §4).
+  * At AX5 the home footer was compressed into unreadable truncation and the
+    tutorial's "Got it" sat ~1700 pt below the screen. The home screen and the
+    tutorial now scroll at accessibility sizes, the result card scrolls, and
+    button labels wrap instead of being cut.
+  * Panorama thumbnails drew across their neighbours' columns on Start Here and
+    in deletion review, because `scaledToFill` in a fixed-height cell asks for
+    four times the column width. Both cells now own their size and the thumbnail
+    is an overlay on it.
+
 
 ## Screenshots
 
@@ -142,6 +195,16 @@ Attachments the suite produces, and what each one is for:
 | `Start Here — oldest first` | same | The order toggle actually reversing the month sections |
 | `Start Here — jumped to a month` | `testStartHereCanJumpStraightToAMonth` | A month reached by the menu, far beyond one screen of scrolling |
 | `Controls — Keep first order` | `testTheRailOrderCanBeFlipped` | The rail order flipped so the decisions sit at the near end |
+| `Play — rail <edge>, anchor <anchor>` (9) | `testPlayThroughEveryRailAndAnchor` | Each rail position with a Live Photo badge and a Review entry in the top strip, and the controls clear of both. Committed as `play-rail-leading-anchor-start.png` and `play-rail-trailing-anchor-start.png` |
+| `Play — Start Here direction wording` | `testPlayTheDirectionChoiceMatchesWhereStartHereWalks` | Start Here naming the direction the user chose (`play-starthere-newer-first.png`) |
+| `Play — Start Here grid columns` | `testPlayStartHereCellsStayInTheirColumns` | Every cell one column wide, including the 4:1 panorama thumbnails (`play-starthere-grid-columns.png`) |
+| `Play — Start Here with a marked photo` | `testPlayStartHereRefusesToStartOnAMarkedPhoto` | The badged, dimmed cell that refuses to start a session (`play-starthere-marked.png`) |
+| `Play — home with an empty library` | `testPlayDeletingEverythingLeavesAnHonestEmptyApp` | Home after the whole library is deleted, with every photo-dependent entry disabled (`play-home-empty-library.png`) |
+| `Play — select mode with two marks chosen` / `Play — review emptied by restoring` | `testPlaySelectModeRestoresSeveralMarksAtOnce` | Select mode ticking individual cells — and the review grid's own columns — then the empty state after restoring them all (`play-review-select-mode.png`) |
+| `Play — statistics after two deletions` | `testPlayStatisticsCountConfirmedDeletionsOnly` | This-session and lifetime counts agreeing on 2 (`play-statistics-after-deletions.png`) |
+| `Play — unreadable saved progress` / `Play — saved progress from a newer version` | `testPlayUnreadableSavedProgressIsExplainedNotOverwritten`, `testPlaySavedProgressFromANewerVersionIsNotOverwritten` | The read-only banner and its Start fresh action |
+| `Play — discarded decision notice` | `testPlayAFailedSaveCanBeDiscarded` | The notice that says a discarded decision was left out |
+| `Play — <screen> at the largest text size` (8) | `testPlayEveryScreenAtTheLargestAccessibilityTextSize` | The app at AX5: home scrolling rather than clipping its footer (`play-home-ax5.png`), the tutorial scrolling with Got it pinned (`play-tutorial-ax5.png`), and the review and result screens readable (`play-review-ax5.png`) |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a

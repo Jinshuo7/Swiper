@@ -23,11 +23,12 @@ The entry screen offers exactly these choices:
 * **Review & delete · N** — shown whenever N photos are marked for deletion, and
   opens deletion review directly from home.
 * **Recent** — start a sequential session at the newest asset, traversing
-  toward older photos.
+  toward older photos. Recent is about where it starts, so it begins at the
+  newest asset whatever the default direction is set to.
 * **Start Here** — open a lazily loaded grid of the whole library, grouped into
   calendar months with the newest first, and begin at the chosen asset. The
   screen states what it is for (choosing where to begin, after which Swiper walks
-  toward older photos and skips anything already decided or marked). A month menu
+  in the default direction and skips anything already decided or marked). A month menu
   jumps straight to any point in the library, and a control flips the order
   between newest and oldest, so no one has to scroll in from one end. Only
   visible thumbnails are decoded; full images are not loaded. Photos already
@@ -112,7 +113,8 @@ in the rail.
 * The rail, its anchor, the preset and the direction are persisted immediately,
   and no choice ever removes the full-screen photo.
 * A Live Photo is labelled in the top strip; the review entry appears there once
-  photos are marked.
+  photos are marked. A side rail anchored at its start sits *beside* that strip
+  rather than over it, so the badge and the review entry stay tappable.
 
 ## 4a. Teaching
 

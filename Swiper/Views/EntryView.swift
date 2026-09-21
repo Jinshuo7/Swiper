@@ -5,6 +5,19 @@ struct EntryView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
+        // Exactly one screen tall at normal sizes, so the layout is unchanged
+        // there. When the largest accessibility text needs more room than that,
+        // the same content scrolls instead of clipping the footer or pushing a
+        // way forward off the screen.
+        GeometryReader { geometry in
+            ScrollView {
+                content.frame(minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             header
             Spacer(minLength: 12)

@@ -49,9 +49,13 @@ struct DeletionReviewView: View {
             VStack(spacing: 2) {
                 Text("Review deletion")
                     .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(DeletionWording.markedForDeletion(markedIDs.count))
                     .font(.caption)
+                    .multilineTextAlignment(.center)
                     .foregroundStyle(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("review.markedCount")
             }
             Spacer()
@@ -212,6 +216,7 @@ struct DeletionReviewView: View {
                     .font(.footnote)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("review.deleteExplanation")
             }
         }
@@ -244,25 +249,29 @@ private struct ReviewCell: View {
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.white.opacity(0.05)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+        // The cell owns its column; the thumbnail is an overlay on it. Sized by
+        // its own content, a 4:1 panorama draws across the neighbouring cells.
+        Color.white.opacity(0.05)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
             }
-            if isSelecting {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.blue : Color.white)
-                    .background(Circle().fill(.black.opacity(0.35)))
-                    .padding(6)
+            .clipped()
+            .overlay(alignment: .topTrailing) {
+                if isSelecting {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.blue : Color.white)
+                        .background(Circle().fill(.black.opacity(0.35)))
+                        .padding(6)
+                }
             }
-        }
-        .clipped()
-        .task(id: id) {
-            image = await model.library.thumbnail(for: id, targetSize: CGSize(width: 240, height: 240))
-        }
+            .task(id: id) {
+                image = await model.library.thumbnail(for: id, targetSize: CGSize(width: 240, height: 240))
+            }
     }
 }
 

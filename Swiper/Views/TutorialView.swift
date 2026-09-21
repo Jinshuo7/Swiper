@@ -8,6 +8,7 @@ import SwiftUI
 /// It is shown once for the first photo and can be replayed from
 /// Settings → How to use.
 struct TutorialView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let preset: ControlPreset
     let onDismiss: () -> Void
 
@@ -18,42 +19,13 @@ struct TutorialView: View {
                 .onTapGesture { onDismiss() }
 
             VStack(alignment: .leading, spacing: 16) {
-                Text("How sorting works")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(instructions, id: \.title) { instruction in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: instruction.symbol)
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(instruction.tint)
-                                .frame(width: 30)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(instruction.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                Text(instruction.detail)
-                                    .font(.footnote)
-                                    .foregroundStyle(.white.opacity(0.8))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                }
-
-                Divider().overlay(Color.white.opacity(0.2))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Nothing is deleted until you review and confirm.")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Every decision is saved as you make it, so closing the app or an interruption does not erase work you already accepted.")
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.8))
-                        .fixedSize(horizontal: false, vertical: true)
+                if dynamicTypeSize.isAccessibilitySize {
+                    // At accessibility sizes the explanation is taller than the
+                    // screen. It scrolls inside the card so the one way out stays
+                    // reachable instead of sitting below the bottom edge.
+                    ScrollView { explanation }
+                } else {
+                    explanation
                 }
 
                 Button(action: onDismiss) {
@@ -73,6 +45,48 @@ struct TutorialView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("viewer.tutorial")
+    }
+
+    private var explanation: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("How sorting works")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(instructions, id: \.title) { instruction in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: instruction.symbol)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(instruction.tint)
+                            .frame(width: 30)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(instruction.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text(instruction.detail)
+                                .font(.footnote)
+                                .foregroundStyle(.white.opacity(0.8))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+
+            Divider().overlay(Color.white.opacity(0.2))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Nothing is deleted until you review and confirm.")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Every decision is saved as you make it, so closing the app or an interruption does not erase work you already accepted.")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private struct Instruction {
