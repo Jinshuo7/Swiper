@@ -277,6 +277,9 @@ struct ViewerView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .foregroundStyle(.white)
         .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+        // One element, not a container plus inherited children, so a UI test
+        // query for the identifier matches exactly once.
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Live Photo")
         .accessibilityHint("Press and hold the photo to play its motion")
         .accessibilityIdentifier("viewer.liveBadge")
