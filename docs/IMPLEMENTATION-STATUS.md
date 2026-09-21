@@ -1,166 +1,122 @@
 # Implementation status checkpoint
 
-Durable resume point for the autonomous implementation of GitHub issues #11–#16
-(parent spec #10). Read this together with `docs/IMPLEMENTATION-PROMPT.md`,
-`docs/specs/photo-cleaning-redesign.md` and the active issue on GitHub.
+Final checkpoint for the autonomous implementation of GitHub issues #11–#16
+(parent spec #10). Read with `docs/IMPLEMENTATION-PROMPT.md`,
+`docs/specs/photo-cleaning-redesign.md` and `docs/TESTING.md`.
 
-## Current ticket
+## Where this stands
 
-**#15 — Minimal swipe feedback and replayable teaching** (checking, commit next).
+All six tickets are implemented, committed locally and reviewed against their
+acceptance criteria. **The only outstanding gap is device execution**: the
+connected iPhone reported `unavailable` for the whole session and this machine has
+no iOS Simulator runtime, so `SwiperAppTests` and `SwiperUITests` have never run
+since the redesign. Nothing that depends on them is reported as passed.
 
-## Environment notes (learned this session)
+## Commits (local only — nothing pushed)
 
-- The DSH file sandbox is `workspace-write`; `xcodebuild` writing to the default
-  `~/Library/Developer/Xcode/DerivedData` is denied. Always pass
-  `-derivedDataPath ./.derivedData`.
-- SwiftUI macros fail with "…StateMacro could not be found … produced malformed
-  response" inside a nested sandbox. Pass
-  `-Xfrontend -disable-sandbox` (for `xcodebuild`:
-  `OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'`). Recorded in
-  `AGENTS.md`; `Scripts/typecheck-ios.sh` sets it itself.
-- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` must prefix Xcode
-  commands.
-- **Device availability is intermittent.** The iPhone 11 Pro
-  (`00008030-000669DE3408802E`) showed `booted` at the start of the session, then
-  flipped to `unavailable` during the first UI-test run, which then hung for 35
-  minutes with no xcresult progress and had to be killed. No simulator runtime
-  exists (`xcrun simctl list runtimes` is empty), so UI and app integration tests
-  cannot run anywhere else. Device-dependent checks are re-attempted at ticket
-  boundaries and reported honestly.
+| Commit | Ticket | Subject |
+| --- | --- | --- |
+| `c61491f` | #11 | Bound the viewer and show complete photos |
+| `86e00bc` | #12 | Persist accepted decisions and surface recovery failures |
+| `96abcb2` | #13 | Preserve marked photos across sorting sessions |
+| `98a6f36` | #14 | Complete review, deletion recovery and return to sorting |
+| `6fe4780` | #15 | Minimal swipe feedback and replayable teaching |
+| _(this commit)_ | #16 | Verify and deliver interruption-safe photo cleaning |
 
-## Ticket #11 — DONE (commit c61491f)
+`git diff --stat 963ee79 HEAD` → 47 files, ~4.8k insertions.
 
-Changed:
+Issue state: #11 closed (its own criterion explicitly allows recording the device
+blocker); #12, #13, #14, #15 commented and left **open** because their device
+evidence is pending. #16 is commented and left open for the same reason. Parent
+#10 and the old backlog #1–#9 were not touched or closed.
 
-- `SwiperKit/PhotoLayout.swift` (new): pure contain-fit geometry
-  (`fittedSize`, `fittedRect`, `fitsWithoutCropping`).
-- `SwiperKit/DeletionWording.swift` (new): one vocabulary for
-  "N photos marked for deletion", "Review · N", "Nothing deleted yet.".
-- `SwiperKit/Models.swift`: `AssetDescriptor.aspectRatio`.
-- `Swiper/Views/ViewerView.swift`: the canvas is framed to exactly the fitted
-  rectangle (so the `viewer.photo` frame *is* the photo bounds), stills and Live
-  Photos are contained (`scaleAspectFit`), the permanent gesture hint is gone,
-  and a compact `Review · N` control sits inside the safe area.
-- `Swiper/PhotoLibrary/FakePhotoLibrary.swift`: demo fixtures cycle landscape /
-  portrait / square / panorama and draw border, four corner blocks and a label.
-- `SwiperUITests/SwiperUITests.swift`: the provisional pixel-sampling test was
-  replaced by frame assertions (contained in the screen, own aspect ratio, never
-  the screen ratio, controls on screen).
-- `SwiperKitTests/PhotoLayoutTests.swift`,
-  `SwiperKitTests/DeletionWordingTests.swift` (new).
-- Docs: `docs/SPEC.md` §3, `CONTEXT.md`, `AGENTS.md`.
+## Checks actually run (exact commands and real results)
 
-Checks actually run:
+1. Pure logic, macOS, no device:
 
-- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh`
-  → **88 tests, 0 failures** (on the commit, verified in a clean git worktree).
-- `… Scripts/typecheck-ios.sh` → `OK`.
-- `xcodebuild build-for-testing -destination 'generic/platform=iOS'` →
-  `** TEST BUILD SUCCEEDED **`.
-- Device UI suite: **NOT RUN — blocked**, phone `unavailable`.
+   ```
+   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
+   ```
 
-## Ticket #12 — DONE (commit 86e00bc), issue left OPEN
+   **110 tests, 0 failures**, exit 0 (baseline before this work: 66).
 
-Decisions:
+2. iOS compile check of the framework and the whole app:
 
-- Persisted shape is now `PersistedState { schemaVersion, marks, session,
-  updatedAt }` with `schemaVersion = 2`. The deletion list moved out of
-  `PersistedSession` to the top level so #13 can give it a lifetime independent
-  of a sorting session. The file name (`session.json`) is unchanged; the
-  unversioned legacy shape is decoded and migrated, so no user data is lost.
-- `SessionLoadResult` distinguishes `absent` / `loaded` / `migrated` /
-  `unreadable` / `unsupportedVersion`. Writes are refused while unreadable or
-  newer-version bytes are in the way; `quarantineUnreadableState()` preserves
-  them under `session-unreadable-<stamp>.json` and unblocks writing.
-- `SessionStoring` writes now `throw`, so a failed save can never be silent.
-- `AppModel` applies a decision to a copy, saves it, and only then publishes and
-  advances. A failed save parks a `PendingDecision` (engine + effects + message),
-  pauses input and offers Retry (persistence only, so no effect is repeated) or
-  Discard. All mutations run on one serial chain.
-- Overlap with old issue #1: #12 implements the substance of #1 (version field,
-  distinguishable unreadable/future state) but not its "refuse loudly, invent no
-  UI" constraint, which the new spec supersedes with migration plus visible
-  recovery. #1 and #8 are left open and untouched; ADR-0004 covers #8's decision.
+   ```
+   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/typecheck-ios.sh
+   ```
 
-Not verified: the `SwiperAppTests` cases and all UI tests have not executed
-(device unavailable). The issue stays open until they run.
+   **`OK`**, exit 0. The script now passes `-Xfrontend -disable-sandbox` itself.
 
-## Ticket #13 — DONE (commit 96abcb2), issue left OPEN
+3. Compiles all three test targets without a device:
 
-Decisions:
+   ```
+   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer TMPDIR=$PWD/.tmp \
+   xcodebuild build-for-testing -project Swiper.xcodeproj -scheme Swiper \
+     -destination 'generic/platform=iOS' -derivedDataPath ./.derivedData \
+     -allowProvisioningUpdates \
+     OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'
+   ```
 
-- `SessionEngine` keeps `decidedIDs` and the durable marks as one
-  "unavailable" set, so every sorting entry point (sequential both directions,
-  Tumbler, `upcomingIDs`, `remainingCount`, `jump(to:)`) skips a marked photo.
-  `jump` refuses a mark outright, and Start Here badges marked cells.
-- `AppModel.startSession` seeds the new engine with the durable marks instead of
-  clearing them. A new session still resets traversal, in-session decisions and
-  Undo.
-- `SessionEngine.restore` now also inserts the restored id into `decidedIDs`, so
-  a restored photo is kept for the current session and can return in a later one.
-  Conflicting Undo entries were already dropped on restore.
-- `AppModel.restore` works with no active session (home → review → restore only
-  unmarks and saves).
-- Review tracks `reviewOrigin`, so Back returns to the viewer, home or the result
-  it came from. `performConfirmedDeletion` now works from `markedIDs` rather than
-  requiring an engine, keeps unsuccessful items marked and never double-counts.
-- Home shows `Continue sorting` and `Review & delete · N` with the
-  marked-not-deleted footer; `docs/adr/0005` records the lifetime decision;
-  CONTEXT/SPEC/VISION/ROADMAP updated.
+   **`** TEST BUILD SUCCEEDED **`**, including `SwiperAppTests` and
+   `SwiperUITests`.
 
-Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
-`TEST BUILD SUCCEEDED`.
+4. The #11 commit was additionally verified in isolation in a clean git worktree
+   (`git worktree add … c61491f`), where `Scripts/run-kit-tests.sh` passed, so the
+   intermediate commit is self-consistent.
 
-Not verified: `SwiperAppTests` and UI tests have still not run (device
-unavailable). #13 stays open until they do.
+## Blocked checks (NOT passed, NOT claimed)
 
-## Ticket #14 — DONE (commit 98a6f36), issue left OPEN
+- `xcodebuild test` on the iPhone `00008030-000669DE3408802E`: **blocked**.
+  `xcrun devicectl list devices` reported `unavailable` from 12:17 onward and
+  stayed `unavailable` at every re-check (ticket boundaries and the final pass).
+  A first attempt while it still reported `booted` hung ~35 minutes with no
+  `xcresult` progress and was killed; `ps`/`timeout` are unavailable in this
+  sandbox, so the wait was bounded by hand.
+- No Simulator fallback exists: `xcrun simctl list runtimes` is empty (the runtime
+  was removed for disk), and the prompt forbids reinstalling it.
+- Therefore not executed: every `SwiperAppTests` case (durable save/retry,
+  restart, migration, unreadable/newer state, cross-session marks, deletion
+  recovery, the integrated journey, tutorial state) and every `SwiperUITests`
+  case (viewer bounds, drag wells, tutorial, home/review navigation).
+- **No screenshot exists.** The UI tests are written to attach them (see the
+  table in `docs/TESTING.md`), and mid-gesture shots are captured while the drag
+  is held, but none has been produced or visually inspected. The design's
+  "inspect screenshots" criteria are unmet.
+- **Real Live Photo playback** is unverified and cannot be covered by the fake
+  library, which returns no `PHLivePhoto`. It needs a manual device check.
 
-Decisions:
+## Decisions worth knowing
 
-- `closeViewer()` makes leaving the viewer explicit: every decision was already
-  saved before it was acknowledged, so Close navigates home and never discards.
-- `continueAfterResult()` routes after a commit: an active session resumes at its
-  sorting position, an exhausted session with marks left lands in review, and no
-  session goes home. The result button label follows the same rule.
-- Comparison of a cancelled deletion: the fake library can now submit assets
-  without removing them (`-uiTestingFailDeletion`), which is exactly what a
-  cancelled system confirmation looks like. Marks stay, statistics stay at zero,
-  and the result says nothing was deleted.
-- Interrupted commit (PhotoKit effect succeeded, local save failed) is exercised
-  by failing writes after the delete and relaunching over the same store: the
-  vanished mark is reconciled away and the deletion is counted once, never twice.
-- SPEC §6 gained the explicit recovery policy and the safety invariant that an
-  acknowledged decision is saved first.
+- Stored shape is `PersistedState { schemaVersion, marks, session, updatedAt }`,
+  schema 2, in the same `session.json`. Legacy unversioned files migrate in
+  memory; the old bytes are replaced only after a successful atomic write. See
+  `docs/adr/0004`.
+- Unreadable and newer-version data block writes until the user explicitly sets
+  the unreadable file aside (`quarantineUnreadableState()`), so an update can
+  never silently empty someone's list.
+- The deletion list outlives sorting sessions; a new session resets traversal,
+  in-session decisions and Undo only. See `docs/adr/0005`.
+- Decisions are staged on a copy, saved, then acknowledged. A failed save parks a
+  `PendingDecision` and offers Retry (persistence only, so no library effect is
+  repeated) or Discard. All mutations run on one serial chain.
+- Local storage and PhotoKit are not one transaction. Swiper never claims a
+  deletion it did not confirm: after a commit it re-reads the library, removes
+  only confirmed-deleted assets, keeps unsuccessful ones marked, and reconciles
+  vanished marks on the next launch without counting them.
+- Overlap with old issue #1 (schema versioning) is implemented as substance but
+  its "refuse loudly, invent no UI" constraint is superseded by migration plus
+  visible recovery. Old issue #8's ADR requirement is covered by ADR-0004. Neither
+  old issue was closed or modified.
 
-Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
-`TEST BUILD SUCCEEDED`.
+## Exact next steps for the next session
 
-Not verified: app/UI tests still have not run (device unavailable).
-
-## Ticket #15 — in progress
-
-Decisions:
-
-- The viewer's drag now reveals feedback-only lower-corner wells (trash left,
-  check right) built from `ultraThinMaterial` plus a tinted fill and stroke; the
-  layer is `allowsHitTesting(false)` and `accessibilityHidden`, so it never
-  swallows the drag and is never announced as a control.
-- The commit threshold (90 pt horizontal) is visible (the well arms) and felt
-  (one light `UIImpactFeedbackGenerator` at the crossing only). Releasing below
-  the threshold, releasing a vertical drag, or a short drag makes no decision.
-- Reduce Motion removes the spring-back and the well's scale change; symbol,
-  wording and stroke still carry the meaning.
-- `TutorialView` explains marking, keeping, review confirmation and automatic
-  saving, adapting its wording to the selected preset. It is shown with the first
-  photo, dismissed once (in-memory guard so a launch argument cannot resurrect
-  it), and replayable from Settings → How to use. Tutorial state lives in an
-  injectable `UserDefaults`, so app tests use an isolated suite.
-- The viewer photo now carries a spoken description (photo, date, marked or not)
-  so the image is not an unlabelled element.
-
-Checks: kit tests 0 failures; typecheck `OK`; build-for-testing
-`TEST BUILD SUCCEEDED`.
-
-Next steps: commit #15, comment on it, then #16 (integrated verification,
-screenshots, docs sync, final checkpoint).
+1. Reconnect and unlock the iPhone, confirm `xcrun devicectl list devices` shows
+   it as available, then run the full suite (command in `docs/TESTING.md`).
+2. Fix whatever the run reveals; expect the never-executed UI details (drag-hold
+   screenshot timing, the `viewer.tutorial` element type, the `review.cell.0`
+   lookup, the `result.done` label) to need adjustment.
+3. Export and *visually inspect* the attachments listed in `docs/TESTING.md`, then
+   report per-issue results and close #12–#16 if the evidence holds.
+4. Perform the manual real-Live-Photo check separately and record it as manual.
+5. Do not push. Astra performs the final correctness and screenshot review.

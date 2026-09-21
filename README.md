@@ -1,9 +1,11 @@
 # Swiper
 
-A minimal iOS photo-cleaning app. One photo fills the screen; a swipe or a
-nearby button decides its fate. Nothing is deleted while you swipe — queued
+A minimal iOS photo-cleaning app. One complete photo fills the screen; a swipe or
+a nearby button decides its fate. Nothing is deleted while you swipe — marked
 photos go to a review screen and are only removed after an explicit final
-confirmation.
+confirmation. The deletion list outlives the session, decisions are saved before
+they are acknowledged, and a save failure is shown with a Retry rather than
+hidden.
 
 For the product vision, glossary, behaviour and decisions, start with
 [`docs/VISION.md`](docs/VISION.md), [`CONTEXT.md`](CONTEXT.md),
@@ -11,7 +13,7 @@ For the product vision, glossary, behaviour and decisions, start with
 
 ## Requirements
 
-* macOS with Xcode 26.x installed.
+* macOS with Xcode 26 or later installed.
 * iOS 17.0 or later on the target device.
 * [xcodeproj](https://github.com/CocoaPods/Xcodeproj) Ruby gem **only** if you
   change the file layout and regenerate the project:
@@ -23,8 +25,9 @@ For the product vision, glossary, behaviour and decisions, start with
 Swiper.xcodeproj          Generated, committed Xcode project and shared scheme
 SwiperKit/                Pure-Swift logic framework (Foundation only, tested)
 Swiper/                   The iOS app: PhotoKit, SwiftUI views, app model
-SwiperKitTests/           Unit tests for SwiperKit
-SwiperUITests/            UI smoke tests against an in-memory fake library
+SwiperKitTests/           Unit tests for SwiperKit (also runnable on macOS)
+SwiperAppTests/           AppModel integration tests against fakes
+SwiperUITests/            UI tests against an in-memory fake library
 Scripts/                  Project generation and no-xcodebuild fallback scripts
 docs/                     Vision, spec, roadmap and ADRs
 ```
@@ -77,9 +80,13 @@ On this machine all three are already satisfied (verified 2026-09-20); only the
 compiler inside `Xcode.app` still works, which is why the fallback scripts below
 exist.
 
-## Building and running in the Simulator
+## Building and running
 
-Once the two machine fixes above are done:
+The iOS Simulator runtime was removed from this machine to save disk, so device
+and UI work happens on a connected iPhone. In Xcode, pick the `Swiper` scheme and
+your device and press ⌘R.
+
+If you do have a Simulator runtime, the equivalent command is:
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
@@ -87,21 +94,23 @@ xcodebuild -project Swiper.xcodeproj -scheme Swiper \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
-Or press ⌘R in Xcode with the `Swiper` scheme and a Simulator destination.
+Do not experiment on a real library first. Add a handful of disposable photos
+(and one Live Photo and one ordinary video) with `xcrun simctl addmedia booted …`
+on a Simulator, or use a throwaway test device.
 
-### Seeding disposable test photos
+### Running from a restricted sandbox
 
-Do not experiment on a real library first. Seed throwaway photos:
+If commands run inside an agent-harness sandbox, two extra flags are needed or
+every SwiftUI `@State` fails to expand its macro:
 
 ```sh
-xcrun simctl boot "iPhone 17 Pro"      # or pick another available device
-open -a Simulator
-# Add one or more disposable images:
-xcrun simctl addmedia booted /path/to/test-photo-1.jpg /path/to/test-photo-2.jpg
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild build-for-testing -project Swiper.xcodeproj -scheme Swiper \
+  -destination 'generic/platform=iOS' -derivedDataPath ./.derivedData \
+  OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'
 ```
 
-Also try a Live Photo and a short video to confirm only the still/Live assets
-appear.
+`Scripts/typecheck-ios.sh` already passes `-Xfrontend -disable-sandbox`.
 
 ## Running on a physical iPhone
 
@@ -128,38 +137,46 @@ access.
 Use a throwaway library (Simulator, or a handful of disposable photos on a test
 device).
 
-**Keep / delete queue / favorite**
+**Keep / mark / favorite**
 
-1. Enter with **Recent**.
-2. Swipe **right** — the photo is kept and the next appears.
-3. Swipe **left** — the photo is queued. It is **not** deleted yet.
-4. Tap the heart — the photo is favorited in the Photos app,
-   kept, and the next appears.
-5. Tap **Undo** — the last decision is reversed and you return to that photo.
+1. Enter with **Recent**. The first photo is shown complete, with both edges
+   visible, and the one-time tutorial explains the flow.
+2. Drag **right** past the threshold — a check well arms with a light haptic and
+   the photo is kept. Drag right only a little: nothing happens.
+3. Drag **left** past the threshold — a trash well arms and the photo is
+   **marked**, not deleted. The compact `Review · N` control appears.
+4. Tap the heart — the photo is favorited in the Photos app, kept, and the next
+   appears.
+5. Tap **Undo** — the last decision of this session is reversed and you return
+   to that photo.
 
 **Deletion review and safety**
 
-6. Queue a few photos, finish reviewing the session, then open the final
-   deletion review.
-7. Tap a thumbnail to inspect it full-screen; tap **Restore photo** to remove
-   it from the queue.
+6. Mark a few photos and open review from the viewer (`Review · N`) or from home
+   (`Review & delete · N`); review is reachable at any time, not only at the end.
+7. Tap a thumbnail to inspect it full-screen; tap **Restore photo** to remove it
+   from the list.
 8. Tap **Select**, then drag across thumbnails to select a batch and tap
    **Restore N selected**.
 9. Tap **Delete N photos**, then confirm. iOS shows its own system confirmation
-   as well. Only after both confirmations are the photos removed.
+   as well. Only after both confirmations are the photos removed. Cancelling
+   either one leaves every mark in place and counts nothing.
 10. Confirm the Photos app now shows the deleted items in **Recently Deleted**,
     and that restored photos are still present.
 
-**Persistence**
+**Persistence, marks and recovery**
 
 11. During a session, force-quit Swiper mid-way and relaunch. The entry screen
-    offers **Continue**; the queue and position are restored.
+    offers **Continue sorting** at the saved position, and **Review & delete · N**
+    for the marks, which survive switching Recent/Start Here/Tumbler too.
+12. Marked photos are skipped while sorting. Restoring one lets a later session
+    present it again.
 
 **Statistics**
 
-12. Open the statistics icon (chart, top-right on the entry screen). Only
-    confirmed deletions are counted. Queued-then-restored photos and failed
-    deletions are not.
+13. Open the statistics icon (chart, top-right on the entry screen). Only
+    confirmed deletions are counted. Marked-then-restored photos, cancelled
+    deletions and failed deletions are not.
 
 > Automated tests never touch a real library. Unit tests exercise the pure
 > `SwiperKit` logic; UI tests launch the app with `-uiTestingFakeLibrary`, which
@@ -167,22 +184,21 @@ device).
 
 ## Tests
 
-With a working Xcode:
+The pure-logic suite runs on macOS with no device:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
+```
+
+`SwiperAppTests` (AppModel against the fake library and a controllable store) and
+`SwiperUITests` need a booted iOS device; there is no Simulator runtime on this
+machine. See [`docs/TESTING.md`](docs/TESTING.md) for the exact commands,
+results, what is currently blocked, and where screenshots are written.
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-```
-
-Verified 2026-09-20 on Xcode 27.0 / iOS 26.5: **66 unit tests + 4 UI tests,
-all green** on the iPhone 17 Pro Simulator.
-
-If `xcodebuild` is unavailable, the logic tests still run on macOS directly:
-
-```sh
-Scripts/run-kit-tests.sh        # builds and runs SwiperKitTests on macOS
-Scripts/typecheck-ios.sh        # compile-checks the iOS app and framework
+  -destination 'platform=iOS,id=<device UDID>'
 ```
 
 ## How storage sizes are reported

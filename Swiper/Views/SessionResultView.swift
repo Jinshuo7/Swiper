@@ -27,7 +27,7 @@ struct SessionResultView: View {
                     Text("Nothing was deleted")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
-                    Text("No queued photo was confirmed deleted. Unconfirmed items are never counted as deletions.")
+                    Text("No marked photo was confirmed deleted. Unconfirmed items are never counted as deletions.")
                         .font(.callout)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.7))

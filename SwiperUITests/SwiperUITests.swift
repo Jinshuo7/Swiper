@@ -1,4 +1,3 @@
-import CoreImage
 import XCTest
 
 /// Smoke tests that drive the app against the in-memory fake library
@@ -70,25 +69,6 @@ final class SwiperUITests: XCTestCase {
         let photo = app.descendants(matching: .any)["viewer.photo"]
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         return photo
-    }
-
-    private func maximumColorChannel(at point: CGPoint, in screenshot: XCUIScreenshot) -> Double {
-        guard let image = CIImage(image: screenshot.image) else {
-            XCTFail("Could not read screenshot")
-            return 0
-        }
-        let x = image.extent.minX + image.extent.width * point.x
-        let y = image.extent.minY + image.extent.height * point.y
-        var pixel = [UInt8](repeating: 0, count: 4)
-        CIContext().render(
-            image,
-            toBitmap: &pixel,
-            rowBytes: 4,
-            bounds: CGRect(x: x, y: y, width: 1, height: 1),
-            format: .RGBA8,
-            colorSpace: CGColorSpaceCreateDeviceRGB()
-        )
-        return Double(pixel[0...2].max() ?? 0) / 255
     }
 
     func testRecentStartsAViewerSession() {

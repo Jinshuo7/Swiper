@@ -562,4 +562,109 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(made.store.state?.marks, [marked].compactMap { $0 })
         XCTAssertNotNil(made.model.resumableSession)
     }
+
+    // MARK: - Integrated journey (#16)
+
+    /// One pass through everything the redesign promises, over a single store:
+    /// restored cross-session state, sorting, an interrupted save with retry, a
+    /// mode switch, review and restore, a cancelled deletion, a partial deletion
+    /// with a successful retry, and continuation.
+    func testFullJourneyFromRestoredStateThroughRecoveryAndDeletion() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore(
+            content: .state(
+                PersistedState(
+                    marks: ["fake-0"],
+                    session: PersistedSession(currentAssetID: "fake-5", direction: .older)
+                )
+            )
+        )
+        let model = AppModel(library: library, store: store, defaults: isolatedDefaults())
+        await model.bootstrap()
+        await model.settle()
+
+        // 1. Restored state: one mark, a resumable position, nothing deleted.
+        XCTAssertEqual(model.markedIDs, ["fake-0"])
+        XCTAssertNotNil(model.resumableSession)
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0)
+        model.resumeSession()
+        XCTAssertEqual(model.currentAsset?.id, "fake-5")
+
+        // 2. Sorting skips the mark and advances.
+        model.apply(.keep)
+        await model.settle()
+        XCTAssertEqual(model.currentAsset?.id, "fake-4")
+        model.apply(.queueDeletion)
+        await model.settle()
+        model.apply(.keep)
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4"])
+        XCTAssertEqual(model.currentAsset?.id, "fake-2")
+
+        // 3. A failed save pauses sorting, keeps the decision recoverable and
+        //    does not move the session on.
+        store.failsWrites = true
+        model.apply(.queueDeletion)
+        await model.settle()
+        XCTAssertNotNil(model.pendingDecision)
+        XCTAssertEqual(model.currentAsset?.id, "fake-2")
+        XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4"])
+
+        store.failsWrites = false
+        await model.retryPendingDecision()
+        await model.settle()
+        XCTAssertNil(model.pendingDecision)
+        XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4", "fake-2"])
+        XCTAssertEqual(model.currentAsset?.id, "fake-1")
+
+        // 4. Switching mode resets traversal and Undo, never the marks.
+        model.startTumbler()
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4", "fake-2"])
+        XCTAssertTrue(model.engine?.decidedIDs.isEmpty ?? false)
+        XCTAssertFalse(model.engine?.undoStack.canUndo ?? true)
+
+        // 5. Review from the viewer restores one mark.
+        model.goToReview(from: .viewer)
+        XCTAssertEqual(model.route, .review)
+        model.restore(ids: ["fake-0"])
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, ["fake-4", "fake-2"])
+        XCTAssertTrue(model.engine?.decidedIDs.contains("fake-0") ?? false)
+
+        // 6. A cancelled system deletion keeps every mark and counts nothing.
+        library.faults.failedDeleteIDs = Set(FakePhotoLibrary.demoDescriptors(count: 6).map(\.id))
+        await model.confirmDeletion()
+        XCTAssertEqual(model.lastDeletion.deletedCount, 0)
+        XCTAssertEqual(model.lastDeletion.failedCount, 2)
+        XCTAssertEqual(model.markedIDs, ["fake-4", "fake-2"])
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0)
+        XCTAssertEqual(store.state?.marks, ["fake-4", "fake-2"])
+
+        // 7. A partial deletion leaves the unsuccessful item marked.
+        model.continueAfterResult()
+        XCTAssertEqual(model.route, .viewer)
+        library.faults.failedDeleteIDs = ["fake-4"]
+        await model.confirmDeletion()
+        XCTAssertEqual(model.lastDeletion.deletedIDs, ["fake-2"])
+        XCTAssertEqual(model.lastDeletion.failedIDs, ["fake-4"])
+        XCTAssertEqual(model.markedIDs, ["fake-4"])
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 1)
+
+        // 8. Retrying deletes the rest without double counting.
+        library.faults.failedDeleteIDs = []
+        await model.confirmDeletion()
+        XCTAssertEqual(model.markedIDs, [])
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 2)
+        XCTAssertEqual(store.state?.marks, [])
+
+        // 9. Continuation, then an explicit finish, returns home.
+        model.continueAfterResult()
+        XCTAssertEqual(model.route, .viewer)
+        model.finishSession()
+        await model.settle()
+        XCTAssertEqual(model.route, .entry)
+        XCTAssertNil(model.engine)
+        XCTAssertNil(store.state?.session)
+    }
 }

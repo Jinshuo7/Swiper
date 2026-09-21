@@ -14,9 +14,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - `xcode-select -p` still points at Command Line Tools, so prefix `xcodebuild`
   with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - Verified working 2026-09-20: Xcode 27.0, licence accepted. The iOS Simulator
-  runtime was removed to save disk; the full suite runs on a connected iPhone:
-  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS,id=<UDID>'`
-  → 66 `SwiperKitTests` + 4 `SwiperUITests`, all green (see `docs/TESTING.md`).
+  runtime was removed to save disk and `xcrun simctl list runtimes` is empty, so
+  `SwiperAppTests` and `SwiperUITests` need a connected, unlocked iPhone:
+  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS,id=<UDID>'`.
+  See `docs/TESTING.md` for commands, results and what is currently blocked.
 - Device builds sign with the personal team and a unique app bundle id set in
   `Scripts/generate_project.rb`; `com.swiper.app` is globally taken, so it cannot
   be registered. Personal-team provisioning profiles expire after 7 days.
@@ -37,14 +38,22 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 ## Architecture
 
 - `SwiperKit/` is a Foundation-only framework holding all decision logic:
-  ordering, the deletion queue, undo, Tumbler, preferences, statistics and
-  stale-asset reconciliation. Keep PhotoKit and UIKit out of it.
+  ordering, the deletion list, undo, Tumbler, preferences, statistics, stored
+  state and migration, stale-asset reconciliation and photo-fit geometry. Keep
+  PhotoKit and UIKit out of it.
 - `Swiper/` is the app. `PhotoKitLibrary` implements the framework protocols;
-  `AppModel` performs the `SessionEffect` values the pure `SessionEngine`
-  emits. Views are in `Swiper/Views/`.
+  `AppModel` performs the `SessionEffect` values the pure `SessionEngine` emits.
+  Views are in `Swiper/Views/`.
 - The engine never mutates the library. Deleting happens only in
   `AppModel.confirmDeletion()` after an explicit user confirmation, and only
   confirmed deletions update statistics.
+- The deletion list outlives sorting sessions (`docs/adr/0005`). `AppModel`
+  stages a decision, saves it, and only then acknowledges and advances; a failed
+  save parks a `PendingDecision` and offers Retry (`docs/adr/0004`).
+- Test seams: `SwiperKitTests` for pure logic on macOS, `SwiperAppTests` for
+  `AppModel` against `FakePhotoLibrary` + `InMemorySessionStore` (which can fail
+  writes or hold unreadable/newer-version data), `SwiperUITests` for the real UI
+  with `-uiTestingFakeLibrary`.
 
 ## Safety
 

@@ -24,7 +24,7 @@ struct StatisticsView: View {
                             ("Cleanup sessions completed", "\(model.statistics.lifetimeCompletedSessions)"),
                         ]
                     )
-                    Text("Only deletions confirmed by the system are counted. Queued photos that were never deleted, and failed deletions, are not included. Storage figures are estimates; Swiper does not use private APIs to read exact file sizes.")
+                    Text("Only deletions confirmed by the system are counted. Photos that were only marked, and failed or cancelled deletions, are not included. Storage figures are estimates; Swiper does not use private APIs to read exact file sizes.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
                         .padding(.horizontal, 4)
