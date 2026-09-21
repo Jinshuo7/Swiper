@@ -206,6 +206,59 @@ Committed, resized, under `docs/screenshots/`:
 | `settings-how-to-use.png` | Replay entry present |
 | `save-failure-retry.png` | "Couldn't save your last decision" banner with Retry and Discard, photo unchanged behind it |
 
+## Round 2 — the control rail (user review, 2026-09-21)
+
+The user reported that the buttons move around depending on the photo, that
+Start Here is confusing and unnavigable, that statistics should not sit on the
+main screen, and asked for controls movable to the bottom or a side rail. A new
+goal tracks that work; this round covers the rail and statistics.
+
+**First, the reported movement was reproduced rather than guessed at.** Two UI
+tests were written before any fix:
+
+- `testControlRailDoesNotMoveBetweenPhotos` — **passed**, so the rail was *not*
+  drifting with the photo's aspect ratio. That ruled out the obvious theory.
+- `testControlRailDoesNotMoveWhenAMarkAppears` — **failed**, printing
+  `(196.7, 668.0)` against `(196.7, 702.0)`: the Review bar appearing shoved the
+  decision controls **34pt up**. That was a real defect introduced in the #11
+  round, where the cluster's bottom padding depended on `queueCount`.
+
+Fixes and changes:
+
+- The chrome container is now **pinned to the screen** (`.frame(width:height:)`
+  before the overlays). Previously the ZStack sized itself to the photo, so a
+  tall asset could move the chrome.
+- **One rail holds every control.** `ControlRail` (Bottom / Left side / Right
+  side) × `ControlAnchor` (start / centre / end) replaces the old three-way
+  placement. Order is fixed from least to most thumb-accessible — Close,
+  Favorite, Undo, Delete, Keep — so on a side rail Close sits at the top and Keep
+  at the bottom, exactly as the user described.
+- Favorite and Undo previously jumped between the top bar and the cluster
+  depending on the preset. They now always live on the rail, so switching preset
+  changes which controls exist, never where they are. Verified by
+  `testSwitchingPresetDoesNotMoveTheRail`.
+- The review entry moved to the **top strip**, so marking a photo can no longer
+  displace the decision rail.
+- A vertical rail reserves an **88pt lane** and the photo is fitted beside it,
+  not underneath it (`testASideRailDoesNotCoverThePhoto`).
+- **Statistics moved into Settings**, with `chart.pie` in place of the
+  Wi-Fi-looking `chart.bar`, and `testStatisticsIsReachedFromSettings` asserts it
+  is gone from the main screen.
+- The Settings rail/anchor controls are explicit option rows, not segmented
+  pickers: SwiftUI does not expose a segmented `Picker`'s identifier or segment
+  labels to XCUITest, which cost two failed runs to discover.
+- `ControlPreferences` gained a decoding migration: the legacy `placement`
+  left/centre/right is carried over as the rail anchor rather than silently
+  resetting the user's choice.
+
+Checks: **170 tests, 0 failures** on the iPhone 11 Pro (115 + 29 + 26),
+`TEST SUCCEEDED`. Screenshots refreshed and inspected under `docs/screenshots/`.
+
+Still open in the goal: Start Here is unchanged and remains confusing and
+unnavigable (it needs an explanation plus date jumping and a fast route through
+the library); English + Chinese localisation is untouched; and the interruption
+scenarios (airplane/Uber, kill and resume) have not been walked end to end.
+
 ## Exact next steps for the next session
 
 1. Reconnect and unlock the iPhone, confirm `xcrun devicectl list devices` shows

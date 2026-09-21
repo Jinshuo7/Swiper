@@ -15,14 +15,70 @@ struct SettingsView: View {
                         }
                     }
 
-                    settingSection(title: "Control placement") {
-                        Picker("Control placement", selection: placementBinding) {
-                            ForEach(ControlPlacement.allCases) { placement in
-                                Text(placement.title).tag(placement)
+                    settingSection(title: "Control rail") {
+                        ForEach(ControlRail.allCases) { rail in
+                            optionRow(
+                                title: rail.title,
+                                subtitle: rail.subtitle,
+                                isSelected: model.preferences.rail == rail,
+                                identifier: "settings.rail.\(rail.rawValue)"
+                            ) {
+                                var preferences = model.preferences
+                                preferences.rail = rail
+                                model.updatePreferences(preferences)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .accessibilityIdentifier("settings.placement")
+
+                        Text("Position on the rail")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.top, 6)
+
+                        ForEach(ControlAnchor.allCases) { anchor in
+                            optionRow(
+                                title: anchor.title(for: model.preferences.rail),
+                                subtitle: nil,
+                                isSelected: model.preferences.anchor == anchor,
+                                identifier: "settings.anchor.\(anchor.rawValue)"
+                            ) {
+                                var preferences = model.preferences
+                                preferences.anchor = anchor
+                                model.updatePreferences(preferences)
+                            }
+                        }
+
+                        Text("Every control lives on this one rail, so it never moves between photos. Pick the edge your thumb reaches; a left-handed grip usually wants the left side, a right-handed one the right side or the bottom.")
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 6)
+                    }
+
+                    settingSection(title: "Statistics") {
+                        Button {
+                            model.route = .statistics
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "chart.pie")
+                                    .foregroundStyle(.white)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Deletion statistics")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                    Text("Confirmed deletions and estimated storage reclaimed.")
+                                        .font(.footnote)
+                                        .foregroundStyle(.white.opacity(0.6))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.4))
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.statistics")
                     }
 
                     settingSection(title: "Help") {
@@ -113,15 +169,36 @@ struct SettingsView: View {
         .accessibilityIdentifier("settings.preset.\(preset.rawValue)")
     }
 
-    private var placementBinding: Binding<ControlPlacement> {
-        Binding(
-            get: { model.preferences.placement },
-            set: { newValue in
-                var preferences = model.preferences
-                preferences.placement = newValue
-                model.updatePreferences(preferences)
+    /// A labelled choice row. Buttons carry their own identifiers, which a
+    /// segmented `Picker` does not expose — and it matches the preset list above.
+    private func optionRow(
+        title: String,
+        subtitle: String?,
+        isSelected: Bool,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(isSelected ? Color.blue : Color.white.opacity(0.4))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
             }
-        )
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private var directionBinding: Binding<TraversalDirection> {

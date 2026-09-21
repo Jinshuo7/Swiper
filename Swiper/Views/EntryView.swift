@@ -109,16 +109,6 @@ struct EntryView: View {
                 .foregroundStyle(.white)
 
             Spacer()
-
-            Button {
-                model.route = .statistics
-            } label: {
-                Image(systemName: "chart.bar")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Statistics")
-            .accessibilityIdentifier("entry.statistics")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12)

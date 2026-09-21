@@ -78,9 +78,9 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
   | --- | --- | --- |
   | `SwiperKitTests` | 111 | 0 failures |
   | `SwiperAppTests` | 29 | 0 failures |
-  | `SwiperUITests` | 21 | 0 failures |
+  | `SwiperUITests` | 26 | 0 failures |
 
-  161 tests, 0 failures. Result bundle: `.derivedData/verify.xcresult`.
+  170 tests, 0 failures. Result bundle: `.derivedData/final2.xcresult`.
 - Two environmental preconditions, both previously recorded as blockers:
   * The device must be **unlocked**. A locked phone fails with
     `deviceprep Code=-3 "Unlock iPhone to Continue"`, and if it locks between the
@@ -129,7 +129,11 @@ Attachments the suite produces, and what each one is for:
 | `Tutorial — first photo, Swipe preset` | `testFirstPhotoTutorialExplainsAndReplaysFromSettings` | Tutorial copy and dismissal |
 | `Settings — How to use` | same | Settings entry that replays it |
 | `Save failure — Retry offered` | `testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession` | The visible save-failure banner and its Retry action |
-| `Viewer — Live Photo labelled` | `testLivePhotosAreLabelledInTheViewer` | The "LIVE" chip beside Close, with symbol and word |
+| `Viewer — Live Photo labelled` | `testLivePhotosAreLabelledInTheViewer` | The "LIVE" chip in the top strip, with symbol and word |
+| `Controls — fixture step 0…3` | `testControlRailDoesNotMoveBetweenPhotos` | The bottom rail in the same place for every aspect ratio |
+| `Controls — right side rail` | `testControlRailCanMoveToEitherSideRail` | The rail moved to the right edge, Close at top and Keep at bottom |
+| `Controls — left side rail` | same | The rail moved to the left edge, with the photo fitted beside its lane |
+| `Settings — statistics row` | `testStatisticsIsReachedFromSettings` | Statistics now inside Settings, reached from a row |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a

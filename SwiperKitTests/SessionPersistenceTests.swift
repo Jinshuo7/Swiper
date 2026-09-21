@@ -96,8 +96,11 @@ final class SessionPersistenceTests: XCTestCase {
         store.saveStatistics(statistics)
         XCTAssertEqual(store.loadStatistics(), statistics)
 
-        store.savePreferences(ControlPreferences(preset: .deleteOnly, placement: .left))
-        XCTAssertEqual(store.loadPreferences(), ControlPreferences(preset: .deleteOnly, placement: .left))
+        store.savePreferences(ControlPreferences(preset: .deleteOnly, rail: .leading, anchor: .start))
+        XCTAssertEqual(
+            store.loadPreferences(),
+            ControlPreferences(preset: .deleteOnly, rail: .leading, anchor: .start)
+        )
 
         try await store.clearState()
         XCTAssertEqual(store.loadState(), .absent)

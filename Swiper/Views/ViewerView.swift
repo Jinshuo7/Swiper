@@ -15,7 +15,6 @@ struct ViewerView: View {
     private let commitThreshold: CGFloat = 90
 
     private var preset: ControlPreset { model.preferences.preset }
-    private var placement: ControlPlacement { model.preferences.placement }
 
     var body: some View {
         GeometryReader { geometry in
@@ -28,6 +27,7 @@ struct ViewerView: View {
                             width: fittedSize(for: asset, in: geometry).width,
                             height: fittedSize(for: asset, in: geometry).height
                         )
+                        .offset(x: photoLaneOffset)
                         .id(asset.id)
                         .gesture(swipeGesture, including: preset.usesSwipeGestures ? .all : .none)
                         .onTapGesture {
@@ -42,10 +42,13 @@ struct ViewerView: View {
                     missingState
                 }
             }
+            // Pinned to the screen. Without this the ZStack sizes itself to the
+            // photo, so the chrome would drift with each asset's aspect ratio and
+            // a tall photo could push the controls out of reach.
+            .frame(width: geometry.size.width, height: geometry.size.height)
             .overlay { dragFeedback }
             .overlay(alignment: .top) { topBar }
-            .overlay(alignment: bottomAlignment) { controlCluster }
-            .overlay(alignment: .bottom) { reviewBar }
+            .overlay(alignment: railAlignment) { controlRail }
         }
         .task(id: currentID) {
             updatePrefetch()
@@ -74,10 +77,25 @@ struct ViewerView: View {
     /// The overlays stay inside `geometry` (the safe area) so controls are
     /// always reachable.
     private func canvasSize(in geometry: GeometryProxy) -> CGSize {
-        CGSize(
+        let full = CGSize(
             width: geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing,
             height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
         )
+        return CGSize(width: max(1, full.width - railLaneWidth), height: full.height)
+    }
+
+    /// Width reserved for a vertical rail, so the photo is fitted *beside* it
+    /// rather than running underneath the controls. A control sitting on a busy
+    /// photo is the "half-buried" feel this design exists to remove.
+    private var railLaneWidth: CGFloat { model.preferences.rail.isVertical ? 88 : 0 }
+
+    /// How far the photo shifts to stay centred in the area the rail leaves free.
+    private var photoLaneOffset: CGFloat {
+        switch model.preferences.rail {
+        case .bottom: return 0
+        case .leading: return railLaneWidth / 2
+        case .trailing: return -railLaneWidth / 2
+        }
     }
 
     private func fittedSize(for asset: AssetDescriptor, in geometry: GeometryProxy) -> CGSize {
@@ -87,11 +105,20 @@ struct ViewerView: View {
         )
     }
 
-    private var bottomAlignment: Alignment {
-        switch placement {
-        case .left: return .bottomLeading
-        case .center: return .bottom
-        case .right: return .bottomTrailing
+    /// Where the rail is anchored. Only the rail's own edge and anchor decide
+    /// this, so nothing about the current photo or the number of marks can move
+    /// a control.
+    private var railAlignment: Alignment {
+        switch (model.preferences.rail, model.preferences.anchor) {
+        case (.bottom, .start): return .bottomLeading
+        case (.bottom, .center): return .bottom
+        case (.bottom, .end): return .bottomTrailing
+        case (.leading, .start): return .topLeading
+        case (.leading, .center): return .leading
+        case (.leading, .end): return .bottomLeading
+        case (.trailing, .start): return .topTrailing
+        case (.trailing, .center): return .trailing
+        case (.trailing, .end): return .bottomTrailing
         }
     }
 
@@ -238,25 +265,16 @@ struct ViewerView: View {
 
     // MARK: - Chrome
 
+    /// Informational chrome only: what this asset is, and the way into review.
+    /// Neither can displace the rail, because the rail is anchored independently
+    /// of the top strip.
     private var topBar: some View {
         HStack(spacing: 10) {
-            TopBarButton(systemImage: "xmark", label: "Close") {
-                model.closeViewer()
-            }
             if model.currentAsset?.isLivePhoto == true {
                 livePhotoBadge
             }
             Spacer()
-            if preset != .extended {
-                TopBarButton(systemImage: "heart", label: "Favorite") {
-                    model.apply(.favorite)
-                }
-                .disabled(model.isDecisionInputBlocked)
-                TopBarButton(systemImage: "arrow.uturn.backward", label: "Undo") {
-                    model.apply(.undo)
-                }
-                .disabled(model.isDecisionInputBlocked)
-            }
+            reviewControl
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
@@ -285,40 +303,72 @@ struct ViewerView: View {
         .accessibilityIdentifier("viewer.liveBadge")
     }
 
-    private var controlCluster: some View {
-        ControlCluster()
-            .disabled(model.isDecisionInputBlocked)
-            .padding(.bottom, model.queueCount > 0 ? 54 : 20)
-            .padding(placement == .center ? 0 : 20)
+    /// A compact, always-reachable way into deletion review. It states the
+    /// agreed wording — photos are *marked*, nothing has been deleted.
+    @ViewBuilder
+    private var reviewControl: some View {
+        if model.queueCount > 0 {
+            Button {
+                model.goToReview(from: .viewer)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "trash")
+                    Text(DeletionWording.reviewCompact(model.queueCount))
+                }
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(.ultraThinMaterial, in: Capsule())
+                .foregroundStyle(.white)
+                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            }
+            .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
+            .accessibilityValue(DeletionWording.nothingDeletedYet)
+            .accessibilityIdentifier("viewer.review")
+        }
     }
 
-    /// A compact, always-reachable way into deletion review. It states the
-    /// agreed wording — photos are *marked*, nothing is deleted yet — and sits
-    /// at the bottom edge, inside the safe area, so it never covers the photo
-    /// centre.
-    private var reviewBar: some View {
+    /// The one place the controls live. They never move: not between photos of
+    /// different shapes, not when a mark appears, not between presets — only
+    /// when the user chooses a different rail.
+    ///
+    /// Order is fixed and runs from the least to the most thumb-accessible:
+    /// Close first, then Favorite and Undo, then the decision pair with Keep
+    /// last, so on a side rail Close sits at the top and Keep at the bottom.
+    private var controlRail: some View {
         Group {
-            if model.queueCount > 0 {
-                Button {
-                    model.goToReview(from: .viewer)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                        Text(DeletionWording.reviewCompact(model.queueCount))
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .foregroundStyle(.white)
-                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-                }
-                .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
-                .accessibilityValue(DeletionWording.nothingDeletedYet)
-                .accessibilityIdentifier("viewer.review")
+            if model.preferences.rail.isVertical {
+                VStack(spacing: 14) { railControls }
+            } else {
+                HStack(spacing: 14) { railControls }
             }
         }
-        .padding(.bottom, 10)
+        .disabled(model.isDecisionInputBlocked)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
+    }
+
+    @ViewBuilder
+    private var railControls: some View {
+        CircleControl(systemImage: "xmark", label: "Close") {
+            model.closeViewer()
+        }
+        CircleControl(systemImage: "heart", label: "Favorite") {
+            model.apply(.favorite)
+        }
+        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
+            model.apply(.undo)
+        }
+        if preset.showsDeleteButton {
+            CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
+                model.apply(.queueDeletion)
+            }
+        }
+        if preset.showsKeepButton {
+            CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
+                model.apply(.keep)
+            }
+        }
     }
 
     private var finishedOverlay: some View {
@@ -448,37 +498,6 @@ struct LivePhotoView: UIViewRepresentable {
     func updateUIView(_ view: PHLivePhotoView, context: Context) {
         if view.livePhoto !== livePhoto {
             view.livePhoto = livePhoto
-        }
-    }
-}
-
-/// The floating control cluster, varying by preset and placement.
-private struct ControlCluster: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        let preset = model.preferences.preset
-        HStack(spacing: 18) {
-            if preset.showsDeleteButton {
-                CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
-                    model.apply(.queueDeletion)
-                }
-            }
-            if preset.showsKeepButton {
-                CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
-                    model.apply(.keep)
-                }
-            }
-            if preset.showsFavoriteButton {
-                CircleControl(systemImage: "heart", label: "Favorite", tint: .pink) {
-                    model.apply(.favorite)
-                }
-            }
-            if preset.showsUndoButton {
-                CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
-                    model.apply(.undo)
-                }
-            }
         }
     }
 }

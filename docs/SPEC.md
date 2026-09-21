@@ -75,19 +75,36 @@ settings. Statistics are not otherwise visible.
    continues in the other direction if undecided assets remain.
 12. Nothing is ever deleted from the viewer.
 
-## 4. Control presets and placement
+## 4. Control rail and presets
+
+Every control lives on **one rail**. Nothing about the current photo, the number
+of marks or the active preset moves a control: the rail is anchored to the screen,
+not to the photo, and the review entry sits in the separate top strip rather than
+in the rail.
+
+* The rail runs along one edge: **Bottom**, **Left side** or **Right side**.
+  This is the handedness choice — a right thumb reaches the bottom or right rail,
+  a left thumb the bottom or left one.
+* Along that edge it is anchored at the start, centre or end (left/centre/right on
+  a bottom rail; top/middle/bottom on a side rail).
+* Order is fixed from least to most thumb-accessible: Close, then Favorite, then
+  Undo, then the decision pair with Keep last. On a side rail Close is at the top
+  and Keep at the bottom; on a bottom rail Close is at the leading end.
+* The preset decides which controls exist, never where they are:
 
 | Preset | Keep | Delete | Favorite | Undo | Swipe gestures |
 | --- | --- | --- | --- | --- | --- |
-| Swipe | gesture | gesture | top bar | top bar | yes |
-| Thumb | button | button | top bar | top bar | no |
-| Delete only | advancing | button | top bar | top bar | no |
-| Extended | button | button | button | button | no |
+| Swipe | gesture | gesture | rail | rail | yes |
+| Thumb | rail | rail | rail | rail | no |
+| Delete only | advancing | rail | rail | rail | no |
+| Extended | rail | rail | rail | rail | no |
 
 * In **Delete only**, advancing (tapping the photo) keeps it; only the Delete
   control marks it.
-* Floating controls can be placed left, centered or right.
-* The choice is persisted immediately and never removes the full-screen photo.
+* The rail, its anchor, the preset and the direction are persisted immediately,
+  and no choice ever removes the full-screen photo.
+* A Live Photo is labelled in the top strip; the review entry appears there once
+  photos are marked.
 
 ## 4a. Teaching
 

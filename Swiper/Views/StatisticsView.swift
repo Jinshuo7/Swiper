@@ -37,7 +37,7 @@ struct StatisticsView: View {
     private var header: some View {
         HStack {
             Button {
-                model.route = .entry
+                model.route = .settings
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))

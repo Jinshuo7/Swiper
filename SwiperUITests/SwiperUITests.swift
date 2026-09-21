@@ -149,6 +149,159 @@ final class SwiperUITests: XCTestCase {
         }
     }
 
+    // MARK: - Control rail stability (user report, 2026-09-21)
+
+    /// Reaches Settings from wherever the test is — including from inside the
+    /// viewer — chooses the rail, and returns home. The presence of
+    /// `entry.settings` cannot be used to decide whether we are already there,
+    /// because it exists on the entry screen too.
+    private func useRail(_ app: XCUIApplication, _ rail: String) {
+        if app.buttons["control.close"].exists {
+            app.buttons["control.close"].tap()
+        }
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        let option = app.buttons["settings.rail.\(rail)"]
+        XCTAssertTrue(option.waitForExistence(timeout: 10), "no rail option \(rail)")
+        option.tap()
+        app.buttons["Back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+    }
+
+    private func useButtonPreset(_ app: XCUIApplication, _ preset: String) {
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        let choice = app.buttons["settings.preset.\(preset)"]
+        XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        choice.tap()
+        app.buttons["Back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+    }
+
+    /// The controls are physical targets: they must sit in the same place for a
+    /// panorama, a square, a portrait and a landscape photo. A rail anchored to
+    /// the photo instead of to the screen fails this.
+    func testControlRailDoesNotMoveBetweenPhotos() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        _ = startViewer(app)
+
+        var frames: [CGRect] = []
+        for step in 0..<4 {
+            let keep = app.buttons["control.keep"]
+            XCTAssertTrue(keep.waitForExistence(timeout: 10), "no Keep control at step \(step)")
+            frames.append(keep.frame)
+            capture("Controls — fixture step \(step)")
+            if step < 3 { photoElement(app).swipeRight() }
+        }
+
+        for (index, frame) in frames.enumerated().dropFirst() {
+            XCTAssertEqual(
+                frame,
+                frames[0],
+                "the rail moved between photos: step 0 at \(frames[0]), step \(index) at \(frame)"
+            )
+        }
+
+        let window = app.windows.firstMatch.frame
+        XCTAssertTrue(window.contains(frames[0]), "the rail must stay on screen")
+        XCTAssertGreaterThan(
+            frames[0].midY,
+            window.height * 0.8,
+            "a bottom rail must sit in the lower part of the screen, got \(frames[0]) in \(window)"
+        )
+    }
+
+    /// The rail is the handedness choice: it must be able to run down either
+    /// side, with Close at the top and Keep at the bottom.
+    func testControlRailCanMoveToEitherSideRail() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        useRail(app, "trailing")
+        _ = startViewer(app)
+
+        let close = app.buttons["control.close"]
+        let keep = app.buttons["control.keep"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        XCTAssertTrue(keep.exists)
+
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(close.frame.midX, window.midX, "the right rail must be on the right")
+        XCTAssertLessThan(close.frame.midY, keep.frame.midY, "Close must sit above Keep on a vertical rail")
+        XCTAssertTrue(window.contains(close.frame) && window.contains(keep.frame))
+        capture("Controls — right side rail")
+
+        useRail(app, "leading")
+        _ = startViewer(app)
+        let leftClose = app.buttons["control.close"]
+        XCTAssertTrue(leftClose.waitForExistence(timeout: 10))
+        XCTAssertLessThan(leftClose.frame.midX, window.midX, "the left rail must be on the left")
+        XCTAssertLessThan(leftClose.frame.midY, app.buttons["control.keep"].frame.midY)
+        XCTAssertTrue(window.contains(leftClose.frame))
+        capture("Controls — left side rail")
+    }
+
+    /// A vertical rail reserves a lane: the photo is fitted beside it, not
+    /// underneath the buttons.
+    func testASideRailDoesNotCoverThePhoto() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        useRail(app, "trailing")
+        _ = startViewer(app)
+
+        let photo = photoElement(app)
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        let close = app.buttons["control.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+
+        let overlap = photo.frame.intersection(close.frame)
+        XCTAssertTrue(
+            overlap.isNull || overlap.width < 1 || overlap.height < 1,
+            "the rail overlaps the photo: photo \(photo.frame), Close \(close.frame)"
+        )
+    }
+
+    /// Only the rail choice may move a control: the preset changes which
+    /// controls exist, never where they are.
+    func testSwitchingPresetDoesNotMoveTheRail() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        _ = startViewer(app)
+
+        let before = app.buttons["control.close"].frame
+        app.buttons["control.close"].tap()   // back home
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
+        useButtonPreset(app, "extended")
+        _ = startViewer(app)
+
+        XCTAssertEqual(
+            app.buttons["control.close"].frame,
+            before,
+            "switching preset moved the rail"
+        )
+    }
+
+    /// Marking a photo makes the Review bar appear. That must not shove the
+    /// decision controls somewhere else mid-session.
+    func testControlRailDoesNotMoveWhenAMarkAppears() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        _ = startViewer(app)
+
+        let keep = app.buttons["control.keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 10))
+        let before = keep.frame
+
+        app.buttons["control.delete"].tap()
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 5), "the mark should be showing")
+
+        XCTAssertEqual(
+            app.buttons["control.keep"].frame,
+            before,
+            "the Review bar appearing moved the decision controls"
+        )
+    }
+
     // MARK: - Swipe feedback and teaching (#15)
 
     func testFirstPhotoTutorialExplainsAndReplaysFromSettings() {
@@ -171,7 +324,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertFalse(tutorialElement(app).waitForExistence(timeout: 2))
 
         // Settings → How to use replays it.
-        app.buttons["topbar.close"].tap()
+        app.buttons["control.close"].tap()
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
         app.buttons["entry.settings"].tap()
         let howTo = app.buttons["settings.howToUse"]
@@ -247,9 +400,9 @@ final class SwiperUITests: XCTestCase {
         _ = startViewer(app)
 
         for (identifier, label) in [
-            ("topbar.close", "Close"),
-            ("topbar.favorite", "Favorite"),
-            ("topbar.undo", "Undo"),
+            ("control.close", "Close"),
+            ("control.favorite", "Favorite"),
+            ("control.undo", "Undo"),
         ] {
             let control = app.buttons[identifier]
             XCTAssertTrue(control.exists, "\(identifier) must exist as a button alternative")
@@ -306,7 +459,7 @@ final class SwiperUITests: XCTestCase {
     }
 
     private func assertControlsInsideScreen(_ app: XCUIApplication, window: CGRect) {
-        for identifier in ["topbar.close", "topbar.favorite", "topbar.undo"] {
+        for identifier in ["control.close", "control.favorite", "control.undo"] {
             let control = app.buttons[identifier]
             XCTAssertTrue(control.exists, "\(identifier) is missing from the viewer")
             XCTAssertTrue(
@@ -351,7 +504,7 @@ final class SwiperUITests: XCTestCase {
         let markedLabel = photo.label
         photo.swipeLeft()
 
-        app.buttons["topbar.close"].tap()
+        app.buttons["control.close"].tap()
 
         let review = app.buttons["entry.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
@@ -369,7 +522,7 @@ final class SwiperUITests: XCTestCase {
         let app = launchApp()
         let photo = startViewer(app)
         photo.swipeLeft()
-        app.buttons["topbar.close"].tap()
+        app.buttons["control.close"].tap()
 
         let review = app.buttons["entry.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
@@ -388,7 +541,7 @@ final class SwiperUITests: XCTestCase {
         let photo = startViewer(app)
         let markedLabel = photo.label
         photo.swipeLeft()
-        app.buttons["topbar.close"].tap()
+        app.buttons["control.close"].tap()
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
 
         app.terminate()
@@ -403,7 +556,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertNotEqual(resumed.label, markedLabel)
 
         // A brand-new mode also skips it.
-        relaunched.buttons["topbar.close"].tap()
+        relaunched.buttons["control.close"].tap()
         XCTAssertTrue(relaunched.buttons["entry.tumbler"].waitForExistence(timeout: 5))
         relaunched.buttons["entry.tumbler"].tap()
         let tumblerPhoto = photoElement(relaunched)
@@ -503,7 +656,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertEqual(review.label, "1 photo marked for deletion")
         XCTAssertEqual(review.value as? String, "Nothing deleted yet.")
 
-        app.buttons["topbar.close"].tap()
+        app.buttons["control.close"].tap()
         XCTAssertEqual(app.buttons["entry.review"].label, "Review & delete · 1")
     }
 
@@ -541,10 +694,18 @@ final class SwiperUITests: XCTestCase {
         XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
     }
 
-    func testStatisticsScreenOpens() {
+    /// Statistics is no longer on the main screen; it lives inside Settings,
+    /// with the Wi-Fi-looking bar glyph replaced.
+    func testStatisticsIsReachedFromSettings() {
         let app = launchApp()
-        XCTAssertTrue(app.buttons["entry.statistics"].waitForExistence(timeout: 10))
-        app.buttons["entry.statistics"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["entry.statistics"].exists, "statistics must not sit on the main screen")
+        app.buttons["entry.settings"].tap()
+
+        let statistics = app.buttons["settings.statistics"]
+        XCTAssertTrue(statistics.waitForExistence(timeout: 10))
+        capture("Settings — statistics row")
+        statistics.tap()
         XCTAssertTrue(app.staticTexts["Statistics"].waitForExistence(timeout: 10))
     }
 }

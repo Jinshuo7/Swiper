@@ -101,7 +101,7 @@ struct TutorialView: View {
                 Instruction(
                     symbol: "heart",
                     title: "Favorite keeps the photo",
-                    detail: "The heart in the top bar marks it as an Apple Photos favorite.",
+                    detail: "The heart on the control rail marks it as an Apple Photos favorite.",
                     tint: .pink
                 ),
                 Instruction(
@@ -149,7 +149,7 @@ struct TutorialView: View {
                 Instruction(
                     symbol: "heart",
                     title: "Favorite keeps the photo",
-                    detail: "Use the heart to favorite it in Apple Photos as well.",
+                    detail: "Use the heart on the rail to favorite it in Apple Photos as well.",
                     tint: .pink
                 ),
                 Instruction(
