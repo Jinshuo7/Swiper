@@ -113,7 +113,11 @@ xcrun xcresulttool export attachments \
   --output-path ./screenshots
 ```
 
-Attachments the suite is written to produce, and what each one is for:
+The green run's attachments are committed, resized to a 900 px long side, in
+[`docs/screenshots/`](screenshots) so a reviewer can see them without running
+anything. They were each inspected by eye; what they establish is listed below.
+
+Attachments the suite produces, and what each one is for:
 
 | Attachment | Produced by | Shows |
 | --- | --- | --- |

@@ -15,16 +15,17 @@ The iPhone became available, and **the full suite now runs green on it**:
 | `SwiperUITests` | 20 | 0 failures |
 
 **160 tests, 0 failures, `** TEST SUCCEEDED **`** on the iPhone 11 Pro
-(`00008030-000669DE3408802E`, iOS 26.2.1), 2026-09-21 21:09. Result bundle
-`.derivedData/full.xcresult`.
+(`00008030-000669DE3408802E`, iOS 26.2.1). Run twice: once at 21:09 and again at
+21:32 on the final committed tree, both green. Result bundle
+`.derivedData/final.xcresult`.
 
 Nine screenshots were exported and **visually inspected** (not merely generated)
 — see "Screenshots inspected" below. Three defects that no test could catch were
 found that way and fixed.
 
-Still not verified: real Live Photo playback (the fake library returns no
-`PHLivePhoto`), and the restrained drag tint has been re-checked only by the
-tests, not yet by eye on the device.
+Still not verified: real Live Photo playback. The fake library returns no
+`PHLivePhoto`, so motion is not exercised by automation and needs a manual check
+with a real live photo.
 
 ## Commits (local only — nothing pushed)
 
@@ -192,16 +193,18 @@ The app now treats `XCTestConfigurationFilePath` as a fake-library run.
 
 All eleven attachments from the green run were looked at:
 
+Committed, resized, under `docs/screenshots/`:
+
 | Screenshot | What it confirmed |
 | --- | --- |
-| Viewer fixture steps 0–3 (panorama, square, portrait, landscape) | Complete asset visible, all four edge markers present, black letterboxing, centred, Close/Favorite/Undo on screen — nothing cropped |
-| Partial left drag | Trash well with symbol **and** the words "Mark for deletion", photo following the finger, below-threshold state |
-| Left drag past threshold | Well armed: larger, thicker bright stroke |
-| Partial right drag | Green check well reading "Keep" |
-| Vertical drag | No well, no tint, photo unmoved |
-| Tutorial, Swipe preset | Four instructions with coloured symbols, plus "Nothing is deleted until you review and confirm." and the automatic-saving sentence |
-| Settings — How to use | Replay entry present |
-| Save failure — Retry offered | "Couldn't save your last decision" banner with Retry and Discard, photo unchanged behind it |
+| `viewer-01-panorama-complete.png` … `viewer-04-landscape-bright-complete.png` | Complete asset visible, all four edge markers present, black letterboxing, centred, Close/Favorite/Undo on screen — nothing cropped. Covers panorama, square (bright), portrait and landscape (bright) |
+| `drag-01-left-below-threshold.png` | Trash well with symbol **and** the words "Mark for deletion", photo following the finger, below-threshold state |
+| `drag-02-left-past-threshold-armed.png` | Well armed: larger, thicker bright stroke; tint confined to the leading edge |
+| `drag-03-right-below-threshold.png` | Green check well reading "Keep" |
+| `drag-04-vertical-no-decision.png` | No well, no tint, photo unmoved |
+| `tutorial-swipe-preset.png` | Four instructions with coloured symbols, plus "Nothing is deleted until you review and confirm." and the automatic-saving sentence |
+| `settings-how-to-use.png` | Replay entry present |
+| `save-failure-retry.png` | "Couldn't save your last decision" banner with Retry and Discard, photo unchanged behind it |
 
 ## Exact next steps for the next session
 
