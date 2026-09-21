@@ -50,6 +50,20 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 Keep these in sync with behaviour: `docs/VISION.md`, `docs/SPEC.md`,
 `docs/ROADMAP.md`, and `docs/adr/`. The glossary is `CONTEXT.md`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `Jinshuo7/Swiper` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
