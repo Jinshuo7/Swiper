@@ -10,6 +10,12 @@ struct RootView: View {
             Color.black.ignoresSafeArea()
             content
             persistenceLayer
+            if model.isShowingTutorial {
+                TutorialView(preset: model.preferences.preset) {
+                    model.dismissTutorial()
+                }
+                .transition(.opacity)
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: model.route)
         .task { await model.bootstrap() }

@@ -92,6 +92,21 @@ A still image with an associated short motion clip. Supported in v1.
 A video asset with no still-photo companion. Deliberately excluded from v1,
 including from all statistics.
 
+**Commit threshold**:
+The horizontal distance a photo must travel before releasing the drag decides
+anything. Crossing it arms the outcome well and gives one light haptic; releasing
+below it, or releasing a vertical drag, is not a decision.
+
+**Outcome well**:
+A feedback-only area revealed in the lower corner a drag is heading for: trash on
+the left, check on the right. It states the prospective outcome with a symbol and
+wording, and is never a separate control.
+
+**Tutorial**:
+The one-time explanation of marking, keeping, review confirmation and automatic
+saving, shown with the first photo and replayable from Settings → How to use. It
+is teaching state, not saved work.
+
 **Control preset**:
 The chosen interaction style: Swipe, Thumb, Delete only, or Extended. It changes
 which controls are shown, never the full-screen photo experience.

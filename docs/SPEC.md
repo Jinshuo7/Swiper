@@ -50,17 +50,27 @@ settings. Statistics are not otherwise visible.
    instruction text over the photo.
 4. Whenever photos are marked for deletion, the viewer shows a compact
    `Review · N` control that opens deletion review without ending the session.
-5. Default Swipe preset gestures:
-   * swipe left → queue for deletion and advance;
-   * swipe right → keep and advance;
-6. A heart control marks the asset as an Apple Photos favorite, keeps it and
-   advances.
-7. Undo reverses the most recent decision, including removing a just-queued
-   photo from the deletion queue, and returns to that photo. Undo never deletes.
-8. Traversal moves in the preferred direction, skipping assets already decided
-   in this session. At the end of the library it continues in the other
-   direction if undecided assets remain.
-9. Nothing is ever deleted from the viewer.
+5. Default Swipe preset gestures. The photo follows the finger, and the drag
+   reveals a feedback-only well in the lower corner it is heading for: trash on
+   the left, check on the right. The wells are never separate tap targets.
+   * drag left past the threshold and release → mark for deletion and advance;
+   * drag right past the threshold and release → keep and advance.
+6. The commit threshold is visible — the well arms with a brighter fill and a
+   stronger stroke — and is confirmed with a single light haptic at the moment it
+   is crossed, not on every update. Releasing below the threshold, releasing a
+   vertical drag and cancelling all make no decision.
+7. Reduce Motion removes the spring-back animation and the well's scale change;
+   the meaning is still carried by symbol, wording and stroke, never by colour or
+   motion alone.
+8. A heart control marks the asset as an Apple Photos favorite, keeps it and
+   advances. It is always available, so nobody has to perform a gesture.
+9. Undo reverses the most recent decision of this session, including removing a
+   just-marked photo from the deletion list, and returns to that photo. Undo
+   never deletes.
+10. Traversal moves in the preferred direction, skipping assets already decided
+   in this session and assets marked for deletion. At the end of the library it
+   continues in the other direction if undecided assets remain.
+11. Nothing is ever deleted from the viewer.
 
 ## 4. Control presets and placement
 
@@ -72,9 +82,21 @@ settings. Statistics are not otherwise visible.
 | Extended | button | button | button | button | no |
 
 * In **Delete only**, advancing (tapping the photo) keeps it; only the Delete
-  control queues it.
+  control marks it.
 * Floating controls can be placed left, centered or right.
 * The choice is persisted immediately and never removes the full-screen photo.
+
+## 4a. Teaching
+
+1. The first time a photo is presented, Swiper explains the flow once: how to
+   mark for deletion, how to keep, that nothing is deleted until review is
+   confirmed, and that accepted decisions are saved as they are made.
+2. The explanation matches the selected preset: the Swipe preset describes the
+   drag, the button presets describe the buttons and never tell the user to
+   swipe.
+3. Dismissing it is permanent until the user replays it from Settings → How to
+   use. It is teaching state, not saved work, and never blocks sorting again
+   after it is dismissed.
 
 ## 5. Resume and persistence
 

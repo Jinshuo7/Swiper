@@ -82,6 +82,28 @@ struct TopBarButton: View {
     }
 }
 
+/// The translucent material behind a swipe outcome well. It arms — brighter
+/// fill, stronger stroke — the moment the drag crosses the commit threshold, so
+/// the threshold is visible as well as felt.
+struct WellBackground: View {
+    let tint: Color
+    let armed: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(tint.opacity(armed ? 0.55 : 0.22))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(armed ? 0.9 : 0.25), lineWidth: armed ? 3 : 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+    }
+}
+
 /// A card that tells the user, in plain words, that something they did was not
 /// saved — and gives them the one action that can fix it. Never used to imply
 /// that unsaved work was accepted.

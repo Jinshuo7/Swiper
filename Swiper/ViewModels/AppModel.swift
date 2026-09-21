@@ -63,18 +63,31 @@ final class AppModel: ObservableObject {
     /// Where "Back" from deletion review should return to.
     @Published private(set) var reviewOrigin: Route = .entry
     @Published var errorMessage: String?
+    /// True while the one-time sorting explanation is on screen.
+    @Published private(set) var isShowingTutorial = false
 
     let library: SwiperPhotoLibrary
     private let store: SessionStoring
+    /// Tutorial completion lives in user defaults rather than the session store:
+    /// it is a one-off piece of teaching, not saved work. Tests inject their own
+    /// defaults so a run never inherits another run's answer.
+    private let defaults: UserDefaults
+    private enum DefaultsKey {
+        static let hasSeenSwipeTutorial = "hasSeenSwipeTutorial"
+    }
 
     /// The state as loaded, kept as the durable baseline between decisions.
     private var storedState = PersistedState()
     private var didBootstrap = false
     private var serialTail: Task<Void, Never>?
+    /// Set for the rest of the launch once the tutorial was dismissed, so a
+    /// launch argument that pins the flag off cannot make it reappear.
+    private var didFinishTutorial = false
 
-    init(library: SwiperPhotoLibrary, store: SessionStoring) {
+    init(library: SwiperPhotoLibrary, store: SessionStoring, defaults: UserDefaults = .standard) {
         self.library = library
         self.store = store
+        self.defaults = defaults
         self.preferences = store.loadPreferences()
         self.statistics = store.loadStatistics()
         self.library.changeHandler = { [weak self] in
@@ -170,6 +183,28 @@ final class AppModel: ObservableObject {
     }
 
     func dismissPersistenceNotice() { persistenceNotice = nil }
+
+    // MARK: - Teaching
+
+    var hasSeenTutorial: Bool { defaults.bool(forKey: DefaultsKey.hasSeenSwipeTutorial) }
+
+    /// Shows the sorting explanation the first time a photo is presented.
+    func presentTutorialIfNeeded() {
+        guard !didFinishTutorial, !hasSeenTutorial, !isShowingTutorial else { return }
+        isShowingTutorial = true
+    }
+
+    /// Dismissing is permanent until the user asks for it again from Settings.
+    func dismissTutorial() {
+        didFinishTutorial = true
+        isShowingTutorial = false
+        defaults.set(true, forKey: DefaultsKey.hasSeenSwipeTutorial)
+    }
+
+    /// Settings → How to use replays the explanation without changing any work.
+    func replayTutorial() {
+        isShowingTutorial = true
+    }
 
     func refreshAuthorization() async {
         authorization = library.currentAuthorization()

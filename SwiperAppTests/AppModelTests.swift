@@ -10,11 +10,20 @@ import XCTest
 /// never touch a real photo library.
 @MainActor
 final class AppModelTests: XCTestCase {
+    /// Tutorial state lives in user defaults, so every test gets its own domain
+    /// and can never inherit another run's answer.
+    private func isolatedDefaults() -> UserDefaults {
+        let name = "SwiperAppTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name) ?? .standard
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
     private func makeModel(
         library: FakePhotoLibrary = FakePhotoLibrary.demo(count: 8),
         store: InMemorySessionStore = InMemorySessionStore()
     ) -> (model: AppModel, library: FakePhotoLibrary, store: InMemorySessionStore) {
-        let model = AppModel(library: library, store: store)
+        let model = AppModel(library: library, store: store, defaults: isolatedDefaults())
         return (model, library, store)
     }
 
@@ -381,6 +390,32 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(second.model.markedIDs, [])
         XCTAssertEqual(second.store.state?.marks, [])
+    }
+
+    // MARK: - Teaching (#15)
+
+    func testTutorialIsShownOnceAndCanBeReplayedWithoutTouchingSavedWork() async {
+        let defaults = isolatedDefaults()
+        let store = InMemorySessionStore()
+        let model = AppModel(library: FakePhotoLibrary.demo(count: 4), store: store, defaults: defaults)
+        await model.bootstrap()
+        await model.settle()
+
+        XCTAssertFalse(model.isShowingTutorial)
+        model.presentTutorialIfNeeded()
+        XCTAssertTrue(model.isShowingTutorial)
+
+        model.dismissTutorial()
+        XCTAssertFalse(model.isShowingTutorial)
+        XCTAssertTrue(model.hasSeenTutorial)
+
+        model.presentTutorialIfNeeded()
+        XCTAssertFalse(model.isShowingTutorial, "the tutorial is shown once")
+
+        model.replayTutorial()
+        XCTAssertTrue(model.isShowingTutorial, "Settings can replay it")
+        model.dismissTutorial()
+        XCTAssertTrue(store.savedStates.isEmpty, "teaching never writes session state")
     }
 
     // MARK: - Deletion recovery (#14)

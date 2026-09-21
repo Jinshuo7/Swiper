@@ -6,7 +6,7 @@ Durable resume point for the autonomous implementation of GitHub issues #11–#1
 
 ## Current ticket
 
-**#14 — Review/deletion recovery and return to sorting** (checking, commit next).
+**#15 — Minimal swipe feedback and replayable teaching** (checking, commit next).
 
 ## Environment notes (learned this session)
 
@@ -114,7 +114,7 @@ Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
 Not verified: `SwiperAppTests` and UI tests have still not run (device
 unavailable). #13 stays open until they do.
 
-## Ticket #14 — in progress
+## Ticket #14 — DONE (commit 98a6f36), issue left OPEN
 
 Decisions:
 
@@ -136,5 +136,31 @@ Decisions:
 Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
 `TEST BUILD SUCCEEDED`.
 
-Next steps: commit #14, comment on it, then #15 (minimal drag feedback and the
-replayable tutorial).
+Not verified: app/UI tests still have not run (device unavailable).
+
+## Ticket #15 — in progress
+
+Decisions:
+
+- The viewer's drag now reveals feedback-only lower-corner wells (trash left,
+  check right) built from `ultraThinMaterial` plus a tinted fill and stroke; the
+  layer is `allowsHitTesting(false)` and `accessibilityHidden`, so it never
+  swallows the drag and is never announced as a control.
+- The commit threshold (90 pt horizontal) is visible (the well arms) and felt
+  (one light `UIImpactFeedbackGenerator` at the crossing only). Releasing below
+  the threshold, releasing a vertical drag, or a short drag makes no decision.
+- Reduce Motion removes the spring-back and the well's scale change; symbol,
+  wording and stroke still carry the meaning.
+- `TutorialView` explains marking, keeping, review confirmation and automatic
+  saving, adapting its wording to the selected preset. It is shown with the first
+  photo, dismissed once (in-memory guard so a launch argument cannot resurrect
+  it), and replayable from Settings → How to use. Tutorial state lives in an
+  injectable `UserDefaults`, so app tests use an isolated suite.
+- The viewer photo now carries a spoken description (photo, date, marked or not)
+  so the image is not an unlabelled element.
+
+Checks: kit tests 0 failures; typecheck `OK`; build-for-testing
+`TEST BUILD SUCCEEDED`.
+
+Next steps: commit #15, comment on it, then #16 (integrated verification,
+screenshots, docs sync, final checkpoint).

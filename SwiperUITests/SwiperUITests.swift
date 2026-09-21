@@ -30,6 +30,40 @@ final class SwiperUITests: XCTestCase {
         app.descendants(matching: .any)["viewer.photo"]
     }
 
+    private func tutorialElement(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["viewer.tutorial"]
+    }
+
+    private func capture(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// Starts a drag that ends *held* in place, captures the mid-gesture
+    /// feedback, and only then releases. The wells are only visible while the
+    /// gesture is live, so a screenshot after release could never show them.
+    private func holdDrag(
+        from start: XCUICoordinate,
+        to end: XCUICoordinate,
+        captureNamed name: String
+    ) {
+        let released = expectation(description: name)
+        DispatchQueue.global(qos: .userInitiated).async {
+            start.press(
+                forDuration: 0.1,
+                thenDragTo: end,
+                withVelocity: .slow,
+                thenHoldForDuration: 1.5
+            )
+            released.fulfill()
+        }
+        Thread.sleep(forTimeInterval: 0.8)
+        capture(name)
+        wait(for: [released], timeout: 20)
+    }
+
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
         XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
         app.buttons["entry.recent"].tap()
@@ -102,12 +136,117 @@ final class SwiperUITests: XCTestCase {
 
             assertControlsInsideScreen(app, window: window)
 
-            let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            attachment.name = "Viewer — fixture step \(step)"
-            attachment.lifetime = .keepAlways
-            add(attachment)
+            capture("Viewer — complete photo, fixture step \(step)")
 
             if step < 3 { photo.swipeRight() }
+        }
+    }
+
+    // MARK: - Swipe feedback and teaching (#15)
+
+    func testFirstPhotoTutorialExplainsAndReplaysFromSettings() {
+        let app = launchApp(showTutorial: true)
+        _ = startViewer(app)
+
+        XCTAssertTrue(tutorialElement(app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nothing is deleted until you review and confirm."].exists)
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "saved as you make it")).firstMatch.exists,
+            "the tutorial must explain that accepted work is saved"
+        )
+        capture("Tutorial — first photo, Swipe preset")
+
+        app.buttons["viewer.tutorial.dismiss"].tap()
+        XCTAssertFalse(tutorialElement(app).waitForExistence(timeout: 2))
+
+        // Dismissed once: it does not return for the next photo.
+        photoElement(app).swipeRight()
+        XCTAssertFalse(tutorialElement(app).waitForExistence(timeout: 2))
+
+        // Settings → How to use replays it.
+        app.buttons["topbar.close"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
+        app.buttons["entry.settings"].tap()
+        let howTo = app.buttons["settings.howToUse"]
+        XCTAssertTrue(howTo.waitForExistence(timeout: 5))
+        capture("Settings — How to use")
+        howTo.tap()
+        XCTAssertTrue(tutorialElement(app).waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["viewer.tutorial.dismiss"].label, "Got it")
+    }
+
+    func testTutorialWordingFollowsTheSelectedPreset() {
+        let app = launchApp(showTutorial: true)
+        app.buttons["entry.settings"].tap()
+        app.buttons["settings.preset.thumb"].tap()
+        app.buttons["Back"].firstMatch.tap()
+        _ = startViewer(app)
+
+        XCTAssertTrue(tutorialElement(app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Trash marks for deletion"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Drag left to mark for deletion"].exists,
+            "a button preset must not be told to swipe"
+        )
+    }
+
+    func testPartialDragsShowFeedbackButDecideNothing() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        let before = photo.label
+
+        let centre = photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        holdDrag(
+            from: centre,
+            to: centre.withOffset(CGVector(dx: -45, dy: 0)),
+            captureNamed: "Partial left drag — below threshold"
+        )
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "a short drag must not mark anything")
+        XCTAssertEqual(photoElement(app).label, before)
+
+        holdDrag(
+            from: centre,
+            to: centre.withOffset(CGVector(dx: 45, dy: 0)),
+            captureNamed: "Partial right drag — below threshold"
+        )
+        XCTAssertEqual(photoElement(app).label, before, "a short drag must not keep anything")
+
+        holdDrag(
+            from: centre,
+            to: centre.withOffset(CGVector(dx: -160, dy: 0)),
+            captureNamed: "Left drag past threshold"
+        )
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 5), "a released drag past the threshold marks")
+    }
+
+    func testVerticalDragDecidesNothing() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        let before = photo.label
+        let centre = photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+
+        holdDrag(
+            from: centre,
+            to: centre.withOffset(CGVector(dx: 0, dy: -200)),
+            captureNamed: "Vertical drag — no decision"
+        )
+
+        XCTAssertFalse(app.buttons["viewer.review"].exists)
+        XCTAssertEqual(photoElement(app).label, before)
+    }
+
+    func testViewerKeepsAccessibleControlAlternatives() {
+        let app = launchApp()
+        _ = startViewer(app)
+
+        for (identifier, label) in [
+            ("topbar.close", "Close"),
+            ("topbar.favorite", "Favorite"),
+            ("topbar.undo", "Undo"),
+        ] {
+            let control = app.buttons[identifier]
+            XCTAssertTrue(control.exists, "\(identifier) must exist as a button alternative")
+            XCTAssertEqual(control.label, label)
         }
     }
 

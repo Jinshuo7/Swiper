@@ -25,6 +25,30 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings.placement")
                     }
 
+                    settingSection(title: "Help") {
+                        Button {
+                            model.replayTutorial()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "questionmark.circle")
+                                    .foregroundStyle(.white)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("How to use Swiper")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                    Text("Replay the explanation of marking, keeping, review and saving.")
+                                        .font(.footnote)
+                                        .foregroundStyle(.white.opacity(0.6))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.howToUse")
+                    }
+
                     settingSection(title: "Default direction") {
                         Picker("Default direction", selection: directionBinding) {
                             Text("Older first").tag(TraversalDirection.older)
