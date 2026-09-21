@@ -409,6 +409,35 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Leaving the viewer is only navigation: every decision was already saved
+    /// before it was acknowledged, so nothing is discarded by going home.
+    func closeViewer() {
+        route = .entry
+    }
+
+    /// Where the user goes after a deletion commit. Returns to the sorting
+    /// position when a session is still active, to review when the session is
+    /// exhausted but marks remain, and home when there is nothing left.
+    func continueAfterResult() {
+        guard let engine else {
+            route = .entry
+            return
+        }
+        if engine.isFinished {
+            reviewOrigin = .result
+            route = markedIDs.isEmpty ? .entry : .review
+        } else {
+            route = .viewer
+        }
+    }
+
+    /// How the result screen should label its only button.
+    var resultContinuationTitle: String {
+        guard let engine else { return "Done" }
+        if engine.isFinished { return markedIDs.isEmpty ? "Done" : "Review marked photos" }
+        return "Continue sorting"
+    }
+
     func finishSession() {
         enqueue {
             self.statistics.completeSession()
@@ -533,7 +562,7 @@ final class AppModel: ObservableObject {
     }
 
     func dismissResult() {
-        route = .entry
+        continueAfterResult()
     }
 
     // MARK: - Effect handling

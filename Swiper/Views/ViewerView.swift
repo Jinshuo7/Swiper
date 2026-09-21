@@ -113,7 +113,7 @@ struct ViewerView: View {
     private var topBar: some View {
         HStack(spacing: 10) {
             TopBarButton(systemImage: "xmark", label: "Close") {
-                model.route = .entry
+                model.closeViewer()
             }
             Spacer()
             if preset != .extended {

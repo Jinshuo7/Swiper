@@ -11,7 +11,8 @@ final class SwiperUITests: XCTestCase {
     private func launchApp(
         showTutorial: Bool = false,
         persistentStore: Bool = false,
-        resetStore: Bool = false
+        resetStore: Bool = false,
+        failDeletion: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -20,6 +21,7 @@ final class SwiperUITests: XCTestCase {
         ]
         if persistentStore { app.launchArguments += ["-uiTestingPersistentStore"] }
         if resetStore { app.launchArguments += ["-uiTestingResetStore"] }
+        if failDeletion { app.launchArguments += ["-uiTestingFailDeletion"] }
         app.launch()
         return app
     }
@@ -238,6 +240,98 @@ final class SwiperUITests: XCTestCase {
         let tumblerPhoto = photoElement(relaunched)
         XCTAssertTrue(tumblerPhoto.waitForExistence(timeout: 10))
         XCTAssertNotEqual(tumblerPhoto.label, markedLabel)
+    }
+
+    // MARK: - Review and deletion recovery (#14)
+
+    func testCancellingTheInAppConfirmationKeepsEveryMark() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        photo.swipeLeft()
+        app.buttons["viewer.review"].tap()
+
+        let delete = app.buttons["review.delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+
+        let cancel = app.alerts.buttons["Cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+
+        XCTAssertTrue(app.staticTexts["Review deletion"].exists)
+        XCTAssertTrue(app.staticTexts["1 photo marked for deletion"].exists)
+        XCTAssertTrue(app.buttons["review.delete"].exists)
+    }
+
+    func testInspectionCanRestoreASingleMarkBackToTheGrid() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        photo.swipeLeft()
+        app.buttons["viewer.review"].tap()
+
+        let cell = app.descendants(matching: .any)["review.cell.0"]
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        cell.tap()
+
+        let restore = app.buttons["inspect.restore"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 5))
+        restore.tap()
+
+        XCTAssertTrue(app.staticTexts["Nothing is marked for deletion"].waitForExistence(timeout: 5))
+    }
+
+    func testACancelledSystemDeletionKeepsMarksAndReportsNoDeletion() {
+        let app = launchApp(failDeletion: true)
+        let photo = startViewer(app)
+        photo.swipeLeft()
+        app.buttons["viewer.review"].tap()
+
+        let delete = app.buttons["review.delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(app.staticTexts["Nothing was deleted"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "stayed marked")).firstMatch.exists,
+            "unsuccessful items must be reported as still marked"
+        )
+
+        let continuation = app.buttons["result.done"]
+        XCTAssertTrue(continuation.waitForExistence(timeout: 5))
+        continuation.tap()
+
+        let review = app.buttons["viewer.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertEqual(review.label, "1 photo marked for deletion")
+        XCTAssertEqual(review.value as? String, "Nothing deleted yet.")
+
+        app.buttons["topbar.close"].tap()
+        XCTAssertEqual(app.buttons["entry.review"].label, "Review & delete · 1")
+    }
+
+    func testSuccessfulDeletionReturnsToTheSortingPosition() {
+        let app = launchApp()
+        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        app.buttons["entry.recent"].tap()
+
+        let photo = photoElement(app)
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        photo.swipeLeft()
+
+        app.buttons["viewer.review"].tap()
+        let delete = app.buttons["review.delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+        app.alerts.buttons["Delete"].tap()
+
+        let continuation = app.buttons["result.done"]
+        XCTAssertTrue(continuation.waitForExistence(timeout: 10))
+        XCTAssertTrue(continuation.label.contains("Continue sorting"))
+        continuation.tap()
+
+        XCTAssertTrue(photoElement(app).waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["viewer.review"].exists)
     }
 
     func testSettingsChangesPresetWithoutCrashing() {

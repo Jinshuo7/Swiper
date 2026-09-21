@@ -382,4 +382,149 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(second.model.markedIDs, [])
         XCTAssertEqual(second.store.state?.marks, [])
     }
+
+    // MARK: - Deletion recovery (#14)
+
+    private func markTwo(
+        _ made: (model: AppModel, library: FakePhotoLibrary, store: InMemorySessionStore)
+    ) async -> [String] {
+        made.model.startRecent()
+        await made.model.settle()
+        made.model.apply(.queueDeletion)
+        await made.model.settle()
+        made.model.apply(.queueDeletion)
+        await made.model.settle()
+        return made.model.markedIDs
+    }
+
+    func testACancelledSystemDeletionPreservesEveryMarkAndCountsNothing() async {
+        let made = await bootstrapped()
+        let marks = await markTwo(made)
+        XCTAssertEqual(marks.count, 2)
+
+        // PhotoKit reports the assets as submitted, but the system confirmation
+        // was cancelled, so they are all still present afterwards.
+        made.library.faults.failedDeleteIDs = Set(marks)
+        await made.model.confirmDeletion()
+
+        XCTAssertEqual(made.model.markedIDs, marks, "cancellation preserves marks")
+        XCTAssertEqual(made.model.lastDeletion.deletedCount, 0)
+        XCTAssertEqual(made.model.lastDeletion.failedCount, 2)
+        XCTAssertEqual(made.model.statistics.lifetimeDeletedCount, 0)
+        XCTAssertEqual(made.store.state?.marks, marks)
+    }
+
+    func testPartialDeletionLeavesUnsuccessfulItemsMarked() async {
+        let made = await bootstrapped()
+        let marks = await markTwo(made)
+        let failing = marks[0]
+        made.library.faults.failedDeleteIDs = [failing]
+
+        await made.model.confirmDeletion()
+
+        XCTAssertEqual(made.model.markedIDs, [failing])
+        XCTAssertEqual(made.model.lastDeletion.deletedIDs, [marks[1]])
+        XCTAssertEqual(made.model.lastDeletion.failedIDs, [failing])
+        XCTAssertEqual(made.model.statistics.currentSessionDeletedCount, 1)
+        XCTAssertEqual(made.model.statistics.lifetimeDeletedCount, 1)
+        XCTAssertEqual(made.store.state?.marks, [failing])
+    }
+
+    func testRetryingAPartialDeletionNeverDoubleCounts() async {
+        let made = await bootstrapped()
+        let marks = await markTwo(made)
+        let failing = marks[0]
+        made.library.faults.failedDeleteIDs = [failing]
+        await made.model.confirmDeletion()
+        XCTAssertEqual(made.model.statistics.lifetimeDeletedCount, 1)
+
+        // The library now accepts the remaining one.
+        made.library.faults.failedDeleteIDs = []
+        await made.model.confirmDeletion()
+
+        XCTAssertEqual(made.model.markedIDs, [])
+        XCTAssertEqual(made.model.lastDeletion.deletedIDs, [failing])
+        XCTAssertEqual(
+            made.model.statistics.lifetimeDeletedCount,
+            2,
+            "a retry must count only the newly confirmed deletion"
+        )
+        XCTAssertEqual(made.store.state?.marks, [])
+    }
+
+    func testInterruptedCommitIsReconciledAfterRelaunchWithoutCountingTwice() async {
+        let store = InMemorySessionStore()
+        let made = await bootstrapped(store: store)
+        let marks = await markTwo(made)
+        let deleted = marks[0]
+
+        // The library deletion succeeds but the local save fails, as if the app
+        // died between the PhotoKit effect and the write.
+        store.failsWrites = true
+        await made.model.confirmDeletion()
+        XCTAssertNotNil(made.model.persistenceNotice)
+        XCTAssertEqual(made.model.statistics.lifetimeDeletedCount, 1)
+        XCTAssertEqual(store.state?.marks, marks, "the stale list is still stored")
+
+        store.failsWrites = false
+        let relaunched = await bootstrapped(store: store)
+        XCTAssertEqual(relaunched.model.markedIDs, [marks[1]], "the vanished mark is reconciled away")
+        XCTAssertEqual(
+            relaunched.model.statistics.lifetimeDeletedCount,
+            1,
+            "reconciliation never credits a deletion Swiper did not confirm"
+        )
+    }
+
+    func testResultContinuationReturnsToTheSortingPositionWhileTheSessionContinues() async {
+        let made = await bootstrapped()
+        await markTwo(made)
+        made.library.faults.failedDeleteIDs = []
+        await made.model.confirmDeletion()
+        XCTAssertEqual(made.model.route, .result)
+
+        made.model.continueAfterResult()
+        XCTAssertEqual(made.model.route, .viewer, "an active session continues where it left off")
+    }
+
+    func testResultContinuationReachesCompletionWithRemainingMarks() async {
+        let made = await bootstrapped(library: FakePhotoLibrary.demo(count: 2))
+        made.model.startRecent()
+        await made.model.settle()
+        made.model.apply(.queueDeletion)
+        await made.model.settle()
+        made.model.apply(.keep)
+        await made.model.settle()
+        XCTAssertTrue(made.model.engine?.isFinished ?? false)
+
+        made.model.continueAfterResult()
+        XCTAssertEqual(made.model.route, .review, "an exhausted session with marks left lands in review")
+    }
+
+    func testResultContinuationReturnsHomeWithNoActiveSession() async {
+        let made = await bootstrapped()
+        await markTwo(made)
+        made.model.finishSession()
+        await made.model.settle()
+        XCTAssertNil(made.model.engine)
+
+        made.model.continueAfterResult()
+
+        XCTAssertEqual(made.model.route, .entry)
+    }
+
+    func testCloseLeavesEveryDecisionSaved() async {
+        let made = await bootstrapped()
+        made.model.startRecent()
+        await made.model.settle()
+        let marked = made.model.currentAsset?.id
+        made.model.apply(.queueDeletion)
+        await made.model.settle()
+
+        made.model.closeViewer()
+
+        XCTAssertEqual(made.model.route, .entry)
+        XCTAssertEqual(made.store.state?.marks, [marked].compactMap { $0 })
+        XCTAssertNotNil(made.model.resumableSession)
+    }
 }

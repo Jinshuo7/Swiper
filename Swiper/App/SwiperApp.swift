@@ -11,7 +11,13 @@ struct SwiperApp: App {
         let library: SwiperPhotoLibrary
         let store: SessionStoring
         if useFakeLibrary {
-            library = FakePhotoLibrary.demo()
+            let fakeLibrary = FakePhotoLibrary.demo()
+            if arguments.contains("-uiTestingFailDeletion") {
+                // The system confirmation is cancelled: every requested asset is
+                // submitted but stays in the library.
+                fakeLibrary.faults.failedDeleteIDs = Set(FakePhotoLibrary.demoDescriptors().map(\.id))
+            }
+            library = fakeLibrary
             store = SwiperApp.makeUITestingStore(arguments: arguments)
         } else {
             library = PhotoKitLibrary()

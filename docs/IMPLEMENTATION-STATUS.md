@@ -6,8 +6,7 @@ Durable resume point for the autonomous implementation of GitHub issues #11–#1
 
 ## Current ticket
 
-**#13 — Preserve marked photos across sorting sessions** (finishing: checks green,
-commit next).
+**#14 — Review/deletion recovery and return to sorting** (checking, commit next).
 
 ## Environment notes (learned this session)
 
@@ -86,7 +85,7 @@ Decisions:
 Not verified: the `SwiperAppTests` cases and all UI tests have not executed
 (device unavailable). The issue stays open until they run.
 
-## Ticket #13 — in progress
+## Ticket #13 — DONE (commit 96abcb2), issue left OPEN
 
 Decisions:
 
@@ -112,5 +111,30 @@ Decisions:
 Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
 `TEST BUILD SUCCEEDED`.
 
-Next steps: commit #13, comment on it, then start #14 (review/delete recovery
-and return-to-sorting).
+Not verified: `SwiperAppTests` and UI tests have still not run (device
+unavailable). #13 stays open until they do.
+
+## Ticket #14 — in progress
+
+Decisions:
+
+- `closeViewer()` makes leaving the viewer explicit: every decision was already
+  saved before it was acknowledged, so Close navigates home and never discards.
+- `continueAfterResult()` routes after a commit: an active session resumes at its
+  sorting position, an exhausted session with marks left lands in review, and no
+  session goes home. The result button label follows the same rule.
+- Comparison of a cancelled deletion: the fake library can now submit assets
+  without removing them (`-uiTestingFailDeletion`), which is exactly what a
+  cancelled system confirmation looks like. Marks stay, statistics stay at zero,
+  and the result says nothing was deleted.
+- Interrupted commit (PhotoKit effect succeeded, local save failed) is exercised
+  by failing writes after the delete and relaunching over the same store: the
+  vanished mark is reconciled away and the deletion is counted once, never twice.
+- SPEC §6 gained the explicit recovery policy and the safety invariant that an
+  acknowledged decision is saved first.
+
+Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
+`TEST BUILD SUCCEEDED`.
+
+Next steps: commit #14, comment on it, then #15 (minimal drag feedback and the
+replayable tutorial).

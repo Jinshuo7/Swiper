@@ -118,6 +118,13 @@ settings. Statistics are not otherwise visible.
    Unsuccessful or cancelled deletions stay marked and are not counted.
 8. Leaving review returns to the place it was opened from, or home when there is
    no active sorting session.
+9. Local storage and PhotoKit are not one transaction. Swiper never claims a
+   deletion it did not confirm: after a commit it re-reads the library, removes
+   only confirmed-deleted assets from the list, keeps unsuccessful ones marked,
+   and re-checks stored state against the library on the next launch. Assets that
+   vanished outside Swiper are dropped from the list without being counted as
+   deletions, and a retry never re-requests or re-counts an asset that is already
+   gone.
 
 ## 7. Result and statistics
 
@@ -135,5 +142,7 @@ settings. Statistics are not otherwise visible.
 * Swiper never deletes while swiping.
 * A marked photo is reversible until the final commit.
 * Restored photos become kept and leave the deletion list.
+* An acknowledged decision is always saved first; a failed save is visible and
+  retryable, and is never presented as success.
 * Statistics only reflect confirmed successful changes.
 * Automated tests never touch a real library.

@@ -34,15 +34,17 @@ struct SessionResultView: View {
                 }
 
                 if outcome.failedCount > 0 {
-                    Text("\(outcome.failedCount) could not be confirmed as deleted.")
+                    Text("\(outcome.failedCount) could not be confirmed as deleted and stayed marked. Nothing about them was counted.")
                         .font(.footnote)
+                        .multilineTextAlignment(.center)
                         .foregroundStyle(.orange)
+                        .accessibilityIdentifier("result.remaining")
                 }
 
                 Button {
                     model.dismissResult()
                 } label: {
-                    Text("Done")
+                    Text(model.resultContinuationTitle)
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 6)
