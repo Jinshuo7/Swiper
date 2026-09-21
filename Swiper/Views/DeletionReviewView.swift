@@ -100,7 +100,13 @@ struct DeletionReviewView: View {
                         .frame(height: cellWidth)
                         .contentShape(Rectangle())
                         .onTapGesture { handleTap(id: id) }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityAddTraits(.isButton)
                         .accessibilityIdentifier("review.cell.\(index)")
+                        .accessibilityLabel(
+                            "\(isSelecting && selected.contains(id) ? "Selected, " : "")Marked photo \(index + 1) of \(markedIDs.count)"
+                        )
+                        .accessibilityHint(isSelecting ? "Double tap to select or deselect" : "Double tap to inspect")
                     }
                 }
                 .coordinateSpace(name: "reviewGrid")

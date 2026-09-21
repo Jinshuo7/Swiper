@@ -136,6 +136,10 @@ and its wrapper store were replaced by a precise
 and a UI test was added for the visible save-failure banner and its Retry, which
 was the one user story with no UI coverage at all.
 
+Also: review-grid thumbnails now carry a real accessibility label
+("Marked photo N of M", plus selection state) and a hint, instead of being
+unlabelled images that VoiceOver cannot describe.
+
 Checks after the fixes: `Scripts/run-kit-tests.sh` → **111 tests, 0 failures**;
 `Scripts/typecheck-ios.sh` → `OK`; `build-for-testing` → `TEST BUILD SUCCEEDED`.
 The device block is unchanged, so the new UI test is likewise unexecuted.
