@@ -280,6 +280,31 @@ final class SwiperUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Review deletion"].waitForExistence(timeout: 5))
     }
 
+    /// The fake library cycles a Live Photo every fifth asset (indices 4, 9, 14,
+    /// 19), and Recent starts at index 23 walking older, so the fifth photo is
+    /// the first Live Photo.
+    func testLivePhotosAreLabelledInTheViewer() {
+        let app = launchApp()
+        _ = startViewer(app)
+
+        let badge = app.descendants(matching: .any)["viewer.liveBadge"]
+        XCTAssertFalse(badge.exists, "the first fixture is a still, so it must not be labelled")
+
+        var swipes = 0
+        while !badge.exists && swipes < 6 {
+            photoElement(app).swipeRight()
+            swipes += 1
+        }
+
+        XCTAssertTrue(badge.exists, "a Live Photo must be labelled in the viewer")
+        XCTAssertEqual(badge.label, "Live Photo")
+        XCTAssertTrue(
+            photoElement(app).label.contains("Live Photo"),
+            "the spoken description must name the kind too, got \(photoElement(app).label)"
+        )
+        capture("Viewer — Live Photo labelled")
+    }
+
     private func assertControlsInsideScreen(_ app: XCUIApplication, window: CGRect) {
         for identifier in ["topbar.close", "topbar.favorite", "topbar.undo"] {
             let control = app.buttons[identifier]

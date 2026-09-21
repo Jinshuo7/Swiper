@@ -243,6 +243,9 @@ struct ViewerView: View {
             TopBarButton(systemImage: "xmark", label: "Close") {
                 model.closeViewer()
             }
+            if model.currentAsset?.isLivePhoto == true {
+                livePhotoBadge
+            }
             Spacer()
             if preset != .extended {
                 TopBarButton(systemImage: "heart", label: "Favorite") {
@@ -257,6 +260,26 @@ struct ViewerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
+    }
+
+    /// Says plainly that this asset has motion, so nobody has to guess why a
+    /// press-and-hold behaves differently. Symbol *and* the word "LIVE", so the
+    /// meaning never rests on the symbol alone.
+    private var livePhotoBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "livephoto")
+                .font(.caption2.weight(.bold))
+            Text("LIVE")
+                .font(.caption2.weight(.bold))
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .foregroundStyle(.white)
+        .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+        .accessibilityLabel("Live Photo")
+        .accessibilityHint("Press and hold the photo to play its motion")
+        .accessibilityIdentifier("viewer.liveBadge")
     }
 
     private var controlCluster: some View {
