@@ -1,3 +1,4 @@
+import SwiperKit
 import SwiftUI
 
 struct EntryView: View {
@@ -12,11 +13,22 @@ struct EntryView: View {
                     Button {
                         model.resumeSession()
                     } label: {
-                        Label("Continue", systemImage: "play.fill")
+                        Label("Continue sorting", systemImage: "play.fill")
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("entry.resume")
-                    .accessibilityHint("Resume Session")
+                    .accessibilityHint("Continue sorting")
+                }
+
+                if model.queueCount > 0 {
+                    Button {
+                        model.goToReview(from: .entry)
+                    } label: {
+                        Label(DeletionWording.reviewAndDelete(model.queueCount), systemImage: "trash")
+                    }
+                    .buttonStyle(AdaptiveButtonStyle(isPrimary: model.resumableSession == nil))
+                    .accessibilityIdentifier("entry.review")
+                    .accessibilityValue(DeletionWording.nothingDeletedYet)
                 }
 
                 Button {
@@ -24,7 +36,7 @@ struct EntryView: View {
                 } label: {
                     Label("Recent", systemImage: "clock.arrow.circlepath")
                 }
-                .buttonStyle(AdaptiveButtonStyle(isPrimary: model.resumableSession == nil))
+                .buttonStyle(AdaptiveButtonStyle(isPrimary: model.resumableSession == nil && model.queueCount == 0))
                 .accessibilityIdentifier("entry.recent")
                 .disabled(!model.hasPhotos)
 
@@ -60,13 +72,22 @@ struct EntryView: View {
 
             Spacer(minLength: 12)
 
-            Text("Swipe left to queue for deletion or right to keep.\nUse the heart to favorite. Videos are left alone.")
+            Text(footerText)
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white.opacity(0.55))
                 .padding(.horizontal, 32)
                 .padding(.bottom, 24)
+                .accessibilityIdentifier("entry.footer")
         }
+    }
+
+    /// Always states whether anything has actually been deleted, so a leftover
+    /// mark can never be mistaken for a completed deletion.
+    private var footerText: String {
+        let base = "Swipe left to mark for deletion or right to keep.\nUse the heart to favorite. Videos are left alone."
+        guard model.queueCount > 0 else { return base }
+        return "\(DeletionWording.markedForDeletion(model.queueCount)). \(DeletionWording.nothingDeletedYet)\n\(base)"
     }
 
     private var header: some View {

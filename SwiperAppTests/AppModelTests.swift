@@ -254,4 +254,132 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0)
         XCTAssertEqual(model.statistics.currentSessionDeletedCount, 0)
     }
+
+    // MARK: - Cross-session marks
+
+    func testMarksSurviveSwitchingSortingMode() async {
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(store: store)
+        model.startRecent()
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
+
+        // Switching to Tumbler replaces the session but never the marks.
+        model.startTumbler()
+        await model.settle()
+
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
+        XCTAssertEqual(store.state?.marks, [marked].compactMap { $0 })
+        XCTAssertNotEqual(model.currentAsset?.id, marked, "a marked photo is skipped while sorting")
+    }
+
+    func testMarkedPhotosAreSkippedAfterRestart() async {
+        let store = InMemorySessionStore()
+        let first = await bootstrapped(store: store)
+        first.model.startRecent()
+        await first.model.settle()
+        let marked = first.model.currentAsset?.id
+        first.model.apply(.queueDeletion)
+        await first.model.settle()
+
+        let second = await bootstrapped(store: store)
+        XCTAssertEqual(second.model.markedIDs, [marked].compactMap { $0 })
+        XCTAssertNotNil(second.model.resumableSession)
+
+        second.model.resumeSession()
+        XCTAssertEqual(second.model.route, .viewer)
+        XCTAssertNotEqual(second.model.currentAsset?.id, marked)
+
+        // Walking the whole session never lands on the marked photo.
+        var seen: [String] = []
+        while let id = second.model.currentAsset?.id {
+            seen.append(id)
+            second.model.apply(.keep)
+            await second.model.settle()
+        }
+        XCTAssertFalse(seen.contains(marked ?? ""))
+        XCTAssertEqual(second.model.markedIDs, [marked].compactMap { $0 })
+    }
+
+    func testAFinishedSessionKeepsItsMarksForLaterReview() async {
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(store: store)
+        model.startRecent()
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+
+        model.finishSession()
+        await model.settle()
+
+        XCTAssertNil(model.engine)
+        XCTAssertNil(model.resumableSession)
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
+
+        model.goToReview(from: .entry)
+        XCTAssertEqual(model.route, .review)
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
+    }
+
+    func testRestoringFromHomeReviewUnmarksWithoutASession() async {
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(store: store)
+        model.startRecent()
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+        model.finishSession()
+        await model.settle()
+        XCTAssertNil(model.engine)
+
+        model.restore(ids: [marked].compactMap { $0 })
+        await model.settle()
+
+        XCTAssertEqual(model.markedIDs, [])
+        XCTAssertEqual(store.state?.marks, [])
+        XCTAssertNil(store.state?.session)
+    }
+
+    func testLeaveReviewReturnsToWhereItWasOpenedFrom() async {
+        let (model, _, _) = await bootstrapped()
+        model.startRecent()
+        await model.settle()
+
+        model.goToReview(from: .viewer)
+        XCTAssertEqual(model.route, .review)
+        model.leaveReview()
+        XCTAssertEqual(model.route, .viewer)
+
+        model.finishSession()
+        await model.settle()
+        model.goToReview(from: .entry)
+        model.leaveReview()
+        XCTAssertEqual(model.route, .entry)
+    }
+
+    func testStaleUndoCannotReapplyARestoredMark() async {
+        let store = InMemorySessionStore()
+        let first = await bootstrapped(store: store)
+        first.model.startRecent()
+        await first.model.settle()
+        let marked = first.model.currentAsset?.id
+        first.model.apply(.queueDeletion)
+        await first.model.settle()
+        first.model.restore(ids: [marked].compactMap { $0 })
+        await first.model.settle()
+        XCTAssertEqual(first.model.markedIDs, [])
+
+        let second = await bootstrapped(store: store)
+        second.model.resumeSession()
+        second.model.undo()
+        await second.model.settle()
+
+        XCTAssertEqual(second.model.markedIDs, [])
+        XCTAssertEqual(second.store.state?.marks, [])
+    }
 }

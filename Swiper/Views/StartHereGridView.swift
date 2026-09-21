@@ -22,7 +22,7 @@ struct StartHereGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(model.order.assets) { asset in
-                            StartHereCell(asset: asset)
+                            StartHereCell(asset: asset, isMarked: model.marks.contains(asset.id))
                                 .onTapGesture { model.startHere(assetID: asset.id) }
                         }
                     }
@@ -56,6 +56,9 @@ struct StartHereGridView: View {
 private struct StartHereCell: View {
     @EnvironmentObject private var model: AppModel
     let asset: AssetDescriptor
+    /// Marked photos are skipped while sorting, so this cell shows why instead
+    /// of silently ignoring a tap.
+    let isMarked: Bool
     @State private var image: UIImage?
 
     var body: some View {
@@ -65,8 +68,18 @@ private struct StartHereCell: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .opacity(isMarked ? 0.35 : 1)
             }
-            if asset.isLivePhoto {
+            if isMarked {
+                Text("MARKED")
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.75), in: Capsule())
+                    .foregroundStyle(.white)
+                    .padding(4)
+                    .accessibilityHidden(true)
+            } else if asset.isLivePhoto {
                 Text("LIVE")
                     .font(.system(size: 9, weight: .bold))
                     .padding(.horizontal, 4)
@@ -74,6 +87,7 @@ private struct StartHereCell: View {
                     .background(.black.opacity(0.6), in: Capsule())
                     .foregroundStyle(.white)
                     .padding(4)
+                    .accessibilityHidden(true)
             }
         }
         .frame(height: 92)
@@ -83,5 +97,6 @@ private struct StartHereCell: View {
             image = await model.library.thumbnail(for: asset.id, targetSize: CGSize(width: 184, height: 184))
         }
         .accessibilityIdentifier("startHere.cell.\(asset.id)")
+        .accessibilityLabel(isMarked ? "\(asset.id), marked for deletion" : asset.id)
     }
 }

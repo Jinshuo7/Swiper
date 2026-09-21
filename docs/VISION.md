@@ -16,22 +16,27 @@ Most cleaners optimise for gamification, statistics and aggressive deletion.
 Swiper optimises for three things instead:
 
 1. **Low thumb effort.** The decision is a swipe or a button near the thumb.
-2. **Reversibility.** Queueing is not deleting. Undo is always one tap away.
+2. **Reversibility.** Marking is not deleting. Marks survive mode changes and
+   relaunches, Undo is one tap away, and restored photos leave the list.
 3. **Honesty.** Storage numbers are labelled as estimates and only confirmed
    deletions ever count.
 
 ## Experience in one paragraph
 
-Open Swiper, grant access, and decide: **Continue** if an unfinished
-session exists, **Recent** to start at the newest photo, **Start Here** to pick
-a starting point from a scrollable grid, or **Tumbler** for a repeat-free random
-walk. Decide each photo with swipe left (queue for deletion), swipe right
-(keep), or a heart (favorite, keep, advance), or switch to a button preset.
-Traversal remembers the preferred direction and defaults toward older photos.
-At the end, review the queued photos in a grid, inspect any photo full-screen,
-restore single photos or drag-select a batch, then explicitly confirm deletion.
-A dismissible result reports how many photos were deleted and approximately how
-much storage was reclaimed.
+Open Swiper, grant access, and decide: **Continue sorting** if an unfinished
+session exists, **Review & delete · N** if photos are already marked, **Recent**
+to start at the newest photo, **Start Here** to pick a starting point from a
+scrollable grid, or **Tumbler** for a repeat-free random walk. Decide each photo
+with swipe left (mark for deletion), swipe right (keep), or a heart (favorite,
+keep, advance), or switch to a button preset. Traversal remembers the preferred
+direction and defaults toward older photos, and skips photos already marked.
+
+Marking is not deleting, and it is not session state: one deletion list carries
+across modes and relaunches, home and the viewer both open review, and only an
+explicit confirmation in review asks the system to delete. There, marked photos
+are inspected full-screen, restored one at a time or as a drag-selected batch,
+and a dismissible result then reports how many photos were deleted and
+approximately how much storage was reclaimed.
 
 ## Documentation map
 

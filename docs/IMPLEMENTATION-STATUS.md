@@ -6,7 +6,8 @@ Durable resume point for the autonomous implementation of GitHub issues #11–#1
 
 ## Current ticket
 
-**#12 — Persist accepted decisions and surface recovery failures** (in progress).
+**#13 — Preserve marked photos across sorting sessions** (finishing: checks green,
+commit next).
 
 ## Environment notes (learned this session)
 
@@ -59,7 +60,7 @@ Checks actually run:
   `** TEST BUILD SUCCEEDED **`.
 - Device UI suite: **NOT RUN — blocked**, phone `unavailable`.
 
-## Ticket #12 — in progress
+## Ticket #12 — DONE (commit 86e00bc), issue left OPEN
 
 Decisions:
 
@@ -82,5 +83,34 @@ Decisions:
   UI" constraint, which the new spec supersedes with migration plus visible
   recovery. #1 and #8 are left open and untouched; ADR-0004 covers #8's decision.
 
-Next steps: run the checks, commit, comment on #12, then start #13
-(cross-session deletion list, skip marked assets, home wording, ADR-0005).
+Not verified: the `SwiperAppTests` cases and all UI tests have not executed
+(device unavailable). The issue stays open until they run.
+
+## Ticket #13 — in progress
+
+Decisions:
+
+- `SessionEngine` keeps `decidedIDs` and the durable marks as one
+  "unavailable" set, so every sorting entry point (sequential both directions,
+  Tumbler, `upcomingIDs`, `remainingCount`, `jump(to:)`) skips a marked photo.
+  `jump` refuses a mark outright, and Start Here badges marked cells.
+- `AppModel.startSession` seeds the new engine with the durable marks instead of
+  clearing them. A new session still resets traversal, in-session decisions and
+  Undo.
+- `SessionEngine.restore` now also inserts the restored id into `decidedIDs`, so
+  a restored photo is kept for the current session and can return in a later one.
+  Conflicting Undo entries were already dropped on restore.
+- `AppModel.restore` works with no active session (home → review → restore only
+  unmarks and saves).
+- Review tracks `reviewOrigin`, so Back returns to the viewer, home or the result
+  it came from. `performConfirmedDeletion` now works from `markedIDs` rather than
+  requiring an engine, keeps unsuccessful items marked and never double-counts.
+- Home shows `Continue sorting` and `Review & delete · N` with the
+  marked-not-deleted footer; `docs/adr/0005` records the lifetime decision;
+  CONTEXT/SPEC/VISION/ROADMAP updated.
+
+Checks: 110 SwiperKit tests 0 failures; typecheck `OK`; build-for-testing
+`TEST BUILD SUCCEEDED`.
+
+Next steps: commit #13, comment on it, then start #14 (review/delete recovery
+and return-to-sorting).

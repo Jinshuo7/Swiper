@@ -4,7 +4,20 @@ Swiper is delivered as vertical slices. Each slice is a working, testable path
 through the product; later slices are not started until the previous one builds
 and is proven on a device.
 
-## Slice 1 — the tracer bullet *(current)*
+## Slice 1a — durable, intuitive cleaning *(current)*
+
+The redesign in [issue #10](https://github.com/Jinshuo7/Swiper/issues/10), added
+on top of the tracer bullet:
+
+* A viewer that shows the complete photo, with controls always inside the
+  viewport.
+* A deletion list that survives every sorting session, skips marked photos and is
+  reachable from home and the viewer.
+* Decisions acknowledged only after they are saved, with visible recovery when a
+  save fails and versioned, migratable stored state.
+* Minimal predictive swipe feedback and a replayable first-photo tutorial.
+
+## Slice 1 — the tracer bullet *(done)*
 
 The smallest end-to-end path that proves the core idea:
 
@@ -32,7 +45,8 @@ logic tests pass.
 * Richer progress affordances that are not cleanup statistics.
 * Better large-library navigation (jump to month/date, search).
 * Refined swipe physics and animations.
-* Accessibility pass: VoiceOver labels, Dynamic Type, reduced motion.
+* Accessibility pass: Dynamic Type, reduced motion (VoiceOver labels for the
+  photo and controls begin in slice 1a).
 
 ## Slice 3 — deletion confidence
 

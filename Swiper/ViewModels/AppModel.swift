@@ -60,6 +60,8 @@ final class AppModel: ObservableObject {
     /// True while stored data this build cannot read is in the way, so nothing
     /// may be written over it.
     @Published private(set) var isPersistenceReadOnly = false
+    /// Where "Back" from deletion review should return to.
+    @Published private(set) var reviewOrigin: Route = .entry
     @Published var errorMessage: String?
 
     let library: SwiperPhotoLibrary
@@ -225,6 +227,7 @@ final class AppModel: ObservableObject {
         }
 
         if engine?.isFinished == true && route == .viewer {
+            reviewOrigin = .viewer
             route = .review
         }
     }
@@ -240,7 +243,13 @@ final class AppModel: ObservableObject {
     }
 
     func startHere(assetID: String) {
-        enqueue { await self.startSession(mode: .sequential, cursorID: assetID) }
+        enqueue {
+            guard !self.marks.contains(assetID) else {
+                self.errorMessage = "That photo is marked for deletion, so it is skipped while sorting. Open Review to restore it."
+                return
+            }
+            await self.startSession(mode: .sequential, cursorID: assetID)
+        }
     }
 
     func showStartHere() { route = .startHere }
@@ -259,9 +268,9 @@ final class AppModel: ObservableObject {
             return
         }
 
-        // In this slice a new sorting session starts with an empty deletion
-        // list. Making the list outlive sessions is ticket #13.
-        let sessionMarks = DeletionQueue.empty
+        // The deletion list outlives sorting sessions: a new session resets
+        // traversal and Undo, never marks.
+        let sessionMarks = marks
 
         isDecisionInFlight = true
         defer { isDecisionInFlight = false }
@@ -384,7 +393,21 @@ final class AppModel: ObservableObject {
         route = .entry
     }
 
-    func goToReview() { route = .review }
+    func goToReview(from origin: Route) {
+        reviewOrigin = origin
+        route = .review
+    }
+
+    /// Leaves deletion review for wherever it was opened from, falling back to
+    /// home when there is nothing to sort any more.
+    func leaveReview() {
+        switch reviewOrigin {
+        case .viewer, .result:
+            route = engine == nil ? .entry : reviewOrigin
+        default:
+            route = .entry
+        }
+    }
 
     func finishSession() {
         enqueue {
@@ -401,12 +424,29 @@ final class AppModel: ObservableObject {
 
     func restore(ids: [String]) {
         enqueue {
-            guard self.pendingDecision == nil, let engine = self.engine else { return }
+            guard self.pendingDecision == nil else { return }
             self.isDecisionInFlight = true
-            var staged = engine
-            let effects = staged.restore(ids: ids)
-            await self.acknowledge(staged, effects: effects)
-            self.isDecisionInFlight = false
+            defer { self.isDecisionInFlight = false }
+
+            if var staged = self.engine {
+                let effects = staged.restore(ids: ids)
+                await self.acknowledge(staged, effects: effects)
+                return
+            }
+
+            // No active sorting session: review is reachable from home, so
+            // restoring only has to unmark and save.
+            var updated = self.marks
+            for id in ids { updated.remove(id) }
+            let state = PersistedState(marks: updated.ids, session: nil)
+            do {
+                try await self.store.saveState(state)
+            } catch {
+                self.persistenceNotice = self.describe(error)
+                return
+            }
+            self.storedState = state
+            self.marks = updated
         }
     }
 
@@ -428,11 +468,11 @@ final class AppModel: ObservableObject {
     }
 
     private func performConfirmedDeletion() async {
-        guard let engine, !engine.queue.isEmpty else { return }
+        let requested = markedIDs
+        guard !requested.isEmpty else { return }
         isBusy = true
         defer { isBusy = false }
 
-        let requested = engine.queue.ids
         let descriptors = await library.descriptors(forIDs: requested)
         do {
             let submitted = try await library.deleteAssets(ids: requested)
@@ -445,12 +485,19 @@ final class AppModel: ObservableObject {
             )
 
             let refreshedOrder = LibraryOrder(await library.fetchAllDescriptors())
-            guard var updated = self.engine else { return }
-            updated.commitDeletion(outcome: outcome)
             order = refreshedOrder
 
+            // Unsuccessful assets stay marked; only confirmed deletions leave
+            // the list, so a retry can never re-request or re-count them.
+            var updatedMarks = DeletionQueue(orderedIDs: requested)
+            for id in outcome.deletedIDs { updatedMarks.remove(id) }
+
+            var updatedEngine = engine
+            updatedEngine?.commitDeletion(outcome: outcome)
+            let session = updatedEngine?.persisted() ?? storedState.session
+
             let reconciled = AssetReconciler.reconcile(
-                PersistedState(marks: updated.queue.ids, session: updated.persisted()),
+                PersistedState(marks: updatedMarks.ids, session: session),
                 order: refreshedOrder
             )
             let state = reconciled.state

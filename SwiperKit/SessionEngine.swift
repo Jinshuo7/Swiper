@@ -65,8 +65,16 @@ public struct SessionEngine: Equatable, Sendable {
 
     public var remainingCount: Int {
         order.assets.reduce(into: 0) { partial, asset in
-            if !decidedIDs.contains(asset.id) { partial += 1 }
+            if !isUnavailable(asset.id) { partial += 1 }
         }
+    }
+
+    /// An asset is unavailable for traversal when it has already been decided in
+    /// this session, or when it is marked for deletion. Marks outlive sorting
+    /// sessions, so a photo the user already marked must never be presented
+    /// again just because a new session started.
+    public func isUnavailable(_ id: String) -> Bool {
+        decidedIDs.contains(id) || queue.contains(id)
     }
 
     public var isEmpty: Bool { order.isEmpty }
@@ -77,7 +85,7 @@ public struct SessionEngine: Equatable, Sendable {
             return tumbler.peek(
                 limit: limit,
                 availableIDs: order.idSet,
-                excluding: decidedIDs
+                excluding: unavailableIDs
             )
         }
 
@@ -91,7 +99,7 @@ public struct SessionEngine: Equatable, Sendable {
             }
             return indices.lazy
                 .map { order.assets[$0] }
-                .filter { !decidedIDs.contains($0.id) }
+                .filter { !isUnavailable($0.id) }
                 .prefix(limit)
                 .map(\.id)
         }
@@ -100,7 +108,7 @@ public struct SessionEngine: Equatable, Sendable {
             var candidateIndex = index + candidateStep
             while ids.count < limit, order.assets.indices.contains(candidateIndex) {
                 let id = order.assets[candidateIndex].id
-                if !decidedIDs.contains(id) { ids.append(id) }
+                if !isUnavailable(id) { ids.append(id) }
                 candidateIndex += candidateStep
             }
         }
@@ -202,10 +210,11 @@ public struct SessionEngine: Equatable, Sendable {
         return .advanced
     }
 
-    /// Jumps directly to a specific asset (used by "Start Here").
+    /// Jumps directly to a specific asset (used by "Start Here"). A marked
+    /// asset is refused: it is waiting in deletion review, not for a decision.
     @discardableResult
     public mutating func jump(to id: String) -> SessionEffect {
-        guard order.contains(id: id) else { return .noOp }
+        guard order.contains(id: id), !queue.contains(id) else { return .noOp }
         cursorID = id
         isFinished = false
         return .advanced
@@ -220,7 +229,7 @@ public struct SessionEngine: Equatable, Sendable {
             while let candidate = plan.next() {
                 tumbler = plan
                 guard order.contains(id: candidate) else { continue }
-                if decidedIDs.contains(candidate) { continue }
+                if isUnavailable(candidate) { continue }
                 return candidate
             }
             tumbler = plan
@@ -244,10 +253,14 @@ public struct SessionEngine: Equatable, Sendable {
         var cursor = index + step
         while order.assets.indices.contains(cursor) {
             let id = order.assets[cursor].id
-            if !decidedIDs.contains(id) { return id }
+            if !isUnavailable(id) { return id }
             cursor += step
         }
         return nil
+    }
+
+    private var unavailableIDs: Set<String> {
+        decidedIDs.union(queue.orderedIDs)
     }
 
     private func firstUndecided(preferNewest: Bool) -> String? {
@@ -256,12 +269,12 @@ public struct SessionEngine: Equatable, Sendable {
         if preferNewest {
             for index in stride(from: count - 1, through: 0, by: -1) {
                 let id = order.assets[index].id
-                if !decidedIDs.contains(id) { return id }
+                if !isUnavailable(id) { return id }
             }
         } else {
             for index in 0..<count {
                 let id = order.assets[index].id
-                if !decidedIDs.contains(id) { return id }
+                if !isUnavailable(id) { return id }
             }
         }
         return nil
@@ -278,7 +291,13 @@ public struct SessionEngine: Equatable, Sendable {
         for id in ids where queue.contains(id) {
             queue.remove(id)
             restored.insert(id)
-            if order.contains(id: id) { keptIDs.insert(id) }
+            if order.contains(id: id) {
+                // A restored photo is decided for this session, so traversal
+                // does not walk straight back onto it, and a later session may
+                // present it again.
+                keptIDs.insert(id)
+                decidedIDs.insert(id)
+            }
             effects.append(.unqueuedDeletion(id: id))
         }
         undoStack.removeEntries(forAssetIDs: Array(restored))

@@ -14,12 +14,12 @@ struct DeletionReviewView: View {
     private let columns = 3
     private let spacing: CGFloat = 2
 
-    private var queueIDs: [String] { model.engine?.queue.ids ?? [] }
+    private var markedIDs: [String] { model.markedIDs }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            if queueIDs.isEmpty {
+            if markedIDs.isEmpty {
                 Spacer()
                 emptyState
                 Spacer()
@@ -31,13 +31,13 @@ struct DeletionReviewView: View {
         .fullScreenCover(item: $inspected) { item in
             InspectionView(id: item.id)
         }
-        .alert("Delete \(queueIDs.count) \(queueIDs.count == 1 ? "photo" : "photos")?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete \(markedIDs.count) \(markedIDs.count == 1 ? "photo" : "photos")?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task { await model.confirmDeletion() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the queued photos from your library after the system confirmation. Photos you restored stay put.")
+            Text("This removes the marked photos from your library after the system confirmation. Photos you restored stay put.")
         }
     }
 
@@ -46,23 +46,25 @@ struct DeletionReviewView: View {
     private var header: some View {
         HStack {
             Button {
-                model.route = .viewer
+                model.leaveReview()
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel("Back")
+            .accessibilityIdentifier("review.back")
             Spacer()
             VStack(spacing: 2) {
                 Text("Review deletion")
                     .font(.headline)
-                Text("\(queueIDs.count) queued")
+                Text(DeletionWording.markedForDeletion(markedIDs.count))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("review.markedCount")
             }
             Spacer()
-            if queueIDs.isEmpty {
+            if markedIDs.isEmpty {
                 Color.clear.frame(width: 44, height: 44)
             } else {
                 Button(isSelecting ? "Done" : "Select") {
@@ -89,7 +91,7 @@ struct DeletionReviewView: View {
                     columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns),
                     spacing: spacing
                 ) {
-                    ForEach(Array(queueIDs.enumerated()), id: \.element) { index, id in
+                    ForEach(Array(markedIDs.enumerated()), id: \.element) { index, id in
                         ReviewCell(
                             id: id,
                             isSelecting: isSelecting,
@@ -158,13 +160,13 @@ struct DeletionReviewView: View {
         let row = Int(point.y / (cellWidth + spacing))
         guard column >= 0, column < columns, row >= 0 else { return nil }
         let index = row * columns + column
-        return queueIDs.indices.contains(index) ? queueIDs[index] : nil
+        return markedIDs.indices.contains(index) ? markedIDs[index] : nil
     }
 
     private func ids(in rect: CGRect, cellWidth: CGFloat) -> Set<String> {
         guard !rect.isNull else { return [] }
         var result = Set<String>()
-        for (index, id) in queueIDs.enumerated() {
+        for (index, id) in markedIDs.enumerated() {
             let row = index / columns
             let column = index % columns
             let frame = CGRect(
@@ -197,7 +199,7 @@ struct DeletionReviewView: View {
                 Button {
                     showDeleteConfirmation = true
                 } label: {
-                    Label("Delete \(queueIDs.count) \(queueIDs.count == 1 ? "photo" : "photos")", systemImage: "trash")
+                    Label("Delete \(markedIDs.count) \(markedIDs.count == 1 ? "photo" : "photos")", systemImage: "trash")
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.isBusy)
@@ -214,9 +216,9 @@ struct DeletionReviewView: View {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.white.opacity(0.7))
-            Text("Nothing is queued for deletion")
+            Text("Nothing is marked for deletion")
                 .foregroundStyle(.white.opacity(0.75))
-            Button("Done") { model.route = .viewer }
+            Button("Done") { model.leaveReview() }
                 .buttonStyle(SecondaryButtonStyle())
                 .padding(.horizontal, 60)
                 .accessibilityIdentifier("review.emptyDone")

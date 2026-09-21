@@ -18,13 +18,20 @@ This is the contract a build must satisfy. It describes behaviour, not code.
 
 The entry screen offers exactly these choices:
 
-* **Continue** — shown only when unfinished session state exists and resumes it.
+* **Continue sorting** — shown only when unfinished session state exists, and
+  resumes it at the saved position with its Undo history.
+* **Review & delete · N** — shown whenever N photos are marked for deletion, and
+  opens deletion review directly from home.
 * **Recent** — start a sequential session at the newest asset, traversing
   toward older photos.
 * **Start Here** — open a lazily loaded grid of the whole library and begin at
   the chosen asset. Only visible thumbnails are decoded; full images are not
-  loaded.
+  loaded. Photos already marked for deletion are badged and cannot be started on.
 * **Tumbler** — begin a randomised, repeat-free session.
+
+Home always states the marked count with the wording "N photos marked for
+deletion" and "Nothing deleted yet.", so a leftover mark is never mistaken for a
+completed deletion.
 
 A subtle statistics icon opens the statistics page; a settings icon opens
 settings. Statistics are not otherwise visible.
@@ -71,27 +78,46 @@ settings. Statistics are not otherwise visible.
 
 ## 5. Resume and persistence
 
-1. Progress (current asset, direction, decisions, deletion queue, undo history,
-   Tumbler order) is saved on device and offered as Continue.
-2. Persistence stores stable PhotoKit local identifiers only, never images.
-3. On resume, identifiers that no longer exist in the library are dropped and
+1. Progress (current asset, direction, decisions, undo history, Tumbler order)
+   is saved on device and offered as Continue sorting.
+2. The deletion list is stored separately from the sorting session and survives
+   starting a new session, switching mode and relaunching. See
+   [ADR-0005](adr/0005-deletion-list-outlives-sessions.md).
+3. Persistence stores stable PhotoKit local identifiers only, never images.
+4. On resume, identifiers that no longer exist in the library are dropped and
    the current asset falls back to the nearest still-present asset in the
    preferred direction. Externally removed assets are not counted as deletions.
-4. Tumbler never repeats an asset within a session.
+5. Tumbler never repeats an asset within a session.
+6. A new session resets traversal position, in-session decisions and Undo; it
+   never clears a mark. Photos marked for deletion are skipped by every sorting
+   entry point, so a photo is decided once.
+7. Stored state carries a schema version. Data written by a newer version of
+   Swiper, or data that cannot be read, is reported to the user and is never
+   overwritten as if the session were empty. See
+   [ADR-0004](adr/0004-schema-versioned-session-persistence.md).
+8. A decision is acknowledged only after it has been saved. A failed save pauses
+   sorting, keeps the decision recoverable and offers an explicit retry; the
+   session never advances on an unsaved decision.
 
 ## 6. Deletion review
 
-1. The review shows the queued photos as a grid of thumbnails.
+1. The review shows the marked photos as a grid of thumbnails. It is reachable
+   from home and from the viewer at any time, not only at the end of a session.
 2. Tapping a thumbnail opens full-screen inspection.
 3. A single photo can be restored. Selection mode lets the user drag across
    thumbnails to select a batch, and restore the selected batch.
-4. Restoring removes a photo from the deletion queue; it becomes kept.
+4. Restoring removes a photo from the deletion list, so a later session may
+   present it again, and keeps it for the current session so it is not
+   immediately re-presented. Undo entries that would reapply a restored mark are
+   dropped.
 5. No statistics or reclaimed-storage totals are displayed during review.
 6. Only after an explicit final confirmation does Swiper ask the system to
-   delete the remaining queued photos. The system presents its own confirmation
+   delete the remaining marked photos. The system presents its own confirmation
    as well.
 7. After the commit, only assets that are confirmed gone count as deleted.
-   Failed or cancelled deletions stay queued and are not counted.
+   Unsuccessful or cancelled deletions stay marked and are not counted.
+8. Leaving review returns to the place it was opened from, or home when there is
+   no active sorting session.
 
 ## 7. Result and statistics
 
@@ -107,7 +133,7 @@ settings. Statistics are not otherwise visible.
 ## 8. Safety invariants
 
 * Swiper never deletes while swiping.
-* A queued photo is reversible until the final commit.
-* Restored photos become kept.
+* A marked photo is reversible until the final commit.
+* Restored photos become kept and leave the deletion list.
 * Statistics only reflect confirmed successful changes.
 * Automated tests never touch a real library.

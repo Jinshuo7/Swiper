@@ -8,14 +8,24 @@ final class SwiperUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launchApp(showTutorial: Bool = false) -> XCUIApplication {
+    private func launchApp(
+        showTutorial: Bool = false,
+        persistentStore: Bool = false,
+        resetStore: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-uiTestingFakeLibrary",
             "-hasSeenSwipeTutorial", showTutorial ? "NO" : "YES",
         ]
+        if persistentStore { app.launchArguments += ["-uiTestingPersistentStore"] }
+        if resetStore { app.launchArguments += ["-uiTestingResetStore"] }
         app.launch()
         return app
+    }
+
+    private func photoElement(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["viewer.photo"]
     }
 
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
@@ -160,6 +170,74 @@ final class SwiperUITests: XCTestCase {
         XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
         app.buttons["result.done"].tap()
         XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+    }
+
+    // MARK: - Cross-session marks (#13)
+
+    func testHomeOffersContinueSortingAndReviewAfterMarking() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        let markedLabel = photo.label
+        photo.swipeLeft()
+
+        app.buttons["topbar.close"].tap()
+
+        let review = app.buttons["entry.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertEqual(review.label, "Review & delete · 1")
+        XCTAssertTrue(app.buttons["entry.resume"].label.contains("Continue sorting"))
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "marked for deletion")).firstMatch.exists,
+            "home must say the photo is marked, not deleted"
+        )
+        XCTAssertTrue(app.staticTexts["Nothing deleted yet."].exists || app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Nothing deleted yet.")).firstMatch.exists)
+        XCTAssertFalse(markedLabel.isEmpty)
+    }
+
+    func testReviewFromHomeReachesTheSameMarks() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        photo.swipeLeft()
+        app.buttons["topbar.close"].tap()
+
+        let review = app.buttons["entry.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        review.tap()
+
+        XCTAssertTrue(app.staticTexts["Review deletion"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 photo marked for deletion"].exists)
+        XCTAssertTrue(app.buttons["review.delete"].exists)
+
+        app.buttons["review.back"].tap()
+        XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
+    }
+
+    func testMarkedPhotoIsSkippedAfterRelaunchAndInANewMode() {
+        let app = launchApp(persistentStore: true, resetStore: true)
+        let photo = startViewer(app)
+        let markedLabel = photo.label
+        photo.swipeLeft()
+        app.buttons["topbar.close"].tap()
+        XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
+
+        app.terminate()
+        let relaunched = launchApp(persistentStore: true)
+        XCTAssertTrue(relaunched.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(relaunched.buttons["entry.review"].exists, "marks survive a relaunch")
+
+        // Continue sorting resumes at the saved position, never on the mark.
+        relaunched.buttons["entry.resume"].tap()
+        let resumed = photoElement(relaunched)
+        XCTAssertTrue(resumed.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(resumed.label, markedLabel)
+
+        // A brand-new mode also skips it.
+        relaunched.buttons["topbar.close"].tap()
+        XCTAssertTrue(relaunched.buttons["entry.tumbler"].waitForExistence(timeout: 5))
+        relaunched.buttons["entry.tumbler"].tap()
+        let tumblerPhoto = photoElement(relaunched)
+        XCTAssertTrue(tumblerPhoto.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(tumblerPhoto.label, markedLabel)
     }
 
     func testSettingsChangesPresetWithoutCrashing() {

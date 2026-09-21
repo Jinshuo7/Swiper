@@ -29,6 +29,7 @@ struct ViewerView: View {
                         }
                         .allowsHitTesting(!model.isDecisionInputBlocked)
                         .accessibilityIdentifier("viewer.photo")
+                        .accessibilityLabel(accessibilityDescription(for: asset))
                 } else if model.engine?.isFinished == true {
                     finishedOverlay
                 } else {
@@ -44,6 +45,20 @@ struct ViewerView: View {
     }
 
     private var currentID: String? { model.engine?.current?.id }
+
+    /// A spoken description of the current asset. VoiceOver users hear what the
+    /// photo is and whether it is already marked, instead of an unlabelled
+    /// image.
+    private func accessibilityDescription(for asset: AssetDescriptor) -> String {
+        var parts = [asset.isLivePhoto ? "Live Photo" : "Photo"]
+        if let date = asset.creationDate {
+            parts.append(date.formatted(date: .abbreviated, time: .shortened))
+        }
+        if model.marks.contains(asset.id) {
+            parts.append("marked for deletion")
+        }
+        return parts.joined(separator: ", ")
+    }
 
     /// The full screen, including the safe-area bars the photo may extend under.
     /// The overlays stay inside `geometry` (the safe area) so controls are
@@ -131,7 +146,7 @@ struct ViewerView: View {
         Group {
             if model.queueCount > 0 {
                 Button {
-                    model.goToReview()
+                    model.goToReview(from: .viewer)
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "trash")
@@ -163,7 +178,7 @@ struct ViewerView: View {
 
             if model.queueCount > 0 {
                 Button {
-                    model.goToReview()
+                    model.goToReview(from: .viewer)
                 } label: {
                     Label("Review \(model.queueCount) for deletion", systemImage: "trash")
                 }
