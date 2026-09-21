@@ -4,13 +4,27 @@ Final checkpoint for the autonomous implementation of GitHub issues #11–#16
 (parent spec #10). Read with `docs/IMPLEMENTATION-PROMPT.md`,
 `docs/specs/photo-cleaning-redesign.md` and `docs/TESTING.md`.
 
-## Where this stands
+## Where this stands — the device block is CLEARED
 
-All six tickets are implemented, committed locally and reviewed against their
-acceptance criteria. **The only outstanding gap is device execution**: the
-connected iPhone reported `unavailable` for the whole session and this machine has
-no iOS Simulator runtime, so `SwiperAppTests` and `SwiperUITests` have never run
-since the redesign. Nothing that depends on them is reported as passed.
+The iPhone became available, and **the full suite now runs green on it**:
+
+| Target | Tests | Result |
+| --- | --- | --- |
+| `SwiperKitTests` | 111 | 0 failures |
+| `SwiperAppTests` | 29 | 0 failures |
+| `SwiperUITests` | 20 | 0 failures |
+
+**160 tests, 0 failures, `** TEST SUCCEEDED **`** on the iPhone 11 Pro
+(`00008030-000669DE3408802E`, iOS 26.2.1), 2026-09-21 21:09. Result bundle
+`.derivedData/full.xcresult`.
+
+Nine screenshots were exported and **visually inspected** (not merely generated)
+— see "Screenshots inspected" below. Three defects that no test could catch were
+found that way and fixed.
+
+Still not verified: real Live Photo playback (the fake library returns no
+`PHLivePhoto`), and the restrained drag tint has been re-checked only by the
+tests, not yet by eye on the device.
 
 ## Commits (local only — nothing pushed)
 
@@ -149,6 +163,45 @@ unlabelled images that VoiceOver cannot describe.
 Checks after the fixes: `Scripts/run-kit-tests.sh` → **111 tests, 0 failures**;
 `Scripts/typecheck-ios.sh` → `OK`; `build-for-testing` → `TEST BUILD SUCCEEDED`.
 The device block is unchanged, so the new UI test is likewise unexecuted.
+
+## What the device run changed
+
+Three real problems, none of which any amount of local building would have found:
+
+1. **`SwiperAppTests` was testing a fresh library, not a relaunch.** My
+   "relaunch" test built a second `FakePhotoLibrary`, so the deleted photo came
+   back and nothing reconciled. Fixed to share the library instance; the
+   production behaviour was correct all along.
+2. **The mid-gesture drag helper could not work.** `XCUICoordinate.press(...)`
+   asserts "Must be called on the main thread", so dragging from a background
+   queue threw immediately. `holdDrag` is inverted — drag on the main thread,
+   screenshot from a background queue while the drag is held — and now produces
+   the drag attachments.
+3. **The drag tint washed the whole screen.** Visually inspected screenshots
+   showed a brown/red cast over the photo, which is neither "restrained" nor good
+   for photo visibility. Now confined to the leading edge (fades out by 38%, capped
+   at 0.20); the wells carry the meaning. Also replaced the debug-sounding injected
+   error text "test failure" with "Swiper is simulating a full disk.".
+
+A safety hole was closed before the first device run: a unit-test bundle is
+hosted *inside* the app process, so the app was constructing the real
+`PhotoKitLibrary` and opening the real `FileSessionStore` before any test ran.
+The app now treats `XCTestConfigurationFilePath` as a fake-library run.
+
+## Screenshots inspected
+
+All eleven attachments from the green run were looked at:
+
+| Screenshot | What it confirmed |
+| --- | --- |
+| Viewer fixture steps 0–3 (panorama, square, portrait, landscape) | Complete asset visible, all four edge markers present, black letterboxing, centred, Close/Favorite/Undo on screen — nothing cropped |
+| Partial left drag | Trash well with symbol **and** the words "Mark for deletion", photo following the finger, below-threshold state |
+| Left drag past threshold | Well armed: larger, thicker bright stroke |
+| Partial right drag | Green check well reading "Keep" |
+| Vertical drag | No well, no tint, photo unmoved |
+| Tutorial, Swipe preset | Four instructions with coloured symbols, plus "Nothing is deleted until you review and confirm." and the automatic-saving sentence |
+| Settings — How to use | Replay entry present |
+| Save failure — Retry offered | "Couldn't save your last decision" banner with Retry and Discard, photo unchanged behind it |
 
 ## Exact next steps for the next session
 

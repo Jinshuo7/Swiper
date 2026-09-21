@@ -21,6 +21,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.s
 ```
 
 - Latest result (2026-09-21, Xcode 27.0): **111 tests, 0 failures**, exit 0.
+- The same suite also passed **on the device** in the full run below.
 - The script honours `$DEVELOPER_DIR` if set, otherwise uses `xcode-select -p`.
 - It detects the host architecture with `uname -m` and the installed macOS SDK
   version from `MacOSX.sdk/SDKSettings.plist`, so no version is hardcoded.
@@ -70,14 +71,30 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 - The device must be connected, unlocked and in Developer Mode, with its
   developer profile trusted under Settings → General → VPN & Device Management.
   Personal Team profiles expire after 7 days; rebuild to re-trust.
-- **Status 2026-09-21: BLOCKED.** The iPhone reported `unavailable` for the whole
-  working session, and there is no Simulator runtime on this machine
-  (`xcrun simctl list runtimes` is empty; the runtime was removed for disk).
-  A `swiper` UI run was attempted while the device still reported `booted`, hung
-  for ~35 minutes with no `xcresult` progress, and was killed. Therefore
-  `SwiperAppTests` and `SwiperUITests` have **not executed** since the redesign,
-  and no design acceptance criterion that depends on them is verified. Do not
-  report them as passing.
+- **Status 2026-09-21 21:09: RUN GREEN.** The full suite ran on the iPhone 11 Pro
+  (`00008030-000669DE3408802E`, iOS 26.2.1), `** TEST SUCCEEDED **`:
+
+  | Target | Tests | Result |
+  | --- | --- | --- |
+  | `SwiperKitTests` | 111 | 0 failures |
+  | `SwiperAppTests` | 29 | 0 failures |
+  | `SwiperUITests` | 20 | 0 failures |
+
+  160 tests, 0 failures. Result bundle: `.derivedData/full.xcresult`.
+- Two environmental preconditions, both previously recorded as blockers:
+  * The device must be **unlocked**. A locked phone fails with
+    `deviceprep Code=-3 "Unlock iPhone to Continue"`, and if it locks between the
+    runner launching and enabling automation the runner reports
+    "Timed out while enabling automation mode."
+  * It helps to force a full connection first. `xcrun devicectl list devices`
+    showing `available (paired)` was followed by automation-mode timeouts;
+    `xcrun devicectl device info details --device <udid>` brought it to
+    `connected` and the run then worked.
+- `SwiperUITests` takes about 3.5 minutes (212 s) because each test relaunches the
+  app and several hold a drag for 1.5 s.
+- Inside a restricted sandbox, launching a device test host needs a
+  pseudo-terminal; without full file access Xcode fails with
+  `IDEPseudoTerminalDomain … Errno: 1` (EPERM) before any test runs.
 
 ## Screenshots
 
@@ -115,11 +132,11 @@ background queue), because the outcome wells only exist during the gesture. They
 must be inspected by eye: passing assertions alone do not establish that the
 photo is uncropped or the controls legible.
 
-**Known risk, never yet executed:** driving an `XCUICoordinate` from a background
-queue while the test thread screenshots is the least conventional thing in this
-suite. If the first real run reports a non-main-thread API failure or a
-mis-timed capture, that helper (`holdDrag`) is where to look first — the outcome
-assertions around it are independent of it and should still be kept.
+**Resolved on first execution:** `XCUICoordinate.press(...)` asserts
+"Must be called on the main thread", so the original helper (drag on a background
+queue, screenshot on the main thread) failed. `holdDrag` is now inverted: the
+drag runs on the main thread and the screenshot is taken from a background queue
+while the gesture is held. That ran green and produced the drag attachments.
 
 Real **Live Photo playback** cannot be covered by the fake library, which returns
 no `PHLivePhoto`. It needs a manual check on a device with a real live photo, and
