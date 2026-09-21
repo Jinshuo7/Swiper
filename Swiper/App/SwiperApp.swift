@@ -7,7 +7,12 @@ struct SwiperApp: App {
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
-        let useFakeLibrary = arguments.contains("-uiTestingFakeLibrary")
+        // A unit-test bundle runs *inside* this app process. XCTest sets this
+        // variable for exactly that case, so tests never fall through to the
+        // real PhotoKit library or the real on-disk store, even when no launch
+        // argument says so.
+        let isHostedByTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let useFakeLibrary = isHostedByTests || arguments.contains("-uiTestingFakeLibrary")
         let library: SwiperPhotoLibrary
         let store: SessionStoring
         if useFakeLibrary {
@@ -34,9 +39,9 @@ struct SwiperApp: App {
         }
     }
 
-    /// Store wiring for UI tests. Every option here is only reachable together
-    /// with `-uiTestingFakeLibrary`, so a test run can never touch a real
-    /// library.
+    /// Store wiring for tests. Every option here is only reachable together with
+    /// a fake library, so a test run can never touch a real library or the real
+    /// saved state.
     private static func makeUITestingStore(arguments: [String]) -> SessionStoring {
         if arguments.contains("-uiTestingUnreadableState") {
             return InMemorySessionStore(content: .unreadable)
