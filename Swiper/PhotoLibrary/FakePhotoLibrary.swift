@@ -80,7 +80,9 @@ final class FakePhotoLibrary: SwiperPhotoLibrary {
             let shape = Shape.all[index % Shape.all.count]
             return AssetDescriptor(
                 id: "fake-\(index)",
-                creationDate: base.addingTimeInterval(Double(index) * 3_600),
+                // Spread across months rather than hours, so the start grid has
+                // real month sections and a date jump worth testing.
+                creationDate: base.addingTimeInterval(Double(index) * 86_400 * 9),
                 pixelWidth: shape.pixelWidth,
                 pixelHeight: shape.pixelHeight,
                 isFavorite: false,

@@ -272,6 +272,61 @@ final class AppModelTests: XCTestCase {
 
     // MARK: - External changes
 
+    func testExternallyRemovedMarksAreReportedOnReturn() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore(content: .state(PersistedState(marks: ["fake-0", "gone"], session: nil)))
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertEqual(model.markedIDs, ["fake-0"])
+        XCTAssertEqual(
+            model.persistenceNotice,
+            "One marked photo is no longer in your library, so it was removed from the list.",
+            "a mark that vanished outside Swiper must be explained, not silently dropped"
+        )
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0)
+    }
+
+    // MARK: - Interruption (airplane / Uber)
+
+    func testKillingTheAppMidSessionLosesNothingAndResumesClearly() async {
+        let library = FakePhotoLibrary.demo(count: 8)
+        let store = InMemorySessionStore()
+
+        // Beginning: open, sort a little, then the user is interrupted.
+        let first = AppModel(library: library, store: store, defaults: isolatedDefaults())
+        await first.bootstrap()
+        await first.settle()
+        first.startRecent()
+        await first.settle()
+        first.apply(.keep)
+        await first.settle()
+        first.apply(.queueDeletion)
+        await first.settle()
+        let positionAtKill = first.currentAsset?.id
+        let marksAtKill = first.markedIDs
+        XCTAssertFalse(marksAtKill.isEmpty)
+
+        // The app is killed, not merely backgrounded: a brand-new model over the
+        // same store and the same device library.
+        let second = AppModel(library: library, store: store, defaults: isolatedDefaults())
+        await second.bootstrap()
+        await second.settle()
+
+        // Middle: home is unambiguous about what can be resumed and reviewed.
+        XCTAssertEqual(second.route, .entry)
+        XCTAssertNotNil(second.resumableSession, "the session must be offered as Continue sorting")
+        XCTAssertEqual(second.markedIDs, marksAtKill, "marks survive the kill")
+
+        second.resumeSession()
+        XCTAssertEqual(second.currentAsset?.id, positionAtKill, "sorting resumes at the same photo")
+        XCTAssertTrue(second.engine?.undoStack.canUndo ?? false, "Undo survives the kill")
+
+        // End: still reachable after the interruption.
+        second.goToReview(from: .entry)
+        XCTAssertEqual(second.route, .review)
+        XCTAssertEqual(second.markedIDs, marksAtKill)
+    }
+
     func testExternallyRemovedMarksAreDroppedWithoutCountingAsDeletions() async {
         let library = FakePhotoLibrary.demo(count: 6)
         let store = InMemorySessionStore(

@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2F5CC7E45CD891E0BC782734"
+               BlueprintIdentifier = "766AA64A0767955AA0CFC4EE"
                BuildableName = "Swiper.app"
                BlueprintName = "Swiper"
                ReferencedContainer = "container:Swiper.xcodeproj">
@@ -28,7 +28,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "18F7ED7BA8CF822414BB5771"
+               BlueprintIdentifier = "3AADAA88999E02CD1E4564B8"
                BuildableName = "SwiperKit.framework"
                BlueprintName = "SwiperKit"
                ReferencedContainer = "container:Swiper.xcodeproj">
@@ -44,7 +44,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2F5CC7E45CD891E0BC782734"
+            BlueprintIdentifier = "766AA64A0767955AA0CFC4EE"
             BuildableName = "Swiper.app"
             BlueprintName = "Swiper"
             ReferencedContainer = "container:Swiper.xcodeproj">
@@ -55,7 +55,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "C6D3DB19BEA3B4C3DA974DF3"
+               BlueprintIdentifier = "630654989165650B552720D0"
                BuildableName = "SwiperKitTests.xctest"
                BlueprintName = "SwiperKitTests"
                ReferencedContainer = "container:Swiper.xcodeproj">
@@ -65,7 +65,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4297D61A29FA442978329E49"
+               BlueprintIdentifier = "C9D2BFB4BFDDCD15ED3CE14C"
                BuildableName = "SwiperAppTests.xctest"
                BlueprintName = "SwiperAppTests"
                ReferencedContainer = "container:Swiper.xcodeproj">
@@ -75,7 +75,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2F8F92CBC4743BA08DB2E737"
+               BlueprintIdentifier = "CFB4E52D54630F1B798C170A"
                BuildableName = "SwiperUITests.xctest"
                BlueprintName = "SwiperUITests"
                ReferencedContainer = "container:Swiper.xcodeproj">
@@ -97,7 +97,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2F5CC7E45CD891E0BC782734"
+            BlueprintIdentifier = "766AA64A0767955AA0CFC4EE"
             BuildableName = "Swiper.app"
             BlueprintName = "Swiper"
             ReferencedContainer = "container:Swiper.xcodeproj">
@@ -114,7 +114,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2F5CC7E45CD891E0BC782734"
+            BlueprintIdentifier = "766AA64A0767955AA0CFC4EE"
             BuildableName = "Swiper.app"
             BlueprintName = "Swiper"
             ReferencedContainer = "container:Swiper.xcodeproj">

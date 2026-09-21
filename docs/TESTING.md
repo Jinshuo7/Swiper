@@ -76,11 +76,11 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SwiperKitTests` | 111 | 0 failures |
-  | `SwiperAppTests` | 29 | 0 failures |
-  | `SwiperUITests` | 26 | 0 failures |
+  | `SwiperKitTests` | 124 | 0 failures |
+  | `SwiperAppTests` | 31 | 0 failures |
+  | `SwiperUITests` | 29 | 0 failures |
 
-  170 tests, 0 failures. Result bundle: `.derivedData/final2.xcresult`.
+  184 tests, 0 failures. Result bundle: `.derivedData/v2.xcresult`.
 - Two environmental preconditions, both previously recorded as blockers:
   * The device must be **unlocked**. A locked phone fails with
     `deviceprep Code=-3 "Unlock iPhone to Continue"`, and if it locks between the
@@ -134,6 +134,9 @@ Attachments the suite produces, and what each one is for:
 | `Controls — right side rail` | `testControlRailCanMoveToEitherSideRail` | The rail moved to the right edge, Close at top and Keep at bottom |
 | `Controls — left side rail` | same | The rail moved to the left edge, with the photo fitted beside its lane |
 | `Settings — statistics row` | `testStatisticsIsReachedFromSettings` | Statistics now inside Settings, reached from a row |
+| `Start Here — explanation, months, jump and sort` | `testStartHereExplainsItselfAndGroupsTheLibraryByMonth` | The explanation, month sections with sticky headers, the month menu and the order toggle |
+| `Start Here — oldest first` | same | The order toggle actually reversing the month sections |
+| `Start Here — jumped to a month` | `testStartHereCanJumpStraightToAMonth` | A month reached by the menu, far beyond one screen of scrolling |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a

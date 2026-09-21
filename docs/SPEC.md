@@ -24,9 +24,14 @@ The entry screen offers exactly these choices:
   opens deletion review directly from home.
 * **Recent** — start a sequential session at the newest asset, traversing
   toward older photos.
-* **Start Here** — open a lazily loaded grid of the whole library and begin at
-  the chosen asset. Only visible thumbnails are decoded; full images are not
-  loaded. Photos already marked for deletion are badged and cannot be started on.
+* **Start Here** — open a lazily loaded grid of the whole library, grouped into
+  calendar months with the newest first, and begin at the chosen asset. The
+  screen states what it is for (choosing where to begin, after which Swiper walks
+  toward older photos and skips anything already decided or marked). A month menu
+  jumps straight to any point in the library, and a control flips the order
+  between newest and oldest, so no one has to scroll in from one end. Only
+  visible thumbnails are decoded; full images are not loaded. Photos already
+  marked for deletion are badged and cannot be started on.
 * **Tumbler** — begin a randomised, repeat-free session.
 
 Home always states the marked count with the wording "N photos marked for
@@ -128,7 +133,9 @@ in the rail.
 3. Persistence stores stable PhotoKit local identifiers only, never images.
 4. On resume, identifiers that no longer exist in the library are dropped and
    the current asset falls back to the nearest still-present asset in the
-   preferred direction. Externally removed assets are not counted as deletions.
+   preferred direction. Externally removed assets are never counted as deletions,
+   and the user is told that they were removed from the list rather than left to
+   wonder where a mark went.
 5. Tumbler never repeats an asset within a session.
 6. A new session resets traversal position, in-session decisions and Undo; it
    never clears a mark. Photos marked for deletion are skipped by every sorting

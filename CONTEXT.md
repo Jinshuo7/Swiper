@@ -50,6 +50,11 @@ older photos and remembers the user's preference.
 A repeat-free randomised traversal of the library. It uses a persisted,
 deterministic random order of identifiers.
 
+**Start Here**:
+The screen for choosing where a sorting session begins. It presents the library
+grouped into calendar months, newest first by default, with a menu that jumps
+straight to a month.
+
 **Deletion review**:
 The dedicated screen where marked photos are inspected, restored, or confirmed
 for deletion. Reachable from home and from the viewer at any time. Statistics are

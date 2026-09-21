@@ -149,6 +149,75 @@ final class SwiperUITests: XCTestCase {
         }
     }
 
+    // MARK: - Start Here (user report, 2026-09-21)
+
+    func testStartHereExplainsItselfAndGroupsTheLibraryByMonth() {
+        let app = launchApp()
+        XCTAssertTrue(app.buttons["entry.startHere"].waitForExistence(timeout: 10))
+        app.buttons["entry.startHere"].tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["startHere.explanation"].waitForExistence(timeout: 10),
+            "Start Here must say what it is for"
+        )
+        let headers = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "startHere.month."))
+        XCTAssertGreaterThanOrEqual(headers.count, 2, "the library should be grouped into months")
+        XCTAssertTrue(app.descendants(matching: .any)["startHere.jump"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["startHere.sort"].exists)
+        capture("Start Here — explanation, months, jump and sort")
+
+        // Newest first by default: toggling must actually reorder the sections.
+        let firstNewest = headers.element(boundBy: 0).identifier
+        let toggle = app.descendants(matching: .any)["startHere.sort"]
+        toggle.tap()
+        XCTAssertTrue(app.staticTexts["Oldest first"].waitForExistence(timeout: 5))
+        XCTAssertNotEqual(
+            headers.element(boundBy: 0).identifier,
+            firstNewest,
+            "switching to oldest first should change which month is at the top"
+        )
+        capture("Start Here — oldest first")
+    }
+
+    func testStartHereCanJumpStraightToAMonth() {
+        let app = launchApp()
+        app.buttons["entry.startHere"].tap()
+
+        let jump = app.descendants(matching: .any)["startHere.jump"]
+        XCTAssertTrue(jump.waitForExistence(timeout: 10))
+        jump.tap()
+
+        // The oldest year in the fixed fixtures; the gap from the newest month
+        // is far more than one screen, so scrolling could not have found it.
+        let oldest = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "2023")).firstMatch
+        XCTAssertTrue(oldest.waitForExistence(timeout: 5), "the month menu should list older months")
+        let chosen = oldest.label
+        oldest.tap()
+
+        XCTAssertTrue(
+            app.staticTexts[chosen].waitForExistence(timeout: 5),
+            "jumping should bring \(chosen) on screen"
+        )
+        capture("Start Here — jumped to \(chosen)")
+    }
+
+    func testChoosingAPhotoStartsSortingAtThatPhoto() {
+        let app = launchApp()
+        app.buttons["entry.startHere"].tap()
+
+        // fake-23 is the newest photo and a 4:1 panorama, so the viewer's own
+        // aspect ratio proves the session started where it was chosen.
+        let cell = app.descendants(matching: .any)["startHere.cell.fake-23"]
+        XCTAssertTrue(cell.waitForExistence(timeout: 10))
+        cell.tap()
+
+        let photo = photoElement(app)
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        let ratio = photo.frame.width / photo.frame.height
+        XCTAssertEqual(ratio, 4.0, accuracy: 0.02, "sorting should have started at the chosen photo")
+    }
+
     // MARK: - Control rail stability (user report, 2026-09-21)
 
     /// Reaches Settings from wherever the test is — including from inside the

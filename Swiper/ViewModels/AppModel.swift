@@ -273,8 +273,18 @@ final class AppModel: ObservableObject {
             resumableSession = nil
         }
 
-        if !reconciled.externallyRemovedIDs.isEmpty, !isPersistenceReadOnly {
-            await persistQuietly(storedState)
+        if !reconciled.externallyRemovedIDs.isEmpty {
+            // Photos vanished outside Swiper — deleted on another device, or by
+            // the system. Silently dropping them would leave the user wondering
+            // where a mark went, which is exactly the ambiguity to avoid when
+            // they come back to the app after an interruption.
+            let count = reconciled.externallyRemovedIDs.count
+            persistenceNotice = count == 1
+                ? "One marked photo is no longer in your library, so it was removed from the list."
+                : "\(count) marked photos are no longer in your library, so they were removed from the list."
+            if !isPersistenceReadOnly {
+                await persistQuietly(storedState)
+            }
         }
 
         if engine?.isFinished == true && route == .viewer {
