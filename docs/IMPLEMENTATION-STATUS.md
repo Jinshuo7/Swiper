@@ -21,9 +21,15 @@ since the redesign. Nothing that depends on them is reported as passed.
 | `96abcb2` | #13 | Preserve marked photos across sorting sessions |
 | `98a6f36` | #14 | Complete review, deletion recovery and return to sorting |
 | `6fe4780` | #15 | Minimal swipe feedback and replayable teaching |
-| _(this commit)_ | #16 | Verify and deliver interruption-safe photo cleaning |
+| `57f6ce8` | #16 | Verify and deliver interruption-safe photo cleaning |
+| `4867a6f` | — | Fix favourite-effect ordering and a mutation-chain race in AppModel |
+| `9a5e22b` | — | Give review thumbnails a spoken label and hint |
+| `7422663` | — | Align roadmap vocabulary with the shipped wording |
 
-`git diff --stat 963ee79 HEAD` → 47 files, ~4.8k insertions.
+`git diff --stat 963ee79 HEAD` → ~4.8k insertions across 47 files.
+
+The three commits after #16 come from a follow-up audit of the app paths whose
+tests cannot run; see "Follow-up audit" below.
 
 Issue state: #11 closed (its own criterion explicitly allows recording the device
 blocker); #12, #13, #14, #15 commented and left **open** because their device
@@ -38,7 +44,7 @@ evidence is pending. #16 is commented and left open for the same reason. Parent
    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
    ```
 
-   **110 tests, 0 failures**, exit 0 (baseline before this work: 66).
+   **111 tests, 0 failures**, exit 0 (baseline before this work: 66).
 
 2. iOS compile check of the framework and the whole app:
 
