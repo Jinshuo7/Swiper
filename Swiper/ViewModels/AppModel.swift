@@ -31,11 +31,10 @@ final class AppModel: ObservableObject {
     }
 
     /// A decision that was computed but could not be saved. It is retried
-    /// verbatim: the library side effects were already performed during
+    /// verbatim: every library side effect was already performed during
     /// staging, so retrying only re-attempts persistence.
     struct PendingDecision: Equatable {
         var engine: SessionEngine
-        var effects: [SessionEffect]
         var message: String
     }
 
@@ -108,15 +107,32 @@ final class AppModel: ObservableObject {
 
     // MARK: - Serialisation
 
-    /// Runs `work` after every previously queued mutation has finished.
-    private func serialized(_ work: @escaping @MainActor () async -> Void) async {
+    /// Appends `work` to the single mutation chain and returns the task that
+    /// runs it.
+    ///
+    /// The chain link is installed *synchronously*, before returning. That
+    /// matters: two gestures delivered in the same run-loop turn must not both
+    /// see an empty tail, or they would run concurrently and the later save
+    /// could overwrite the earlier one.
+    private func chain(_ work: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
         let previous = serialTail
         let task = Task { @MainActor in
             await previous?.value
             await work()
         }
         serialTail = task
-        await task.value
+        return task
+    }
+
+    /// Queues a mutation started from a synchronous UI action.
+    private func enqueue(_ work: @escaping @MainActor () async -> Void) {
+        _ = chain(work)
+    }
+
+    /// Runs `work` after every previously queued mutation has finished and waits
+    /// for it, for callers that are already asynchronous.
+    private func serialized(_ work: @escaping @MainActor () async -> Void) async {
+        await chain(work).value
     }
 
     /// Test seam: waits until every mutation queued so far has settled.
@@ -289,10 +305,6 @@ final class AppModel: ObservableObject {
 
     func showStartHere() { route = .startHere }
 
-    private func enqueue(_ work: @escaping @MainActor () async -> Void) {
-        Task { await self.serialized(work) }
-    }
-
     private func startSession(
         mode: SessionMode,
         cursorID: String?,
@@ -355,8 +367,13 @@ final class AppModel: ObservableObject {
 
     func undo() { apply(.undo) }
 
-    /// Applies the decision to a copy of the session, performs any library
+    /// Applies the decision to a copy of the session, performs every library
     /// effect it needs, saves, and only then acknowledges it.
+    ///
+    /// Library effects always happen *before* the save. That ordering is what
+    /// makes a retry safe: by the time a decision can be parked, its PhotoKit
+    /// side effect is already done, so retrying only re-attempts the write and
+    /// can never repeat a favorite change.
     private func stage(_ action: SessionAction) async {
         guard pendingDecision == nil, let engine else { return }
 
@@ -364,39 +381,31 @@ final class AppModel: ObservableObject {
         defer { isDecisionInFlight = false }
 
         var staged = engine
-        var effects: [SessionEffect]
+        var libraryEffects: [SessionEffect] = []
 
         if action == .favorite {
             guard let assetID = staged.current?.id else { return }
-            do {
-                try await library.setFavorite(true, forID: assetID)
-            } catch {
-                errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
-                return
-            }
-            // The library effect is already done, so it must not be repeated.
-            effects = staged.apply(.favorite).filter { effect in
-                if case .setFavorite = effect { return false }
-                return true
-            }
-        } else {
-            effects = staged.apply(action)
+            libraryEffects.append(.setFavorite(id: assetID, isFavorite: true))
         }
 
-        await acknowledge(staged, effects: effects)
+        for effect in staged.apply(action) {
+            guard case .setFavorite = effect, action != .favorite else { continue }
+            libraryEffects.append(effect)
+        }
+
+        guard await performLibraryEffects(libraryEffects) else { return }
+        await acknowledge(staged)
     }
 
-    /// Saves the staged session and publishes it, or parks it for retry.
-    private func acknowledge(_ staged: SessionEngine, effects: [SessionEffect]) async {
+    /// Saves the staged session and publishes it, or parks it for retry. There
+    /// is nothing left to perform afterwards: every library effect already
+    /// happened before this point.
+    private func acknowledge(_ staged: SessionEngine) async {
         let state = PersistedState(marks: staged.queue.ids, session: staged.persisted())
         do {
             try await store.saveState(state)
         } catch {
-            pendingDecision = PendingDecision(
-                engine: staged,
-                effects: effects,
-                message: describe(error)
-            )
+            pendingDecision = PendingDecision(engine: staged, message: describe(error))
             return
         }
         storedState = state
@@ -405,7 +414,6 @@ final class AppModel: ObservableObject {
         resumableSession = state.session
         pendingDecision = nil
         persistenceNotice = nil
-        perform(effects)
     }
 
     /// Retries the parked decision. Only persistence is re-attempted, so a
@@ -414,7 +422,7 @@ final class AppModel: ObservableObject {
         await serialized {
             guard let pending = self.pendingDecision else { return }
             self.isDecisionInFlight = true
-            await self.acknowledge(pending.engine, effects: pending.effects)
+            await self.acknowledge(pending.engine)
             self.isDecisionInFlight = false
         }
     }
@@ -493,8 +501,10 @@ final class AppModel: ObservableObject {
             defer { self.isDecisionInFlight = false }
 
             if var staged = self.engine {
-                let effects = staged.restore(ids: ids)
-                await self.acknowledge(staged, effects: effects)
+                // Restoring unmarks and keeps the photo for this session. It has
+                // no library effect, so it only has to be saved.
+                staged.restore(ids: ids)
+                await self.acknowledge(staged)
                 return
             }
 
@@ -602,22 +612,21 @@ final class AppModel: ObservableObject {
 
     // MARK: - Effect handling
 
-    private func perform(_ effects: [SessionEffect]) {
+    /// Performs the PhotoKit half of a decision, in order, before anything is
+    /// recorded. Returns `false` when the library refused, in which case the
+    /// decision is abandoned and the session is left as it was.
+    @discardableResult
+    private func performLibraryEffects(_ effects: [SessionEffect]) async -> Bool {
         for effect in effects {
-            switch effect {
-            case .setFavorite(let id, let isFavorite):
-                Task { [weak self] in
-                    guard let self else { return }
-                    do {
-                        try await self.library.setFavorite(isFavorite, forID: id)
-                    } catch {
-                        self.errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
-                    }
-                }
-            case .queuedDeletion, .unqueuedDeletion, .advanced, .undoApplied, .sessionFinished, .noOp:
-                break
+            guard case .setFavorite(let id, let isFavorite) = effect else { continue }
+            do {
+                try await library.setFavorite(isFavorite, forID: id)
+            } catch {
+                errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
+                return false
             }
         }
+        return true
     }
 
     // MARK: - Persistence helpers

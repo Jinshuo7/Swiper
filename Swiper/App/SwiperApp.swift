@@ -51,43 +51,18 @@ struct SwiperApp: App {
             try? FileManager.default.removeItem(at: directory)
         }
 
-        // Restart tests need state that survives relaunching the app.
-        guard arguments.contains("-uiTestingPersistentStore") else {
+        // The session-start write is attempt 1, so attempt 2 is the first user
+        // decision: the run sees a real failure followed by a real retry.
+        if arguments.contains("-uiTestingFailFirstDecisionSave") {
             let store = InMemorySessionStore()
-            store.failsWrites = arguments.contains("-uiTestingFailSaves")
+            store.failSaveAttempt = 2
             return store
         }
 
-        let store = FileSessionStore(directory: directory)
-        if arguments.contains("-uiTestingFailSaves") {
-            return FailingSessionStore(wrapping: store)
+        // Restart tests need state that survives relaunching the app.
+        guard arguments.contains("-uiTestingPersistentStore") else {
+            return InMemorySessionStore()
         }
-        return store
+        return FileSessionStore(directory: directory)
     }
-}
-
-/// Wraps a real store and refuses every write, so the visible save-failure path
-/// can be exercised for real.
-private final class FailingSessionStore: SessionStoring {
-    private let wrapped: SessionStoring
-
-    init(wrapping wrapped: SessionStoring) {
-        self.wrapped = wrapped
-    }
-
-    func loadState() -> SessionLoadResult { wrapped.loadState() }
-
-    func saveState(_ state: PersistedState) async throws {
-        throw SessionStoreError.writeFailed("Swiper is simulating a full disk.")
-    }
-
-    func clearState() async throws {
-        throw SessionStoreError.writeFailed("Swiper is simulating a full disk.")
-    }
-
-    func quarantineUnreadableState() throws -> URL? { try wrapped.quarantineUnreadableState() }
-    func loadStatistics() -> SessionStatistics { wrapped.loadStatistics() }
-    func saveStatistics(_ statistics: SessionStatistics) { wrapped.saveStatistics(statistics) }
-    func loadPreferences() -> ControlPreferences { wrapped.loadPreferences() }
-    func savePreferences(_ preferences: ControlPreferences) { wrapped.savePreferences(preferences) }
 }

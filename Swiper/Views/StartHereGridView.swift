@@ -22,8 +22,15 @@ struct StartHereGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(model.order.assets) { asset in
-                            StartHereCell(asset: asset, isMarked: model.marks.contains(asset.id))
-                                .onTapGesture { model.startHere(assetID: asset.id) }
+                            let isMarked = model.marks.contains(asset.id)
+                            StartHereCell(asset: asset, isMarked: isMarked)
+                                // A marked photo is waiting in review, not for a
+                                // decision, so the cell explains itself instead
+                                // of starting a session on it.
+                                .onTapGesture {
+                                    guard !isMarked else { return }
+                                    model.startHere(assetID: asset.id)
+                                }
                         }
                     }
                     .padding(.horizontal, 2)

@@ -20,7 +20,7 @@ UI test launches with `-uiTestingFakeLibrary`.
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
 ```
 
-- Latest result (2026-09-21, Xcode 27.0): **110 tests, 0 failures**, exit 0.
+- Latest result (2026-09-21, Xcode 27.0): **111 tests, 0 failures**, exit 0.
 - The script honours `$DEVELOPER_DIR` if set, otherwise uses `xcode-select -p`.
 - It detects the host architecture with `uname -m` and the installed macOS SDK
   version from `MacOSX.sdk/SDKSettings.plist`, so no version is hardcoded.
@@ -107,6 +107,7 @@ Attachments the suite is written to produce, and what each one is for:
 | `Vertical drag — no decision` | `testVerticalDragDecidesNothing` | No well, no outcome |
 | `Tutorial — first photo, Swipe preset` | `testFirstPhotoTutorialExplainsAndReplaysFromSettings` | Tutorial copy and dismissal |
 | `Settings — How to use` | same | Settings entry that replays it |
+| `Save failure — Retry offered` | `testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession` | The visible save-failure banner and its Retry action |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a

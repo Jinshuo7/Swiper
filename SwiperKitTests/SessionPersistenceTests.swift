@@ -327,6 +327,22 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertTrue(store.savedStates.isEmpty)
     }
 
+    func testInMemoryStoreCanFailExactlyOneNumberOfedSaveAttempt() async throws {
+        let store = InMemorySessionStore()
+        store.failSaveAttempt = 2
+
+        try await store.saveState(PersistedState(marks: ["a"]))
+        do {
+            try await store.saveState(PersistedState(marks: ["a", "b"]))
+            XCTFail("attempt 2 should fail")
+        } catch {
+            XCTAssertEqual(error as? SessionStoreError, .writeFailed("test failure"))
+        }
+        try await store.saveState(PersistedState(marks: ["a", "b", "c"]))
+        XCTAssertEqual(store.state?.marks, ["a", "b", "c"], "later attempts succeed again")
+        XCTAssertEqual(store.saveAttempts, 3)
+    }
+
     func testInMemoryStoreRefusesToOverwriteUnreadableContent() async {
         let store = InMemorySessionStore(content: .unreadable)
         do {

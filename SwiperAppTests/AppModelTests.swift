@@ -155,6 +155,28 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.route, .entry)
     }
 
+    func testFavoriteAndItsUndoAreAppliedInOrderExactlyOnceEach() async {
+        let made = await bootstrapped()
+        made.model.startRecent()
+        await made.model.settle()
+        let favorited = made.model.currentAsset?.id
+
+        // Two gestures in the same run-loop turn: the second must wait for the
+        // first, and neither library effect may be repeated or reordered.
+        made.model.apply(.favorite)
+        made.model.apply(.undo)
+        await made.model.settle()
+
+        XCTAssertEqual(made.model.currentAsset?.id, favorited, "undo returns to the favorited photo")
+        XCTAssertEqual(
+            made.library.favoriteWrites.map { "\($0.id):\($0.isFavorite)" },
+            ["\(favorited ?? ""):true", "\(favorited ?? ""):false"],
+            "the favorite write and its undo must land in order, once each"
+        )
+        XCTAssertFalse(made.model.engine?.decidedIDs.contains(favorited ?? "") ?? true)
+        XCTAssertNil(made.model.pendingDecision)
+    }
+
     // MARK: - Restart
 
     func testRestartRestoresPositionAndUndoFromStoredState() async {

@@ -11,7 +11,8 @@ final class SwiperUITests: XCTestCase {
         showTutorial: Bool = false,
         persistentStore: Bool = false,
         resetStore: Bool = false,
-        failDeletion: Bool = false
+        failDeletion: Bool = false,
+        failFirstDecisionSave: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -21,6 +22,7 @@ final class SwiperUITests: XCTestCase {
         if persistentStore { app.launchArguments += ["-uiTestingPersistentStore"] }
         if resetStore { app.launchArguments += ["-uiTestingResetStore"] }
         if failDeletion { app.launchArguments += ["-uiTestingFailDeletion"] }
+        if failFirstDecisionSave { app.launchArguments += ["-uiTestingFailFirstDecisionSave"] }
         app.launch()
         return app
     }
@@ -359,6 +361,31 @@ final class SwiperUITests: XCTestCase {
         let tumblerPhoto = photoElement(relaunched)
         XCTAssertTrue(tumblerPhoto.waitForExistence(timeout: 10))
         XCTAssertNotEqual(tumblerPhoto.label, markedLabel)
+    }
+
+    // MARK: - Visible save failure and retry (#12)
+
+    func testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession() {
+        let app = launchApp(failFirstDecisionSave: true)
+        let photo = startViewer(app)
+        let before = photo.label
+
+        photo.swipeLeft()
+
+        let banner = app.descendants(matching: .any)["saveFailure.banner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "a failed save must be visible")
+        XCTAssertTrue(app.staticTexts["Couldn't save your last decision"].exists)
+        XCTAssertEqual(photoElement(app).label, before, "the session must not advance before the decision is saved")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "an unsaved mark must not appear")
+
+        let retry = app.buttons["Retry"]
+        XCTAssertTrue(retry.exists)
+        capture("Save failure — Retry offered")
+        retry.tap()
+
+        XCTAssertFalse(banner.waitForExistence(timeout: 3), "a successful retry clears the banner")
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 5), "the retried decision is acknowledged")
+        XCTAssertNotEqual(photoElement(app).label, before)
     }
 
     // MARK: - Review and deletion recovery (#14)

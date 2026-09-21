@@ -109,6 +109,37 @@ evidence is pending. #16 is commented and left open for the same reason. Parent
   visible recovery. Old issue #8's ADR requirement is covered by ADR-0004. Neither
   old issue was closed or modified.
 
+## Follow-up audit (round 2): two real defects found and fixed
+
+With the device still unavailable, the never-executed app paths were re-read line
+by line. Two genuine defects in `AppModel` were found and fixed:
+
+1. **Favorite library effects were no longer serialised.** The rewrite fired
+   `.setFavorite` effects from `acknowledge` inside a detached `Task`, after the
+   save, with no input blocking — so a favorite followed quickly by Undo could
+   reach PhotoKit out of order. The original code had blocked input while a
+   favorite write was in flight, and #12 requires input to be serialised. Now
+   *all* library effects run inside the serialised chain **before** the save, and
+   there is nothing left to perform afterwards, so a retry can only ever retry
+   the write. `PendingDecision` no longer carries an effect list at all, which
+   removes the "effects replayed on retry" failure mode by construction.
+2. **The mutation chain had a race.** `enqueue` wrapped `serialized` in a `Task`,
+   so two gestures delivered in the same run-loop turn could both observe an
+   empty tail and run concurrently, letting the later save overwrite the earlier
+   one. The chain link is now installed synchronously in `chain(_:)` before
+   returning.
+
+Also in this round: `Start Here` no longer fires a tap on a marked cell (the cell
+explains itself with its MARKED badge), the unused `-uiTestingFailSaves` wiring
+and its wrapper store were replaced by a precise
+`-uiTestingFailFirstDecisionSave` seam (`InMemorySessionStore.failSaveAttempt`),
+and a UI test was added for the visible save-failure banner and its Retry, which
+was the one user story with no UI coverage at all.
+
+Checks after the fixes: `Scripts/run-kit-tests.sh` → **111 tests, 0 failures**;
+`Scripts/typecheck-ios.sh` → `OK`; `build-for-testing` → `TEST BUILD SUCCEEDED`.
+The device block is unchanged, so the new UI test is likewise unexecuted.
+
 ## Exact next steps for the next session
 
 1. Reconnect and unlock the iPhone, confirm `xcrun devicectl list devices` shows

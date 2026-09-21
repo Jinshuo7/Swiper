@@ -405,6 +405,9 @@ public final class InMemorySessionStore: SessionStoring {
     public var content: StoredContent
     /// When true, ``saveState(_:)`` and ``clearState()`` fail until it is reset.
     public var failsWrites = false
+    /// When set, exactly that numbered save attempt fails and later ones succeed
+    /// again, so a test can watch a real failure turn into a real retry.
+    public var failSaveAttempt: Int?
     public private(set) var statistics: SessionStatistics
     public private(set) var preferences: ControlPreferences
     /// Every state that was successfully written, in order.
@@ -456,7 +459,7 @@ public final class InMemorySessionStore: SessionStoring {
 
     public func saveState(_ state: PersistedState) async throws {
         saveAttempts += 1
-        if failsWrites {
+        if failsWrites || saveAttempts == failSaveAttempt {
             throw SessionStoreError.writeFailed("test failure")
         }
         if !loadState().allowsWrites {
