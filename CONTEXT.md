@@ -25,8 +25,11 @@ A reversible decision that adds a photo to the deletion queue. It never removes
 anything from the library.
 
 **Deletion queue**:
-The ordered set of photos queued for deletion in the current session. Every
-member is reversible until the final deletion commit.
+The persistent, ordered set of photos marked for deletion across sorting
+sessions. Starting a new session never clears it; each mark remains reversible
+until the final deletion commit.
+
+_User-facing wording_: "Photos marked for deletion", not "queue".
 
 **Traversal direction**:
 Whether the session walks toward older or newer photos. Swiper defaults toward
@@ -64,6 +67,10 @@ media kind because PhotoKit exposes no public byte size. Always labelled as an
 estimate.
 
 ## Media and preferences
+
+**Full-photo presentation**:
+The viewer shows the complete asset at its original aspect ratio. Unused screen
+area stays black; the viewer never crops an asset merely to fill the display.
 
 **Live Photo**:
 A still image with an associated short motion clip. Supported in v1.

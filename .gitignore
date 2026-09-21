@@ -14,3 +14,7 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Local scratch (agent builds, macro plugin temp)
+.derivedData/
+.tmp/

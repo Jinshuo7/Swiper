@@ -22,6 +22,15 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   be registered. Personal-team provisioning profiles expire after 7 days.
 - Raw-compiler fallbacks when `xcodebuild` is unavailable:
   `Scripts/run-kit-tests.sh` (macOS) and `Scripts/typecheck-ios.sh` (iOS check).
+- Inside a restricted (agent-harness) sandbox, two extra flags are required, or
+  every SwiftUI `@State` fails with "external macro implementation type
+  'SwiftUIMacros.StateMacro' could not be found … produced malformed response":
+  `-Xfrontend -disable-sandbox` (the macro plugin server cannot apply its own
+  nested sandbox) and `-derivedDataPath ./.derivedData` (the default
+  `~/Library/Developer/Xcode/DerivedData` is outside the writable workspace).
+  For `xcodebuild` pass the flag via
+  `OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'`.
+  `Scripts/typecheck-ios.sh` already sets it.
 - After adding, renaming or deleting source files, run
   `ruby Scripts/generate_project.rb` and commit `Swiper.xcodeproj`.
 

@@ -34,8 +34,14 @@ echo "==> Building SwiperKit for iOS ($TARGET)"
   $(find "$ROOT/SwiperKit" -name '*.swift' | sort)
 
 echo "==> Type-checking the Swiper app"
+# -disable-sandbox: SwiftUI's macros are expanded by swift-plugin-server, which
+# wraps the plugin in its own sandbox. That nested sandbox fails when this
+# script already runs inside one (for example an agent-harness sandbox), and the
+# macro then reports a "malformed response". The flag only changes how the
+# compiler launches macro plugins; it does not change the code being checked.
 "$SWIFTC" -sdk "$IOSSDK" -target "$TARGET" -parse-as-library -typecheck \
   -I "$BUILD" \
+  -Xfrontend -disable-sandbox \
   $(find "$ROOT/Swiper" -name '*.swift' | sort)
 
 echo "OK"

@@ -31,22 +31,29 @@ settings. Statistics are not otherwise visible.
 
 ## 3. The full-screen viewer
 
-1. One photo occupies the whole screen against black, edge to edge, preserving
-   aspect ratio. Live Photos show their still and can play their motion.
+1. The viewer contains the complete asset at its original aspect ratio, centred
+   against black and as large as the display allows. It is never cropped merely
+   to fill the screen; unused area stays black. Live Photos show their still and
+   can play their motion.
 2. Only the current asset's display image and a small prefetch window of
    neighbours are requested. Requests for assets that are no longer current are
    cancelled.
-3. Default Swipe preset gestures:
+3. Every control and overlay stays inside the viewport and its safe area, so
+   Close, Favorite and Undo are always reachable. There is no permanent
+   instruction text over the photo.
+4. Whenever photos are marked for deletion, the viewer shows a compact
+   `Review · N` control that opens deletion review without ending the session.
+5. Default Swipe preset gestures:
    * swipe left → queue for deletion and advance;
    * swipe right → keep and advance;
-4. A heart control marks the asset as an Apple Photos favorite, keeps it and
+6. A heart control marks the asset as an Apple Photos favorite, keeps it and
    advances.
-5. Undo reverses the most recent decision, including removing a just-queued
+7. Undo reverses the most recent decision, including removing a just-queued
    photo from the deletion queue, and returns to that photo. Undo never deletes.
-6. Traversal moves in the preferred direction, skipping assets already decided
+8. Traversal moves in the preferred direction, skipping assets already decided
    in this session. At the end of the library it continues in the other
    direction if undecided assets remain.
-7. Nothing is ever deleted from the viewer.
+9. Nothing is ever deleted from the viewer.
 
 ## 4. Control presets and placement
 

@@ -17,7 +17,11 @@ struct ViewerView: View {
                 Color.black.ignoresSafeArea()
 
                 if let asset = model.engine?.current {
-                    AssetCanvas(asset: asset, targetSize: geometry.size, dragOffset: dragOffset)
+                    AssetCanvas(asset: asset, targetSize: canvasSize(in: geometry), dragOffset: dragOffset)
+                        .frame(
+                            width: fittedSize(for: asset, in: geometry).width,
+                            height: fittedSize(for: asset, in: geometry).height
+                        )
                         .id(asset.id)
                         .gesture(swipeGesture, including: preset.usesSwipeGestures ? .all : .none)
                         .onTapGesture {
@@ -33,13 +37,30 @@ struct ViewerView: View {
             }
             .overlay(alignment: .top) { topBar }
             .overlay(alignment: bottomAlignment) { controlCluster }
-            .overlay(alignment: .bottom) { swipeHint }
+            .overlay(alignment: .bottom) { reviewBar }
         }
         .task(id: currentID) { updatePrefetch() }
         .onDisappear { clearPrefetch() }
     }
 
     private var currentID: String? { model.engine?.current?.id }
+
+    /// The full screen, including the safe-area bars the photo may extend under.
+    /// The overlays stay inside `geometry` (the safe area) so controls are
+    /// always reachable.
+    private func canvasSize(in geometry: GeometryProxy) -> CGSize {
+        CGSize(
+            width: geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing,
+            height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+        )
+    }
+
+    private func fittedSize(for asset: AssetDescriptor, in geometry: GeometryProxy) -> CGSize {
+        PhotoLayout.fittedSize(
+            forPixelSize: CGSize(width: asset.pixelWidth, height: asset.pixelHeight),
+            in: canvasSize(in: geometry)
+        )
+    }
 
     private var bottomAlignment: Alignment {
         switch placement {
@@ -98,19 +119,37 @@ struct ViewerView: View {
     private var controlCluster: some View {
         ControlCluster()
             .disabled(model.isDecisionInputBlocked)
-            .padding(.bottom, 28)
+            .padding(.bottom, model.queueCount > 0 ? 54 : 20)
             .padding(placement == .center ? 0 : 20)
     }
 
-    private var swipeHint: some View {
+    /// A compact, always-reachable way into deletion review. It states the
+    /// agreed wording — photos are *marked*, nothing is deleted yet — and sits
+    /// at the bottom edge, inside the safe area, so it never covers the photo
+    /// centre.
+    private var reviewBar: some View {
         Group {
-            if preset.usesSwipeGestures && model.engine?.current != nil {
-                Text("◀ Queue deletion     Keep ▶     Tap ♡ to favorite")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.45))
-                    .padding(.bottom, 8)
+            if model.queueCount > 0 {
+                Button {
+                    model.goToReview()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash")
+                        Text(DeletionWording.reviewCompact(model.queueCount))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .foregroundStyle(.white)
+                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                }
+                .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
+                .accessibilityValue(DeletionWording.nothingDeletedYet)
+                .accessibilityIdentifier("viewer.review")
             }
         }
+        .padding(.bottom, 10)
     }
 
     private var finishedOverlay: some View {
@@ -204,14 +243,13 @@ private struct AssetCanvas: View {
             } else if let image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .aspectRatio(contentMode: .fit)
             } else {
                 ProgressView().tint(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .ignoresSafeArea()
         .offset(dragOffset)
         .task(id: asset.id) {
             image = nil
@@ -232,7 +270,7 @@ struct LivePhotoView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PHLivePhotoView {
         let view = PHLivePhotoView()
-        view.contentMode = .scaleAspectFill
+        view.contentMode = .scaleAspectFit
         view.clipsToBounds = true
         view.livePhoto = livePhoto
         return view

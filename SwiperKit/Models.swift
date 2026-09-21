@@ -47,6 +47,13 @@ public struct AssetDescriptor: Codable, Equatable, Hashable, Identifiable, Senda
     }
 
     public var isLivePhoto: Bool { kind == .livePhoto }
+
+    /// Width ÷ height in pixels. Used to contain the asset at its original
+    /// aspect ratio; see ``PhotoLayout``.
+    public var aspectRatio: CGFloat {
+        guard pixelWidth > 0, pixelHeight > 0 else { return 1 }
+        return CGFloat(pixelWidth) / CGFloat(pixelHeight)
+    }
 }
 
 /// Which way through `creationDate` time the user prefers to browse.
