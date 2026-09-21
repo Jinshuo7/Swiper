@@ -336,10 +336,8 @@ final class SwiperUITests: XCTestCase {
         XCTAssertTrue(delete.waitForExistence(timeout: 10))
         delete.tap()
 
-        let confirm = app.alerts.buttons["Delete"]
-        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
-        confirm.tap()
-
+        // Swiper adds no dialog of its own; the fake library stands in for
+        // PhotoKit, whose system prompt is the only confirmation in the real app.
         XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
         app.buttons["result.done"].tap()
         XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
@@ -440,23 +438,27 @@ final class SwiperUITests: XCTestCase {
 
     // MARK: - Review and deletion recovery (#14)
 
-    func testCancellingTheInAppConfirmationKeepsEveryMark() {
+    /// Deleting asks once, not twice. Swiper adds no dialog of its own: the only
+    /// confirmation is PhotoKit's system prompt, which the fake library stands in
+    /// for. What that dialog used to explain is on the review screen instead.
+    func testDeletionAsksOnlyTheSystemConfirmationAndExplainsItself() {
         let app = launchApp()
         let photo = startViewer(app)
         photo.swipeLeft()
         app.buttons["viewer.review"].tap()
 
+        XCTAssertTrue(
+            app.staticTexts["Your iPhone asks you to confirm before anything is removed. Photos you restored stay put."]
+                .waitForExistence(timeout: 5),
+            "the review screen must say what the commit does, now that Swiper has no alert"
+        )
+
         let delete = app.buttons["review.delete"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
 
-        let cancel = app.alerts.buttons["Cancel"]
-        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
-        cancel.tap()
-
-        XCTAssertTrue(app.staticTexts["Review deletion"].exists)
-        XCTAssertTrue(app.staticTexts["1 photo marked for deletion"].exists)
-        XCTAssertTrue(app.buttons["review.delete"].exists)
+        // No Swiper dialog appears; the outcome follows the single tap.
+        XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
     }
 
     func testInspectionCanRestoreASingleMarkBackToTheGrid() {
@@ -485,7 +487,6 @@ final class SwiperUITests: XCTestCase {
         let delete = app.buttons["review.delete"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
-        app.alerts.buttons["Delete"].tap()
 
         XCTAssertTrue(app.staticTexts["Nothing was deleted"].waitForExistence(timeout: 10))
         XCTAssertTrue(
@@ -519,7 +520,6 @@ final class SwiperUITests: XCTestCase {
         let delete = app.buttons["review.delete"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
-        app.alerts.buttons["Delete"].tap()
 
         let continuation = app.buttons["result.done"]
         XCTAssertTrue(continuation.waitForExistence(timeout: 10))

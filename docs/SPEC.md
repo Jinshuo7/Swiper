@@ -136,9 +136,12 @@ settings. Statistics are not otherwise visible.
    immediately re-presented. Undo entries that would reapply a restored mark are
    dropped.
 5. No statistics or reclaimed-storage totals are displayed during review.
-6. Only after an explicit final confirmation does Swiper ask the system to
-   delete the remaining marked photos. The system presents its own confirmation
-   as well.
+6. Tapping Delete in review is the explicit final action; it asks the system to
+   delete the remaining marked photos. Swiper adds **no confirmation dialog of
+   its own** — the single confirmation is the system's, which PhotoKit always
+   presents and which is the only thing that authorises the deletion. The review
+   screen states what the commit will do, since that explanation no longer lives
+   in a dialog.
 7. After the commit, only assets that are confirmed gone count as deleted.
    Unsuccessful or cancelled deletions stay marked and are not counted.
 8. Leaving review returns to the place it was opened from, or home when there is
@@ -165,6 +168,8 @@ settings. Statistics are not otherwise visible.
 ## 8. Safety invariants
 
 * Swiper never deletes while swiping.
+* Deleting requires two deliberate acts: tapping Delete in review, then allowing
+  it in the system prompt. Swiper never adds a third.
 * A marked photo is reversible until the final commit.
 * Restored photos become kept and leave the deletion list.
 * An acknowledged decision is always saved first; a failed save is visible and

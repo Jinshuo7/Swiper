@@ -7,7 +7,6 @@ struct DeletionReviewView: View {
     @State private var isSelecting = false
     @State private var selected: Set<String> = []
     @State private var inspected: IdentifiedString?
-    @State private var showDeleteConfirmation = false
     @State private var dragStartLocation: CGPoint?
     @State private var dragBaseSelection: Set<String> = []
 
@@ -30,14 +29,6 @@ struct DeletionReviewView: View {
         }
         .fullScreenCover(item: $inspected) { item in
             InspectionView(id: item.id)
-        }
-        .alert("Delete \(markedIDs.count) \(markedIDs.count == 1 ? "photo" : "photos")?", isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
-                Task { await model.confirmDeletion() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes the marked photos from your library after the system confirmation. Photos you restored stay put.")
         }
     }
 
@@ -202,14 +193,26 @@ struct DeletionReviewView: View {
                 .disabled(selected.isEmpty)
                 .accessibilityIdentifier("review.restoreSelected")
             } else {
+                // Swiper deliberately adds no confirmation dialog of its own.
+                // The explicit final confirmation is PhotoKit's own system
+                // prompt, which is the only thing that actually authorises a
+                // deletion; asking here as well just meant two taps for one
+                // decision. What that alert used to explain lives on this screen
+                // instead, so nothing is lost.
                 Button {
-                    showDeleteConfirmation = true
+                    Task { await model.confirmDeletion() }
                 } label: {
                     Label("Delete \(markedIDs.count) \(markedIDs.count == 1 ? "photo" : "photos")", systemImage: "trash")
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.isBusy)
                 .accessibilityIdentifier("review.delete")
+
+                Text("Your iPhone asks you to confirm before anything is removed. Photos you restored stay put.")
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("review.deleteExplanation")
             }
         }
         .padding(.horizontal, 20)
