@@ -9,14 +9,13 @@ struct RootView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             content
+            persistenceLayer
         }
         .animation(.easeInOut(duration: 0.2), value: model.route)
         .task { await model.bootstrap() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await model.refreshAuthorization() }
-            } else {
-                model.flushSessionWrites()
             }
         }
         .alert(
@@ -54,5 +53,46 @@ struct RootView: View {
         case .startHere:
             StartHereGridView()
         }
+    }
+
+    /// Anything the user must know about saved state, placed above the current
+    /// screen so a failed write can never look like a successful one.
+    @ViewBuilder
+    private var persistenceLayer: some View {
+        VStack(spacing: 0) {
+            if let pending = model.pendingDecision {
+                PersistenceBanner(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: "Couldn't save your last decision",
+                    message: pending.message,
+                    primaryTitle: "Retry",
+                    primaryAction: { Task { await model.retryPendingDecision() } },
+                    secondaryTitle: "Discard",
+                    secondaryAction: { model.discardPendingDecision() }
+                )
+                .accessibilityIdentifier("saveFailure.banner")
+            } else if model.isPersistenceReadOnly, let notice = model.persistenceNotice {
+                PersistenceBanner(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: "Saved progress can't be read",
+                    message: notice,
+                    primaryTitle: "Start fresh",
+                    primaryAction: { Task { await model.recoverFromUnreadableState() } }
+                )
+                .accessibilityIdentifier("persistence.readOnly")
+            } else if let notice = model.persistenceNotice {
+                PersistenceBanner(
+                    systemImage: "info.circle",
+                    title: "Swiper",
+                    message: notice,
+                    primaryTitle: "OK",
+                    primaryAction: { model.dismissPersistenceNotice() }
+                )
+                .accessibilityIdentifier("persistence.notice")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 }

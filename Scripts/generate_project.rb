@@ -43,6 +43,7 @@ end
 app = project.new_target(:application, "Swiper", :ios, DEPLOYMENT_TARGET)
 kit = project.new_target(:framework, "SwiperKit", :ios, DEPLOYMENT_TARGET)
 unit_tests = project.new_target(:unit_test_bundle, "SwiperKitTests", :ios, DEPLOYMENT_TARGET)
+app_tests = project.new_target(:unit_test_bundle, "SwiperAppTests", :ios, DEPLOYMENT_TARGET)
 ui_tests = project.new_target(:ui_test_bundle, "SwiperUITests", :ios, DEPLOYMENT_TARGET)
 
 project.build_configurations.each do |config|
@@ -115,6 +116,26 @@ unit_tests.add_dependency(kit)
 unit_tests.add_dependency(app)
 unit_tests.frameworks_build_phase.add_file_reference(kit.product_reference)
 
+# --- SwiperAppTests ------------------------------------------------------------
+# App-level integration tests: AppModel operations against the fake photo
+# library and a controllable persistence store. These need UIKit/PhotoKit, so
+# they cannot live in the macOS-runnable SwiperKitTests bundle.
+add_sources(project, app_tests, "SwiperAppTests")
+settings(app_tests, {
+  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperAppTests",
+  "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
+  "PRODUCT_NAME" => "SwiperAppTests",
+  "GENERATE_INFOPLIST_FILE" => "YES",
+  "CODE_SIGN_STYLE" => "Automatic",
+  "SWIFT_EMIT_LOC_STRINGS" => "YES",
+  "TEST_HOST" => "$(BUILT_PRODUCTS_DIR)/Swiper.app/Swiper",
+  "BUNDLE_LOADER" => "$(TEST_HOST)",
+  "LD_RUNPATH_SEARCH_PATHS" => ["$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"],
+})
+app_tests.add_dependency(kit)
+app_tests.add_dependency(app)
+app_tests.frameworks_build_phase.add_file_reference(kit.product_reference)
+
 # --- SwiperUITests -------------------------------------------------------------
 add_sources(project, ui_tests, "SwiperUITests")
 settings(ui_tests, {
@@ -133,6 +154,7 @@ scheme.add_build_target(app)
 scheme.add_build_target(kit)
 scheme.set_launch_target(app)
 scheme.add_test_target(unit_tests)
+scheme.add_test_target(app_tests)
 scheme.add_test_target(ui_tests)
 scheme.save_as(PROJECT_PATH, "Swiper", true)
 

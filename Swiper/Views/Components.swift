@@ -81,3 +81,61 @@ struct TopBarButton: View {
         .accessibilityIdentifier("topbar.\(label.lowercased())")
     }
 }
+
+/// A card that tells the user, in plain words, that something they did was not
+/// saved — and gives them the one action that can fix it. Never used to imply
+/// that unsaved work was accepted.
+struct PersistenceBanner: View {
+    let systemImage: String
+    let title: String
+    let message: String
+    let primaryTitle: String
+    let primaryAction: () -> Void
+    var secondaryTitle: String?
+    var secondaryAction: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 10) {
+                Button(primaryTitle, action: primaryAction)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .foregroundStyle(.black)
+                    .clipShape(Capsule())
+                if let secondaryTitle, let secondaryAction {
+                    Button(secondaryTitle, action: secondaryAction)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.12))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+        .frame(maxWidth: 460)
+    }
+}

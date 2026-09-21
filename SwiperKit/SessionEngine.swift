@@ -310,7 +310,6 @@ public struct SessionEngine: Equatable, Sendable {
             mode: mode,
             decidedIDs: Array(decidedIDs),
             keptIDs: Array(keptIDs),
-            queueIDs: queue.ids,
             undoEntries: undoStack.entries,
             tumbler: tumbler,
             updatedAt: updatedAt,
@@ -318,13 +317,19 @@ public struct SessionEngine: Equatable, Sendable {
         )
     }
 
-    public static func restored(from persisted: PersistedSession, order: LibraryOrder) -> SessionEngine {
+    /// Rebuilds a session from persisted traversal state plus the durable
+    /// deletion list, which outlives any single session.
+    public static func restored(
+        from persisted: PersistedSession,
+        order: LibraryOrder,
+        marks: [String] = []
+    ) -> SessionEngine {
         SessionEngine(
             order: order,
             direction: persisted.direction,
             mode: persisted.mode,
             cursorID: persisted.currentAssetID,
-            queue: DeletionQueue(orderedIDs: persisted.queueIDs),
+            queue: DeletionQueue(orderedIDs: marks),
             undoStack: UndoStack(entries: persisted.undoEntries),
             decidedIDs: Set(persisted.decidedIDs),
             keptIDs: Set(persisted.keptIDs),

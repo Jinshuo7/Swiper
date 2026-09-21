@@ -3,10 +3,19 @@ import SwiperKit
 import UIKit
 
 /// Owns the whole app state machine: permissions, the library snapshot, the
-/// current session, statistics and preferences.
+/// durable deletion list, the current session, statistics and preferences.
 ///
 /// The model performs the ``SessionEffect`` values the pure engine emits; the
 /// engine never touches PhotoKit itself.
+///
+/// Durability contract: a decision is applied to a *copy* of the session, that
+/// copy is saved, and only a successful save is acknowledged by publishing it
+/// and advancing. A failed save leaves the previous state untouched and parks
+/// the decision for an explicit retry, so the UI can never imply that unsaved
+/// work was accepted.
+///
+/// Every state mutation runs on one serial chain, so two quick gestures cannot
+/// interleave and produce a save that does not match the visible session.
 @MainActor
 final class AppModel: ObservableObject {
     enum Route: Equatable {
@@ -21,6 +30,15 @@ final class AppModel: ObservableObject {
         case startHere
     }
 
+    /// A decision that was computed but could not be saved. It is retried
+    /// verbatim: the library side effects were already performed during
+    /// staging, so retrying only re-attempts persistence.
+    struct PendingDecision: Equatable {
+        var engine: SessionEngine
+        var effects: [SessionEffect]
+        var message: String
+    }
+
     @Published var route: Route = .loading
     @Published private(set) var authorization: LibraryAuthorization = .notDetermined
     @Published private(set) var order: LibraryOrder = .empty
@@ -28,17 +46,29 @@ final class AppModel: ObservableObject {
     @Published private(set) var preferences: ControlPreferences
     @Published private(set) var statistics: SessionStatistics
     @Published private(set) var resumableSession: PersistedSession?
+    /// The durable deletion list. It is written with every decision, and a
+    /// session started from home is seeded from it.
+    @Published private(set) var marks: DeletionQueue = .empty
     @Published private(set) var lastDeletion: DeletionOutcome = .empty
     @Published private(set) var isBusy = false
-    @Published private(set) var isDecisionInputBlocked = false
+    /// True while a decision is being staged and saved, so input is serialised.
+    @Published private(set) var isDecisionInFlight = false
+    /// Set when the last state write failed.
+    @Published private(set) var pendingDecision: PendingDecision?
+    /// A durable, user-visible explanation of a persistence problem.
+    @Published private(set) var persistenceNotice: String?
+    /// True while stored data this build cannot read is in the way, so nothing
+    /// may be written over it.
+    @Published private(set) var isPersistenceReadOnly = false
     @Published var errorMessage: String?
 
     let library: SwiperPhotoLibrary
     private let store: SessionStoring
+
+    /// The state as loaded, kept as the durable baseline between decisions.
+    private var storedState = PersistedState()
     private var didBootstrap = false
-    /// Serialises favorite changes so a favorite immediately followed by an
-    /// undo cannot apply out of order.
-    private var favoriteTask: Task<Void, Never>?
+    private var serialTail: Task<Void, Never>?
 
     init(library: SwiperPhotoLibrary, store: SessionStoring) {
         self.library = library
@@ -53,16 +83,91 @@ final class AppModel: ObservableObject {
     }
 
     var currentAsset: AssetDescriptor? { engine?.current }
-    var queueCount: Int { engine?.queue.count ?? 0 }
+    var markedIDs: [String] { engine?.queue.ids ?? marks.ids }
+    var queueCount: Int { markedIDs.count }
     var hasPhotos: Bool { !order.isEmpty }
+
+    /// Decision input is refused while a save is in flight or a failed save is
+    /// waiting to be retried.
+    var isDecisionInputBlocked: Bool { isDecisionInFlight || pendingDecision != nil }
+
+    // MARK: - Serialisation
+
+    /// Runs `work` after every previously queued mutation has finished.
+    private func serialized(_ work: @escaping @MainActor () async -> Void) async {
+        let previous = serialTail
+        let task = Task { @MainActor in
+            await previous?.value
+            await work()
+        }
+        serialTail = task
+        await task.value
+    }
+
+    /// Test seam: waits until every mutation queued so far has settled.
+    func settle() async {
+        await serialTail?.value
+    }
 
     // MARK: - Lifecycle
 
     func bootstrap() async {
         guard !didBootstrap else { return }
         didBootstrap = true
+        await loadPersistedState()
         await refreshAuthorization()
     }
+
+    /// Reads stored state and reports anything this build cannot read instead
+    /// of silently starting empty.
+    private func loadPersistedState() async {
+        switch store.loadState() {
+        case .absent:
+            storedState = PersistedState()
+        case .loaded(let state):
+            storedState = state
+        case .migrated(let state):
+            storedState = state
+            // Finish the migration, but replace the old bytes only once the
+            // atomic write has succeeded.
+            do {
+                try await store.saveState(state)
+                persistenceNotice = "Your saved progress was upgraded to the latest format."
+            } catch {
+                persistenceNotice = describe(error)
+            }
+        case .unreadable(let reason):
+            isPersistenceReadOnly = true
+            persistenceNotice = "Swiper could not read your saved progress (\(reason)). Nothing has been overwritten."
+        case .unsupportedVersion(let found, let supported):
+            isPersistenceReadOnly = true
+            persistenceNotice = SessionStoreError
+                .stateIsFromNewerVersion(found: found, supported: supported)
+                .localizedDescription
+        }
+        marks = DeletionQueue(orderedIDs: storedState.marks)
+    }
+
+    /// Preserves unreadable stored data under a new name and starts fresh.
+    func recoverFromUnreadableState() async {
+        do {
+            let destination = try store.quarantineUnreadableState()
+            isPersistenceReadOnly = false
+            storedState = PersistedState()
+            marks = .empty
+            resumableSession = nil
+            engine = nil
+            if let destination {
+                persistenceNotice = "Your old file was kept as \(destination.lastPathComponent), then set aside."
+            } else {
+                persistenceNotice = nil
+            }
+        } catch {
+            persistenceNotice = describe(error)
+        }
+    }
+
+    func dismissPersistenceNotice() { persistenceNotice = nil }
 
     func refreshAuthorization() async {
         authorization = library.currentAuthorization()
@@ -96,126 +201,213 @@ final class AppModel: ObservableObject {
         library.presentLimitedLibraryPicker(from: controller)
     }
 
-    /// Refreshes the metadata snapshot and reconciles any unfinished session.
+    /// Refreshes the metadata snapshot and reconciles stored state against it.
     func reloadLibrary() async {
         let descriptors = await library.fetchAllDescriptors()
         order = LibraryOrder(descriptors)
-        if let engine {
-            let session = reconcile(engine.persisted(), restoreEngine: true)
-            if session.isFinished && route == .viewer {
-                route = .review
-            }
-        } else {
-            reconcilePersistedSession()
-        }
-    }
 
-    private func reconcilePersistedSession() {
-        guard let persisted = store.loadSession(), persisted.isResumable else {
-            resumableSession = nil
-            return
-        }
-        _ = reconcile(persisted, restoreEngine: false)
-    }
+        let reconciled = AssetReconciler.reconcile(storedState, order: order)
+        storedState = reconciled.state
 
-    @discardableResult
-    private func reconcile(_ persisted: PersistedSession, restoreEngine: Bool) -> PersistedSession {
-        let session = AssetReconciler.reconcile(persisted, order: order).session
-        if restoreEngine {
-            engine = SessionEngine.restored(from: session, order: order)
-        }
-        if session.isResumable {
-            store.saveSession(session)
+        if let session = storedState.session, session.isResumable {
+            let restored = SessionEngine.restored(from: session, order: order, marks: storedState.marks)
+            engine = restored
+            marks = restored.queue
             resumableSession = session
         } else {
-            store.clearSession()
+            engine = nil
+            marks = DeletionQueue(orderedIDs: storedState.marks)
             resumableSession = nil
         }
-        return session
+
+        if !reconciled.externallyRemovedIDs.isEmpty, !isPersistenceReadOnly {
+            await persistQuietly(storedState)
+        }
+
+        if engine?.isFinished == true && route == .viewer {
+            route = .review
+        }
     }
 
     // MARK: - Entry points
 
-    func startRecent() { startSession(mode: .sequential, cursorID: nil, direction: .older) }
+    func startRecent() {
+        enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .older) }
+    }
 
-    func startTumbler() { startSession(mode: .tumbler, cursorID: nil) }
+    func startTumbler() {
+        enqueue { await self.startSession(mode: .tumbler, cursorID: nil) }
+    }
 
     func startHere(assetID: String) {
-        startSession(mode: .sequential, cursorID: assetID)
+        enqueue { await self.startSession(mode: .sequential, cursorID: assetID) }
     }
 
     func showStartHere() { route = .startHere }
+
+    private func enqueue(_ work: @escaping @MainActor () async -> Void) {
+        Task { await self.serialized(work) }
+    }
 
     private func startSession(
         mode: SessionMode,
         cursorID: String?,
         direction: TraversalDirection? = nil
-    ) {
+    ) async {
         guard hasPhotos else {
             errorMessage = "There are no photos or Live Photos to review."
             return
         }
-        store.clearSession()
-        resumableSession = nil
+
+        // In this slice a new sorting session starts with an empty deletion
+        // list. Making the list outlive sessions is ticket #13.
+        let sessionMarks = DeletionQueue.empty
+
+        isDecisionInFlight = true
+        defer { isDecisionInFlight = false }
+
         statistics.beginSession()
         store.saveStatistics(statistics)
 
-        var engine = SessionEngine(
+        var newEngine = SessionEngine(
             order: order,
             direction: direction ?? preferences.defaultDirection,
             mode: mode,
             cursorID: cursorID,
+            queue: sessionMarks,
             tumblerSeed: mode == .tumbler ? SessionEngine.makeSeed() : nil
         )
         if cursorID == nil || mode == .tumbler {
-            engine.start()
+            newEngine.start()
         }
-        self.engine = engine
-        persistSession()
+
+        let state = PersistedState(marks: newEngine.queue.ids, session: newEngine.persisted())
+        do {
+            try await store.saveState(state)
+        } catch {
+            errorMessage = describe(error)
+            return
+        }
+
+        storedState = state
+        engine = newEngine
+        marks = newEngine.queue
+        resumableSession = state.session
         route = .viewer
     }
 
     func resumeSession() {
-        guard let persisted = resumableSession else { return }
-        let engine = SessionEngine.restored(from: persisted, order: order)
-        self.engine = engine
-        route = engine.isFinished ? .review : .viewer
+        guard let persisted = resumableSession ?? storedState.session else { return }
+        let restored = SessionEngine.restored(from: persisted, order: order, marks: storedState.marks)
+        engine = restored
+        route = restored.isFinished ? .review : .viewer
     }
 
     // MARK: - Decisions
 
     func apply(_ action: SessionAction) {
-        if action == .favorite {
-            applyFavorite()
-            return
-        }
-        // Block decision gestures and controls during favorite writes rather than silently dropping input.
-        guard favoriteTask == nil else { return }
-        guard var engine else { return }
-        let effects = engine.apply(action)
-        self.engine = engine
-        perform(effects)
-        persistSession()
+        enqueue { await self.stage(action) }
     }
 
     func undo() { apply(.undo) }
 
-    func goToReview() { route = .review }
+    /// Applies the decision to a copy of the session, performs any library
+    /// effect it needs, saves, and only then acknowledges it.
+    private func stage(_ action: SessionAction) async {
+        guard pendingDecision == nil, let engine else { return }
 
-    func finishSession() {
-        statistics.completeSession()
-        store.saveStatistics(statistics)
-        engine = nil
-        resumableSession = nil
-        store.clearSession()
+        isDecisionInFlight = true
+        defer { isDecisionInFlight = false }
+
+        var staged = engine
+        var effects: [SessionEffect]
+
+        if action == .favorite {
+            guard let assetID = staged.current?.id else { return }
+            do {
+                try await library.setFavorite(true, forID: assetID)
+            } catch {
+                errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
+                return
+            }
+            // The library effect is already done, so it must not be repeated.
+            effects = staged.apply(.favorite).filter { effect in
+                if case .setFavorite = effect { return false }
+                return true
+            }
+        } else {
+            effects = staged.apply(action)
+        }
+
+        await acknowledge(staged, effects: effects)
+    }
+
+    /// Saves the staged session and publishes it, or parks it for retry.
+    private func acknowledge(_ staged: SessionEngine, effects: [SessionEffect]) async {
+        let state = PersistedState(marks: staged.queue.ids, session: staged.persisted())
+        do {
+            try await store.saveState(state)
+        } catch {
+            pendingDecision = PendingDecision(
+                engine: staged,
+                effects: effects,
+                message: describe(error)
+            )
+            return
+        }
+        storedState = state
+        engine = staged
+        marks = staged.queue
+        resumableSession = state.session
+        pendingDecision = nil
+        persistenceNotice = nil
+        perform(effects)
+    }
+
+    /// Retries the parked decision. Only persistence is re-attempted, so a
+    /// retry can never repeat a favorite change or a queued-deletion effect.
+    func retryPendingDecision() async {
+        await serialized {
+            guard let pending = self.pendingDecision else { return }
+            self.isDecisionInFlight = true
+            await self.acknowledge(pending.engine, effects: pending.effects)
+            self.isDecisionInFlight = false
+        }
+    }
+
+    /// Drops a decision that could never be saved. The stored state is
+    /// untouched, so this only forgets an acknowledgement the user never
+    /// received.
+    func discardPendingDecision() {
+        pendingDecision = nil
+        persistenceNotice = "That decision was not saved, so it was left out. Nothing else changed."
         route = .entry
     }
 
+    func goToReview() { route = .review }
+
+    func finishSession() {
+        enqueue {
+            self.statistics.completeSession()
+            self.store.saveStatistics(self.statistics)
+            self.engine = nil
+            self.resumableSession = nil
+            self.storedState = PersistedState(marks: self.storedState.marks, session: nil)
+            self.marks = DeletionQueue(orderedIDs: self.storedState.marks)
+            await self.persistQuietly(self.storedState)
+            self.route = .entry
+        }
+    }
+
     func restore(ids: [String]) {
-        guard var engine else { return }
-        engine.restore(ids: ids)
-        self.engine = engine
-        persistSession()
+        enqueue {
+            guard self.pendingDecision == nil, let engine = self.engine else { return }
+            self.isDecisionInFlight = true
+            var staged = engine
+            let effects = staged.restore(ids: ids)
+            await self.acknowledge(staged, effects: effects)
+            self.isDecisionInFlight = false
+        }
     }
 
     func updatePreferences(_ preferences: ControlPreferences) {
@@ -224,13 +416,18 @@ final class AppModel: ObservableObject {
         if var engine {
             engine.setDirection(preferences.defaultDirection)
             self.engine = engine
-            persistSession()
+            storedState.session = engine.persisted()
+            Task { await self.persistQuietly(self.storedState) }
         }
     }
 
     // MARK: - Deletion
 
     func confirmDeletion() async {
+        await serialized { await self.performConfirmedDeletion() }
+    }
+
+    private func performConfirmedDeletion() async {
         guard let engine, !engine.queue.isEmpty else { return }
         isBusy = true
         defer { isBusy = false }
@@ -251,17 +448,36 @@ final class AppModel: ObservableObject {
             guard var updated = self.engine else { return }
             updated.commitDeletion(outcome: outcome)
             order = refreshedOrder
-            let session = reconcile(updated.persisted(), restoreEngine: true)
 
-            if session.isFinished && session.queueIDs.isEmpty {
-                statistics.completeSession()
-                self.engine = nil
-                store.clearSession()
-                resumableSession = nil
-            }
+            let reconciled = AssetReconciler.reconcile(
+                PersistedState(marks: updated.queue.ids, session: updated.persisted()),
+                order: refreshedOrder
+            )
+            let state = reconciled.state
 
             statistics.record(outcome)
             store.saveStatistics(statistics)
+
+            do {
+                try await store.saveState(state)
+            } catch {
+                // The library already changed. Never report a success the user
+                // cannot trust: say exactly what could not be saved.
+                persistenceNotice = "Swiper deleted the confirmed photos but could not save the updated list. \(describe(error))"
+            }
+
+            storedState = state
+            if let session = state.session, session.isResumable {
+                let restored = SessionEngine.restored(from: session, order: refreshedOrder, marks: state.marks)
+                self.engine = restored
+                marks = restored.queue
+                resumableSession = session
+            } else {
+                self.engine = nil
+                marks = DeletionQueue(orderedIDs: state.marks)
+                resumableSession = nil
+            }
+
             lastDeletion = outcome
             route = .result
         } catch {
@@ -275,42 +491,14 @@ final class AppModel: ObservableObject {
 
     // MARK: - Effect handling
 
-    private func applyFavorite() {
-        guard favoriteTask == nil, let assetID = engine?.current?.id else { return }
-        isDecisionInputBlocked = true
-        favoriteTask = Task {
-            defer {
-                favoriteTask = nil
-                isDecisionInputBlocked = false
-            }
-            do {
-                try await library.setFavorite(true, forID: assetID)
-                guard var engine, engine.current?.id == assetID else { return }
-                let effects = engine.apply(.favorite).filter {
-                    if case .setFavorite = $0 { return false }
-                    return true
-                }
-                self.engine = engine
-                perform(effects)
-                persistSession()
-            } catch {
-                errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
-            }
-        }
-    }
-
     private func perform(_ effects: [SessionEffect]) {
         for effect in effects {
             switch effect {
             case .setFavorite(let id, let isFavorite):
-                isDecisionInputBlocked = true
-                favoriteTask = Task {
-                    defer {
-                        self.favoriteTask = nil
-                        self.isDecisionInputBlocked = false
-                    }
+                Task { [weak self] in
+                    guard let self else { return }
                     do {
-                        try await library.setFavorite(isFavorite, forID: id)
+                        try await self.library.setFavorite(isFavorite, forID: id)
                     } catch {
                         self.errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
                     }
@@ -321,14 +509,18 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func persistSession() {
-        guard let engine else { return }
-        let persisted = engine.persisted()
-        store.saveSession(persisted)
-        resumableSession = persisted.isResumable ? persisted : nil
+    // MARK: - Persistence helpers
+
+    private func persistQuietly(_ state: PersistedState) async {
+        guard !isPersistenceReadOnly else { return }
+        do {
+            try await store.saveState(state)
+        } catch {
+            persistenceNotice = describe(error)
+        }
     }
 
-    func flushSessionWrites() {
-        store.flushSessionWrites()
+    private func describe(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 }
