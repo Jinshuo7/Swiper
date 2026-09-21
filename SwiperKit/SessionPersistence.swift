@@ -460,7 +460,7 @@ public final class InMemorySessionStore: SessionStoring {
     public func saveState(_ state: PersistedState) async throws {
         saveAttempts += 1
         if failsWrites || saveAttempts == failSaveAttempt {
-            throw SessionStoreError.writeFailed("test failure")
+            throw SessionStoreError.writeFailed("Swiper is simulating a full disk.")
         }
         if !loadState().allowsWrites {
             throw SessionStoreError.stateIsUnreadable
@@ -471,7 +471,7 @@ public final class InMemorySessionStore: SessionStoring {
 
     public func clearState() async throws {
         if failsWrites {
-            throw SessionStoreError.writeFailed("test failure")
+            throw SessionStoreError.writeFailed("Swiper is simulating a full disk.")
         }
         content = .empty
     }

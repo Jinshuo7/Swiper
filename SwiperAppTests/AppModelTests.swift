@@ -510,10 +510,18 @@ final class AppModelTests: XCTestCase {
     }
 
     func testInterruptedCommitIsReconciledAfterRelaunchWithoutCountingTwice() async {
+        // Relaunching means the same device library and the same store, so the
+        // library instance is shared deliberately: reusing a fresh one would
+        // "restore" the photo and test nothing.
+        let library = FakePhotoLibrary.demo(count: 8)
         let store = InMemorySessionStore()
-        let made = await bootstrapped(store: store)
-        let marks = await markTwo(made)
-        let deleted = marks[0]
+        let made = await bootstrapped(library: library, store: store)
+        made.model.startRecent()
+        await made.model.settle()
+        let deleted = made.model.currentAsset?.id
+        made.model.apply(.queueDeletion)
+        await made.model.settle()
+        XCTAssertEqual(made.model.markedIDs, [deleted].compactMap { $0 })
 
         // The library deletion succeeds but the local save fails, as if the app
         // died between the PhotoKit effect and the write.
@@ -521,15 +529,15 @@ final class AppModelTests: XCTestCase {
         await made.model.confirmDeletion()
         XCTAssertNotNil(made.model.persistenceNotice)
         XCTAssertEqual(made.model.statistics.lifetimeDeletedCount, 1)
-        XCTAssertEqual(store.state?.marks, marks, "the stale list is still stored")
+        XCTAssertEqual(store.state?.marks, [deleted].compactMap { $0 }, "the stale list is still stored")
 
         store.failsWrites = false
-        let relaunched = await bootstrapped(store: store)
-        XCTAssertEqual(relaunched.model.markedIDs, [marks[1]], "the vanished mark is reconciled away")
+        let relaunched = await bootstrapped(library: library, store: store)
+        XCTAssertEqual(relaunched.model.markedIDs, [], "the vanished mark is reconciled away")
         XCTAssertEqual(
             relaunched.model.statistics.lifetimeDeletedCount,
             1,
-            "reconciliation never credits a deletion Swiper did not confirm"
+            "reconciliation never counts the deletion a second time"
         )
     }
 

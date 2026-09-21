@@ -321,7 +321,7 @@ final class SessionPersistenceTests: XCTestCase {
             try await store.saveState(PersistedState(marks: ["a"]))
             XCTFail("expected the injected failure")
         } catch {
-            XCTAssertEqual(error as? SessionStoreError, .writeFailed("test failure"))
+            XCTAssertEqual(error as? SessionStoreError, .writeFailed("Swiper is simulating a full disk."))
         }
         XCTAssertEqual(store.saveAttempts, 1)
         XCTAssertTrue(store.savedStates.isEmpty)
@@ -336,7 +336,7 @@ final class SessionPersistenceTests: XCTestCase {
             try await store.saveState(PersistedState(marks: ["a", "b"]))
             XCTFail("attempt 2 should fail")
         } catch {
-            XCTAssertEqual(error as? SessionStoreError, .writeFailed("test failure"))
+            XCTAssertEqual(error as? SessionStoreError, .writeFailed("Swiper is simulating a full disk."))
         }
         try await store.saveState(PersistedState(marks: ["a", "b", "c"]))
         XCTAssertEqual(store.state?.marks, ["a", "b", "c"], "later attempts succeed again")

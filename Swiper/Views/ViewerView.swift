@@ -163,8 +163,14 @@ struct ViewerView: View {
             let armed = isPastThreshold
 
             ZStack {
+                // Confined to the edge the drag is heading for and never very
+                // strong: the photo stays readable, and the wells — not the wash
+                // — carry the meaning.
                 LinearGradient(
-                    colors: [outcomeTint(direction).opacity(0.30 * progress), .clear],
+                    stops: [
+                        .init(color: outcomeTint(direction).opacity(0.20 * progress), location: 0),
+                        .init(color: .clear, location: 0.38),
+                    ],
                     startPoint: direction == .queueDeletion ? .leading : .trailing,
                     endPoint: direction == .queueDeletion ? .trailing : .leading
                 )

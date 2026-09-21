@@ -42,27 +42,52 @@ final class SwiperUITests: XCTestCase {
         add(attachment)
     }
 
+    /// A thread-safe slot for the screenshot taken while a drag is held.
+    private final class ScreenshotBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: XCUIScreenshot?
+
+        var screenshot: XCUIScreenshot? {
+            get { lock.withLock { stored } }
+            set { lock.withLock { stored = newValue } }
+        }
+    }
+
     /// Starts a drag that ends *held* in place, captures the mid-gesture
-    /// feedback, and only then releases. The wells are only visible while the
-    /// gesture is live, so a screenshot after release could never show them.
+    /// feedback, and only then releases.
+    ///
+    /// `press(...)` asserts that it runs on the main thread, and it does not
+    /// return until the drag is released — so the capture has to happen
+    /// concurrently, on a background queue, while the main thread is inside the
+    /// held gesture. The wells are only visible during that hold, so a
+    /// screenshot taken after release could never show them.
     private func holdDrag(
         from start: XCUICoordinate,
         to end: XCUICoordinate,
         captureNamed name: String
     ) {
-        let released = expectation(description: name)
-        DispatchQueue.global(qos: .userInitiated).async {
-            start.press(
-                forDuration: 0.1,
-                thenDragTo: end,
-                withVelocity: .slow,
-                thenHoldForDuration: 1.5
-            )
-            released.fulfill()
+        let box = ScreenshotBox()
+        let captured = expectation(description: "captured \(name)")
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.6) {
+            box.screenshot = XCUIScreen.main.screenshot()
+            captured.fulfill()
         }
-        Thread.sleep(forTimeInterval: 0.8)
-        capture(name)
-        wait(for: [released], timeout: 20)
+
+        start.press(
+            forDuration: 0.1,
+            thenDragTo: end,
+            withVelocity: .slow,
+            thenHoldForDuration: 1.5
+        )
+
+        wait(for: [captured], timeout: 20)
+        guard let screenshot = box.screenshot else {
+            return XCTFail("Could not capture \(name) while the drag was held")
+        }
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
