@@ -149,6 +149,51 @@ final class SwiperUITests: XCTestCase {
         }
     }
 
+    // MARK: - Interruption (airplane / Uber)
+
+    /// The interrupted-session case end to end: sort, have the app killed, come
+    /// back. Nothing may be lost, and home must be unambiguous about what can be
+    /// resumed and what can be reviewed.
+    func testKillingTheAppMidSessionRestoresPositionMarksAndUndo() {
+        let app = launchApp(persistentStore: true, resetStore: true)
+        let photo = startViewer(app)
+
+        photo.swipeRight()                       // keep the newest
+        let markedLabel = photoElement(app).label
+        photoElement(app).swipeLeft()            // mark this one
+        let positionAtKill = photoElement(app).label
+        XCTAssertNotEqual(positionAtKill, markedLabel)
+
+        app.terminate()
+
+        let relaunched = launchApp(persistentStore: true)
+        XCTAssertTrue(relaunched.buttons["entry.resume"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            relaunched.buttons["entry.resume"].label.contains("Continue sorting"),
+            "home must offer to continue the interrupted session"
+        )
+        XCTAssertEqual(
+            relaunched.buttons["entry.review"].label,
+            "Review & delete · 1",
+            "the mark made before the kill must still be there"
+        )
+
+        relaunched.buttons["entry.resume"].tap()
+        let resumed = photoElement(relaunched)
+        XCTAssertTrue(resumed.waitForExistence(timeout: 10))
+        XCTAssertEqual(resumed.label, positionAtKill, "sorting must resume at the same photo")
+
+        // Undo survived too, and still reverses the mark made before the kill.
+        relaunched.buttons["control.undo"].tap()
+        XCTAssertFalse(
+            relaunched.buttons["viewer.review"].waitForExistence(timeout: 3),
+            "undo after a kill must still remove the mark"
+        )
+        let afterUndo = photoElement(relaunched)
+        XCTAssertTrue(afterUndo.waitForExistence(timeout: 5))
+        XCTAssertEqual(afterUndo.label, markedLabel, "undo returns to the photo it marked")
+    }
+
     // MARK: - Start Here (user report, 2026-09-21)
 
     func testStartHereExplainsItselfAndGroupsTheLibraryByMonth() {
@@ -308,6 +353,37 @@ final class SwiperUITests: XCTestCase {
         XCTAssertLessThan(leftClose.frame.midY, app.buttons["control.keep"].frame.midY)
         XCTAssertTrue(window.contains(leftClose.frame))
         capture("Controls — left side rail")
+    }
+
+    /// The order half of the handedness choice: with Keep first the decisions
+    /// move to the other end of the rail, which is what a left thumb on a bottom
+    /// rail needs.
+    func testTheRailOrderCanBeFlipped() {
+        let app = launchApp()
+        useButtonPreset(app, "thumb")
+        _ = startViewer(app)
+
+        let closeFirst = app.buttons["control.close"].frame
+        let keepFirst = app.buttons["control.keep"].frame
+        XCTAssertLessThan(closeFirst.midX, keepFirst.midX, "Close should start at the leading end")
+
+        app.buttons["control.close"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        let flipped = app.buttons["settings.order.keepFirst"]
+        XCTAssertTrue(flipped.waitForExistence(timeout: 10))
+        flipped.tap()
+        app.buttons["Back"].firstMatch.tap()
+
+        _ = startViewer(app)
+        let newClose = app.buttons["control.close"]
+        XCTAssertTrue(newClose.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(
+            newClose.frame.midX,
+            app.buttons["control.keep"].frame.midX,
+            "with Keep first the decisions should be at the leading end"
+        )
+        capture("Controls — Keep first order")
     }
 
     /// A vertical rail reserves a lane: the photo is fitted beside it, not

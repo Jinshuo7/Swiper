@@ -254,10 +254,22 @@ Fixes and changes:
 Checks: **170 tests, 0 failures** on the iPhone 11 Pro (115 + 29 + 26),
 `TEST SUCCEEDED`. Screenshots refreshed and inspected under `docs/screenshots/`.
 
-Still open in the goal: Start Here is done (round 3); the localisation migration
-is surveyed but not started, pending a translation decision; and the interruption
-scenario is covered by tests but has not been walked by hand on the device with
-the app killed mid-flow.
+All five items of the current goal are addressed: the rail (with order), Start
+Here, statistics in Settings, the localisation survey plus its enforcement guard,
+and interruption verified on the device.
+
+Genuinely outstanding, and deliberately so:
+
+- The localisation **migration** has not started. `docs/LOCALIZATION.md` says why:
+  it is all-or-nothing, it needs the SwiperKit catalog first, and it needs a
+  decision about who supplies the `zh-Hans` translation. This is the largest
+  remaining piece of the user's brief ("at least English and Chinese").
+- Real **Live Photo playback with a real live photo** was confirmed manually by
+  the user, but no automated test covers it: the fake library returns no
+  `PHLivePhoto`.
+- The default preset is still **Swipe**, which shows no Keep/Delete buttons. The
+  user was shown buttons in a preset they had chosen; whether the default should
+  change is their call and is flagged in the summary.
 
 ## Round 3 — Start Here, interruption, and the localisation survey
 
@@ -295,8 +307,19 @@ value, accept plural variations, and no-op while no catalog exists. The migratio
 itself is deliberately not started — it is all-or-nothing, and it needs a decision
 about who supplies the `zh-Hans` translation.
 
-Checks: **184 tests, 0 failures** on the iPhone 11 Pro (124 + 31 + 29),
-`TEST SUCCEEDED`. 19 screenshots committed under `docs/screenshots/`.
+The rail also gained a configurable **order** (`Close first` default, or
+`Keep first`), which is the second half of the handedness choice: a left thumb on
+a bottom rail reaches the near end, so the decisions have to be able to move
+there. Without it the left-handed case was only half solved.
+
+Interruption is now verified on the device, not just in unit tests:
+`testKillingTheAppMidSessionRestoresPositionMarksAndUndo` sorts, terminates the
+app, relaunches it and asserts that home offers Continue sorting, that the mark
+survived, that the session resumes at the same photo, and that Undo still
+reverses the mark made before the kill.
+
+Checks: **188 tests, 0 failures** on the iPhone 11 Pro (126 + 31 + 31),
+`TEST SUCCEEDED`. 20 screenshots committed under `docs/screenshots/`.
 
 ## Exact next steps for the next session
 

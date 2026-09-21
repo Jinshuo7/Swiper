@@ -350,20 +350,50 @@ struct ViewerView: View {
 
     @ViewBuilder
     private var railControls: some View {
+        if model.preferences.order == .keepFirst {
+            keepControl
+            deleteControl
+            undoControl
+            favoriteControl
+            closeControl
+        } else {
+            closeControl
+            favoriteControl
+            undoControl
+            deleteControl
+            keepControl
+        }
+    }
+
+    private var closeControl: some View {
         CircleControl(systemImage: "xmark", label: "Close") {
             model.closeViewer()
         }
+    }
+
+    private var favoriteControl: some View {
         CircleControl(systemImage: "heart", label: "Favorite") {
             model.apply(.favorite)
         }
+    }
+
+    private var undoControl: some View {
         CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
             model.apply(.undo)
         }
+    }
+
+    @ViewBuilder
+    private var deleteControl: some View {
         if preset.showsDeleteButton {
             CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
                 model.apply(.queueDeletion)
             }
         }
+    }
+
+    @ViewBuilder
+    private var keepControl: some View {
         if preset.showsKeepButton {
             CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
                 model.apply(.keep)

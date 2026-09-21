@@ -27,6 +27,7 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.preset, .swipe)
         XCTAssertEqual(preferences.rail, .bottom)
         XCTAssertEqual(preferences.anchor, .center)
+        XCTAssertEqual(preferences.order, .closeFirst)
         XCTAssertEqual(preferences.defaultDirection, .older)
     }
 
@@ -45,6 +46,7 @@ final class ControlPreferencesTests: XCTestCase {
             preset: .extended,
             rail: .leading,
             anchor: .start,
+            order: .keepFirst,
             defaultDirection: .newer
         )
         let data = try JSONEncoder().encode(preferences)
@@ -80,6 +82,24 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(right.rail, .bottom)
         XCTAssertEqual(right.anchor, .end)
         XCTAssertEqual(right.preset, .swipe, "a missing preset falls back to the default")
+    }
+
+    func testRailOrderDefaultsToCloseFirstWhenAbsent() throws {
+        let decoded = try JSONDecoder().decode(
+            ControlPreferences.self,
+            from: Data(#"{"preset":"thumb","rail":"bottom","anchor":"center"}"#.utf8)
+        )
+        XCTAssertEqual(decoded.order, .closeFirst)
+    }
+
+    func testRailOrderRoundTrips() throws {
+        let preferences = ControlPreferences(preset: .thumb, rail: .bottom, anchor: .start, order: .keepFirst)
+        let decoded = try JSONDecoder().decode(
+            ControlPreferences.self,
+            from: JSONEncoder().encode(preferences)
+        )
+        XCTAssertEqual(decoded.order, .keepFirst)
+        XCTAssertEqual(decoded, preferences)
     }
 
     func testEncodedPreferencesDoNotWriteTheLegacyKey() throws {

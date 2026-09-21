@@ -81,6 +81,35 @@ public enum ControlRail: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Which end of the rail the decisions sit at.
+///
+/// The order is the second half of the handedness choice. A right thumb reaches
+/// the *end* of a bottom rail and the *bottom* of a side rail, so decisions go
+/// there by default. A left thumb on a bottom rail reaches the other end, which
+/// is what `.decisionsFirst` is for.
+public enum ControlOrder: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Close, Favorite, Undo, then the decision pair, with Keep last.
+    case closeFirst
+    /// The mirror image: Keep first, then Delete, Undo, Favorite, Close last.
+    case keepFirst
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .closeFirst: return "Close first"
+        case .keepFirst: return "Keep first"
+        }
+    }
+
+    public var subtitle: String {
+        switch self {
+        case .closeFirst: return "Close at the far end, Keep nearest your thumb."
+        case .keepFirst: return "Keep at the near end instead, for a left thumb on a bottom rail."
+        }
+    }
+}
+
 /// Where the rail sits along its edge.
 public enum ControlAnchor: String, Codable, CaseIterable, Identifiable, Sendable {
     case start
@@ -110,6 +139,8 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     public var rail: ControlRail
     /// Where along that edge they sit.
     public var anchor: ControlAnchor
+    /// Which end of the rail the decisions sit at.
+    public var order: ControlOrder
     /// Direction a new session starts in. Swiper always starts out toward
     /// older photos; the user can change this and it is remembered.
     public var defaultDirection: TraversalDirection
@@ -118,11 +149,13 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         preset: ControlPreset = .swipe,
         rail: ControlRail = .bottom,
         anchor: ControlAnchor = .center,
+        order: ControlOrder = .closeFirst,
         defaultDirection: TraversalDirection = .older
     ) {
         self.preset = preset
         self.rail = rail
         self.anchor = anchor
+        self.order = order
         self.defaultDirection = defaultDirection
     }
 
@@ -142,6 +175,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         case preset
         case rail
         case anchor
+        case order
         case defaultDirection
         case placement
     }
@@ -149,6 +183,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         preset = try container.decodeIfPresent(ControlPreset.self, forKey: .preset) ?? .swipe
+        order = try container.decodeIfPresent(ControlOrder.self, forKey: .order) ?? .closeFirst
         defaultDirection = try container.decodeIfPresent(TraversalDirection.self, forKey: .defaultDirection) ?? .older
 
         if let storedRail = try container.decodeIfPresent(ControlRail.self, forKey: .rail) {
@@ -171,6 +206,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         try container.encode(preset, forKey: .preset)
         try container.encode(rail, forKey: .rail)
         try container.encode(anchor, forKey: .anchor)
+        try container.encode(order, forKey: .order)
         try container.encode(defaultDirection, forKey: .defaultDirection)
     }
 }

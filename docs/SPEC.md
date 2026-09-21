@@ -92,9 +92,12 @@ in the rail.
   a left thumb the bottom or left one.
 * Along that edge it is anchored at the start, centre or end (left/centre/right on
   a bottom rail; top/middle/bottom on a side rail).
-* Order is fixed from least to most thumb-accessible: Close, then Favorite, then
-  Undo, then the decision pair with Keep last. On a side rail Close is at the top
-  and Keep at the bottom; on a bottom rail Close is at the leading end.
+* The order is the other half of the handedness choice. **Close first** (the
+  default) runs least to most thumb-accessible — Close, Favorite, Undo, then the
+  decision pair with Keep last — so a side rail has Close at the top and Keep at
+  the bottom. **Keep first** mirrors it, which is what a left thumb on a bottom
+  rail needs: the decisions come to the near end and Close goes to the far one.
+  The fixed set of actions is the same either way; only the ends swap.
 * The preset decides which controls exist, never where they are:
 
 | Preset | Keep | Delete | Favorite | Undo | Swipe gestures |

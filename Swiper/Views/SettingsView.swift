@@ -47,6 +47,24 @@ struct SettingsView: View {
                             }
                         }
 
+                        Text("Order on the rail")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.top, 6)
+
+                        ForEach(ControlOrder.allCases) { order in
+                            optionRow(
+                                title: order.title,
+                                subtitle: order.subtitle,
+                                isSelected: model.preferences.order == order,
+                                identifier: "settings.order.\(order.rawValue)"
+                            ) {
+                                var preferences = model.preferences
+                                preferences.order = order
+                                model.updatePreferences(preferences)
+                            }
+                        }
+
                         Text("Every control lives on this one rail, so it never moves between photos. Pick the edge your thumb reaches; a left-handed grip usually wants the left side, a right-handed one the right side or the bottom.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))

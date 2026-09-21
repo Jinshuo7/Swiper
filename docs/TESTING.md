@@ -76,11 +76,15 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SwiperKitTests` | 124 | 0 failures |
+  | `SwiperKitTests` | 126 | 0 failures |
   | `SwiperAppTests` | 31 | 0 failures |
-  | `SwiperUITests` | 29 | 0 failures |
+  | `SwiperUITests` | 31 | 0 failures |
 
-  184 tests, 0 failures. Result bundle: `.derivedData/v2.xcresult`.
+  188 tests, 0 failures. Result bundle: `.derivedData/final4.xcresult`.
+- The interrupted-session case runs on the device too:
+  `testKillingTheAppMidSessionRestoresPositionMarksAndUndo` terminates the app
+  mid-flow, relaunches it, and checks that Continue sorting, the mark and Undo all
+  survive.
 - Two environmental preconditions, both previously recorded as blockers:
   * The device must be **unlocked**. A locked phone fails with
     `deviceprep Code=-3 "Unlock iPhone to Continue"`, and if it locks between the
@@ -137,6 +141,7 @@ Attachments the suite produces, and what each one is for:
 | `Start Here — explanation, months, jump and sort` | `testStartHereExplainsItselfAndGroupsTheLibraryByMonth` | The explanation, month sections with sticky headers, the month menu and the order toggle |
 | `Start Here — oldest first` | same | The order toggle actually reversing the month sections |
 | `Start Here — jumped to a month` | `testStartHereCanJumpStraightToAMonth` | A month reached by the menu, far beyond one screen of scrolling |
+| `Controls — Keep first order` | `testTheRailOrderCanBeFlipped` | The rail order flipped so the decisions sit at the near end |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a
