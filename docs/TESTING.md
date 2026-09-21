@@ -115,6 +115,12 @@ background queue), because the outcome wells only exist during the gesture. They
 must be inspected by eye: passing assertions alone do not establish that the
 photo is uncropped or the controls legible.
 
+**Known risk, never yet executed:** driving an `XCUICoordinate` from a background
+queue while the test thread screenshots is the least conventional thing in this
+suite. If the first real run reports a non-main-thread API failure or a
+mis-timed capture, that helper (`holdDrag`) is where to look first — the outcome
+assertions around it are independent of it and should still be kept.
+
 Real **Live Photo playback** cannot be covered by the fake library, which returns
 no `PHLivePhoto`. It needs a manual check on a device with a real live photo, and
 is currently unverified.

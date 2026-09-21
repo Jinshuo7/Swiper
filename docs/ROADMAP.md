@@ -17,12 +17,12 @@ on top of the tracer bullet:
   save fails and versioned, migratable stored state.
 * Minimal predictive swipe feedback and a replayable first-photo tutorial.
 
-## Slice 1 — the tracer bullet *(done)*
+## Slice 1 — the tracer bullet *(done, vocabulary superseded by slice 1a)*
 
 The smallest end-to-end path that proves the core idea:
 
 > permission → library snapshot → one real full-screen photo → decide
-> (keep / queue for deletion / favorite) → reversible deletion queue →
+> (keep / mark for deletion / favorite) → reversible deletion list →
 > explicit deletion review → system-backed commit → result feedback
 
 In scope for this slice:
@@ -32,7 +32,7 @@ In scope for this slice:
 * Entry: Continue, Recent, Start Here (lazy grid), Tumbler.
 * Full-screen viewer with the four control presets and left/center/right
   placement.
-* Undo, persisted session and deletion queue, stale-asset reconciliation.
+* Undo, persisted session and deletion list, stale-asset reconciliation.
 * Deletion review with single restore and drag-select batch restore.
 * Result feedback plus current-session and lifetime statistics.
 * `SwiperKit` logic framework with unit tests; UI test of the fake-library flow.
