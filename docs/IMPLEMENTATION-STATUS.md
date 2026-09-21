@@ -254,10 +254,49 @@ Fixes and changes:
 Checks: **170 tests, 0 failures** on the iPhone 11 Pro (115 + 29 + 26),
 `TEST SUCCEEDED`. Screenshots refreshed and inspected under `docs/screenshots/`.
 
-Still open in the goal: Start Here is unchanged and remains confusing and
-unnavigable (it needs an explanation plus date jumping and a fast route through
-the library); English + Chinese localisation is untouched; and the interruption
-scenarios (airplane/Uber, kill and resume) have not been walked end to end.
+Still open in the goal: Start Here is done (round 3); the localisation migration
+is surveyed but not started, pending a translation decision; and the interruption
+scenario is covered by tests but has not been walked by hand on the device with
+the app killed mid-flow.
+
+## Round 3 — Start Here, interruption, and the localisation survey
+
+**Start Here was rebuilt**, because the user's first two complaints were about it
+("very confusing", "just a photo library with no features, no sorting mechanism,
+no pick-the-date function, and no way to reach the bottom without scrolling from
+the oldest photo"):
+
+- It now states what it is for: choosing where to begin, after which Swiper walks
+  toward older photos and skips anything already decided or marked.
+- The library is grouped into calendar months with sticky headers and per-month
+  counts, newest first by default.
+- A "Jump to month" menu scrolls straight to any month, and an order control
+  flips newest/oldest. Both are asserted by UI tests.
+- `SwiperKit/LibraryCalendar` holds the grouping and the localised month titles,
+  with nine unit tests, including one asserting a Chinese title (`2024年11月`).
+- The demo fixtures now spread across months rather than hours, so the grid has
+  real sections in tests and screenshots.
+
+**Interruption.** A mark whose photo vanished outside Swiper is now explained on
+return instead of silently disappearing, and an app test kills a session mid-flow
+and asserts that position, marks and Undo all survive into a fresh model. The
+existing mechanics already covered it: a decision is saved before it is
+acknowledged, and home offers Continue sorting plus Review & delete · N. No
+progress bar was added: `CONTEXT.md` reserves "progress" for confirmed deletion
+totals, so inventing one would have contradicted the glossary.
+
+**Localisation: surveyed, not migrated.** `docs/LOCALIZATION.md` inventories ~150
+user-facing strings and names the blockers, the most important being that much of
+the copy lives in `SwiperKit` and so needs a framework catalog with
+`bundle: .module` lookups. Six places build plurals by hand and must become
+catalog plural variations. `Scripts/check_localizations.sh` enforces the
+no-half-migrated rule; it was verified to pass a complete catalog, fail an empty
+value, accept plural variations, and no-op while no catalog exists. The migration
+itself is deliberately not started — it is all-or-nothing, and it needs a decision
+about who supplies the `zh-Hans` translation.
+
+Checks: **184 tests, 0 failures** on the iPhone 11 Pro (124 + 31 + 29),
+`TEST SUCCEEDED`. 19 screenshots committed under `docs/screenshots/`.
 
 ## Exact next steps for the next session
 

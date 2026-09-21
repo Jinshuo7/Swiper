@@ -46,5 +46,6 @@ approximately how much storage was reclaimed.
 | [`docs/VISION.md`](docs/VISION.md) | Product vision and the boundaries of v1. |
 | [`docs/SPEC.md`](docs/SPEC.md) | Behavioural specification of the shipped flow. |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Vertically sliced delivery plan. |
+| [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) | English + Chinese survey, blockers and migration plan. |
 | [`docs/adr/`](docs/adr) | Hard-to-reverse decisions and why they were made. |
 | [`README.md`](README.md) | Build, run and safe manual verification. |

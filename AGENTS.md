@@ -63,6 +63,18 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Do not add private APIs or Key-Value Coding file-size tricks. Storage is an
   estimate; see `SwiperKit/StorageEstimate.swift` and `docs/adr/0002`.
 
+## Localisation
+
+- English only, deliberately: no String Catalog exists yet, so nothing is
+  half-migrated. `docs/LOCALIZATION.md` has the inventory, the blockers and the
+  plan; read it before touching copy.
+- The blocker to know up front: a large share of user-facing copy lives in
+  `SwiperKit` (`DeletionWording`, rail and preset titles, error descriptions), so
+  it needs the framework's own catalog and `bundle: .module` lookups, not just an
+  app catalog.
+- `Scripts/check_localizations.sh` fails if any catalog key lacks a `zh-Hans`
+  value. Run it once catalogs exist.
+
 ## Documentation
 
 Keep these in sync with behaviour: `docs/VISION.md`, `docs/SPEC.md`,
