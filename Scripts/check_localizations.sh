@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Guards the "no half-migrated strings" rule for Swiper's localisation.
+# Guards the "no half-migrated strings" rule for SWIPR's localisation.
 #
 # Every String Catalog in the tree must give a non-empty translation for each
 # language the app claims to ship. A catalog that is missing a key, or has an

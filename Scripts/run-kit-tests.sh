@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Runs the SwiperKit unit tests on macOS without xcodebuild.
+# Runs the SWIPRKit unit tests on macOS without xcodebuild.
 #
 # Why this exists: on machines where the global developer directory still points
 # at Command Line Tools and/or the Xcode license has not been accepted for the
@@ -31,37 +31,37 @@ fi
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
 
-echo "==> Building SwiperKit (macOS)"
+echo "==> Building SWIPRKit (macOS)"
 "$SWIFTC" -sdk "$MACSDK" -target "$TARGET" -parse-as-library -enable-testing \
-  -module-name SwiperKit \
+  -module-name SWIPRKit \
   -emit-module -emit-library \
-  -emit-module-path "$BUILD/SwiperKit.swiftmodule" \
-  -o "$BUILD/libSwiperKit.dylib" \
-  $(find "$ROOT/SwiperKit" -name '*.swift' | sort)
+  -emit-module-path "$BUILD/SWIPRKit.swiftmodule" \
+  -o "$BUILD/libSWIPRKit.dylib" \
+  $(find "$ROOT/SWIPRKit" -name '*.swift' | sort)
 
-BUNDLE="$BUILD/SwiperKitTests.xctest"
+BUNDLE="$BUILD/SWIPRKitTests.xctest"
 mkdir -p "$BUNDLE/Contents/MacOS"
 cat > "$BUNDLE/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>SwiperKitTests</string>
-<key>CFBundleIdentifier</key><string>com.swiper.kittests</string>
-<key>CFBundleName</key><string>SwiperKitTests</string>
+<key>CFBundleExecutable</key><string>SWIPRKitTests</string>
+<key>CFBundleIdentifier</key><string>com.zhangjinshuo.swipr.kit.tests</string>
+<key>CFBundleName</key><string>SWIPRKitTests</string>
 <key>CFBundlePackageType</key><string>BNDL</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleShortVersionString</key><string>1.0</string>
 </dict></plist>
 PLIST
 
-echo "==> Building SwiperKitTests (macOS)"
+echo "==> Building SWIPRKitTests (macOS)"
 "$SWIFTC" -sdk "$MACSDK" -target "$TARGET" -parse-as-library \
-  -I "$BUILD" -L "$BUILD" -lSwiperKit \
+  -I "$BUILD" -L "$BUILD" -lSWIPRKit \
   -I "$XCTEST_LIB" -L "$XCTEST_LIB" -F "$XCTEST_FW" \
   -framework XCTest -lXCTestSwiftSupport \
   -Xlinker -rpath -Xlinker "$BUILD" \
-  -emit-library -o "$BUNDLE/Contents/MacOS/SwiperKitTests" \
-  $(find "$ROOT/SwiperKitTests" -name '*.swift' | sort)
+  -emit-library -o "$BUNDLE/Contents/MacOS/SWIPRKitTests" \
+  $(find "$ROOT/SWIPRKitTests" -name '*.swift' | sort)
 
 echo "==> Running tests"
 "$XCTEST_RUN" "$BUNDLE"

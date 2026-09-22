@@ -55,7 +55,7 @@ row with a chevron.
 
 ### 1. Rename to SWIPR
 
-- Framework module `SwiperKit` becomes `SWIPRKit`, and every `import` follows.
+- Framework module `SWIPRKit` becomes `SWIPRKit`, and every `import` follows.
 - Source directories, targets, scheme and product names become `SWIPR`,
   `SWIPRKit`, `SWIPRAppTests`, `SWIPRKitTests`, `SWIPRUITests`.
 - Bundle identifiers change, including the app's:

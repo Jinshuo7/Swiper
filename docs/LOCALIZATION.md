@@ -11,7 +11,7 @@ and Chinese.
 - `Scripts/generate_project.rb` already sets `SWIFT_EMIT_LOC_STRINGS = YES` on
   every target, so Xcode can extract SwiftUI string literals into a String
   Catalog with no per-call-site change.
-- `SwiperKit/LibraryCalendar` formats month titles with a locale-aware
+- `SWIPRKit/LibraryCalendar` formats month titles with a locale-aware
   `DateFormatter` (`setLocalizedDateFormatFromTemplate("yMMMM")`). A unit test
   asserts English `"November 2024"` **and** Chinese `"2024年11月"`. Month headers
   therefore need no catalog work at all — the main grid already localises.
@@ -22,14 +22,14 @@ About 150 user-facing strings, in these places:
 
 | Area | Approx. | Notes |
 | --- | --- | --- |
-| `Swiper/Views/` | ~95 | Screens, buttons, wells, tutorial, banners |
-| `Swiper/ViewModels/AppModel.swift` | ~16 | Persistence and failure notices |
-| `SwiperKit/ControlPreferences.swift` | 21 | Preset and rail titles/subtitles |
-| `SwiperKit/DeletionWording.swift` | 9 | The agreed deletion vocabulary |
-| `SwiperKit/SessionPersistence.swift` | ~7 | `SessionStoreError.errorDescription` |
-| `SwiperKit/Models.swift` | 4 | `SessionAction.title` |
-| `SwiperKit/ByteFormatter.swift` | ~5 | "1 byte", "about 1.2 GB" |
-| `SwiperKit/LibraryCalendar.swift` | 1 | "No date" |
+| `SWIPR/Views/` | ~95 | Screens, buttons, wells, tutorial, banners |
+| `SWIPR/ViewModels/AppModel.swift` | ~16 | Persistence and failure notices |
+| `SWIPRKit/ControlPreferences.swift` | 21 | Preset and rail titles/subtitles |
+| `SWIPRKit/DeletionWording.swift` | 9 | The agreed deletion vocabulary |
+| `SWIPRKit/SessionPersistence.swift` | ~7 | `SessionStoreError.errorDescription` |
+| `SWIPRKit/Models.swift` | 4 | `SessionAction.title` |
+| `SWIPRKit/ByteFormatter.swift` | ~5 | "1 byte", "about 1.2 GB" |
+| `SWIPRKit/LibraryCalendar.swift` | 1 | "No date" |
 
 Non-copy literals that must **not** be localised, and must be excluded from any
 blanket extraction: `"mediaType == %d"` (a `PHFetchOptions` predicate), asset
@@ -38,12 +38,12 @@ names, and the `XCTestConfigurationFilePath` environment key.
 
 ## Blockers, in the order they will bite
 
-1. **Framework copy lives in `SwiperKit`, not the app.** A String Catalog in the
+1. **Framework copy lives in `SWIPRKit`, not the app.** A String Catalog in the
    app target does not cover the framework. `DeletionWording`, the rail and
    preset titles, `SessionAction.title`, `ByteFormatter` and
-   `SessionStoreError.errorDescription` are all in `SwiperKit`, including the
+   `SessionStoreError.errorDescription` are all in `SWIPRKit`, including the
    strings the user sees most (the marked count, the review button, every error
-   banner). These need `SwiperKit/Localizable.xcstrings` plus lookups with
+   banner). These need `SWIPRKit/Localizable.xcstrings` plus lookups with
    `bundle: .module`, and the framework target needs a default localisation.
    This is the change that is easy to discover halfway through, which is why it
    is written down first.
@@ -72,7 +72,7 @@ names, and the `XCTestConfigurationFilePath` environment key.
 
 ## Plan — one pass, no intermediate release
 
-1. Add `SwiperKit` localisation: catalog, default localisation, and
+1. Add `SWIPRKit` localisation: catalog, default localisation, and
    `bundle: .module` lookups for the framework strings listed above.
 2. Replace every manual plural with a String Catalog plural variation, so the
    English source changes too (and its tests with it).

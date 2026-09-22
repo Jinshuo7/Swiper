@@ -6,8 +6,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## Build and test
 
-- Xcode 27.x, iOS deployment target 17.0. The scheme is `Swiper`; the project is
-  `Swiper.xcodeproj`.
+- Xcode 27.x, iOS deployment target 17.0. The scheme is `SWIPR`; the project is
+  `SWIPR.xcodeproj`.
 - If the global developer directory points at Command Line Tools, use
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` on commands rather
   than changing the machine selection.
@@ -15,8 +15,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - Verified working 2026-09-20: Xcode 27.0, licence accepted. The iOS Simulator
   runtime was removed to save disk and `xcrun simctl list runtimes` is empty, so
-  `SwiperAppTests` and `SwiperUITests` need a connected, unlocked iPhone:
-  `xcodebuild test -project Swiper.xcodeproj -scheme Swiper -destination 'platform=iOS,id=<UDID>'`.
+  `SWIPRAppTests` and `SWIPRUITests` need a connected, unlocked iPhone:
+  `xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR -destination 'platform=iOS,id=<UDID>'`.
   See `docs/TESTING.md` for commands, results and what is currently blocked.
 - Running the device suite from a sandboxed agent session needs **full file
   access**. Xcode launches the test host through a pseudo-terminal, so a
@@ -27,9 +27,14 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   (`deviceprep Code=-3 "Unlock iPhone to Continue"`), and `devicectl` cannot
   report the lock state. Ask the owner to unlock the phone before starting a
   device run, and kill and ask again if that error appears.
-- Device builds sign with the personal team and a unique app bundle id set in
-  `Scripts/generate_project.rb`; `com.swiper.app` is globally taken, so it cannot
-  be registered. Personal-team provisioning profiles expire after 7 days.
+- Device builds sign with the personal team and the bundle id in
+  `Scripts/generate_project.rb`. Changing that id needs a provisioning profile for
+  the new id, and only a signed-in Xcode account can create one: from a sandboxed
+  `xcodebuild`, a new id fails with `No Accounts`, while an id that already has a
+  cached profile builds with no account involved. Managed profiles live in
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`. To prove the code
+  compiles without touching signing, add `CODE_SIGNING_ALLOWED=NO`. Personal-team
+  profiles expire after 7 days.
 - Raw-compiler fallbacks when `xcodebuild` is unavailable:
   `Scripts/run-kit-tests.sh` (macOS) and `Scripts/typecheck-ios.sh` (iOS check).
 - Inside a restricted (agent-harness) sandbox, two extra flags are required, or
@@ -42,35 +47,35 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   `OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'`.
   `Scripts/typecheck-ios.sh` already sets it.
 - After adding, renaming or deleting source files, run
-  `ruby Scripts/generate_project.rb` and commit `Swiper.xcodeproj`.
+  `ruby Scripts/generate_project.rb` and commit `SWIPR.xcodeproj`.
 
 ## Architecture
 
-- `SwiperKit/` is a Foundation-only framework holding all decision logic:
+- `SWIPRKit/` is a Foundation-only framework holding all decision logic:
   ordering, the deletion list, undo, Tumbler, preferences, statistics, stored
   state and migration, stale-asset reconciliation and photo-fit geometry. Keep
   PhotoKit and UIKit out of it.
-- `Swiper/` is the app. `PhotoKitLibrary` implements the framework protocols;
+- `SWIPR/` is the app. `PhotoKitLibrary` implements the framework protocols;
   `AppModel` performs the `SessionEffect` values the pure `SessionEngine` emits.
-  Views are in `Swiper/Views/`.
+  Views are in `SWIPR/Views/`.
 - The engine never mutates the library. Deleting happens only in
   `AppModel.confirmDeletion()` after an explicit user confirmation, and only
   confirmed deletions update statistics.
 - The deletion list outlives sorting sessions (`docs/adr/0005`). `AppModel`
   stages a decision, saves it, and only then acknowledges and advances; a failed
   save parks a `PendingDecision` and offers Retry (`docs/adr/0004`).
-- Test seams: `SwiperKitTests` for pure logic on macOS, `SwiperAppTests` for
+- Test seams: `SWIPRKitTests` for pure logic on macOS, `SWIPRAppTests` for
   `AppModel` against `FakePhotoLibrary` + `InMemorySessionStore` (which can fail
-  writes or hold unreadable/newer-version data), `SwiperUITests` for the real UI
+  writes or hold unreadable/newer-version data), `SWIPRUITests` for the real UI
   with `-uiTestingFakeLibrary`.
 
 ## Safety
 
 - Automated tests must never touch a real photo library. Unit tests use
-  `SwiperKit` fakes; UI tests launch with `-uiTestingFakeLibrary`, which swaps in
+  `SWIPRKit` fakes; UI tests launch with `-uiTestingFakeLibrary`, which swaps in
   `FakePhotoLibrary`.
 - Do not add private APIs or Key-Value Coding file-size tricks. Storage is an
-  estimate; see `SwiperKit/StorageEstimate.swift` and `docs/adr/0002`.
+  estimate; see `SWIPRKit/StorageEstimate.swift` and `docs/adr/0002`.
 
 ## Localisation
 
@@ -78,7 +83,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   half-migrated. `docs/LOCALIZATION.md` has the inventory, the blockers and the
   plan; read it before touching copy.
 - The blocker to know up front: a large share of user-facing copy lives in
-  `SwiperKit` (`DeletionWording`, rail and preset titles, error descriptions), so
+  `SWIPRKit` (`DeletionWording`, rail and preset titles, error descriptions), so
   it needs the framework's own catalog and `bundle: .module` lookups, not just an
   app catalog.
 - `Scripts/check_localizations.sh` fails if any catalog key lacks a `zh-Hans`

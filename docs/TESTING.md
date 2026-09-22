@@ -1,15 +1,15 @@
 # Testing
 
-This document records the exact commands used to verify Swiper and what a future
+This document records the exact commands used to verify SWIPR and what a future
 agent needs to re-run them. Keep it in sync when the test setup changes.
 
 There are three test targets:
 
 | Target | What it covers | Where it runs |
 | --- | --- | --- |
-| `SwiperKitTests` | Pure logic: ordering, marks, undo, persistence and migration, reconciliation, statistics, layout | macOS **or** device |
-| `SwiperAppTests` | `AppModel` against `FakePhotoLibrary` and a controllable `InMemorySessionStore`: acknowledgement, failure/retry, restart, recovery, deletion outcomes | Device only |
-| `SwiperUITests` | Real UI against the fake library: viewer bounds, drag feedback, tutorial, home/review navigation, screenshots — plus the exploratory `PlaySessionUITests` "play like a user" suite | Device only |
+| `SWIPRKitTests` | Pure logic: ordering, marks, undo, persistence and migration, reconciliation, statistics, layout | macOS **or** device |
+| `SWIPRAppTests` | `AppModel` against `FakePhotoLibrary` and a controllable `InMemorySessionStore`: acknowledgement, failure/retry, restart, recovery, deletion outcomes | Device only |
+| `SWIPRUITests` | Real UI against the fake library: viewer bounds, drag feedback, tutorial, home/review navigation, screenshots — plus the exploratory `PlaySessionUITests` "play like a user" suite | Device only |
 
 Automated tests never touch a real photo library: unit tests use fakes, and every
 UI test launches with `-uiTestingFakeLibrary`.
@@ -42,15 +42,15 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/typecheck-ios.s
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 TMPDIR=$PWD/.tmp \
-xcodebuild build-for-testing -project Swiper.xcodeproj -scheme Swiper \
+xcodebuild build-for-testing -project SWIPR.xcodeproj -scheme SWIPR \
   -destination 'generic/platform=iOS' -derivedDataPath ./.derivedData \
   -allowProvisioningUpdates \
   OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'
 ```
 
 - Latest result: `** TEST BUILD SUCCEEDED **`. This compiles all three test
-  targets, so it is the check that catches a broken `SwiperAppTests` or
-  `SwiperUITests` without a device.
+  targets, so it is the check that catches a broken `SWIPRAppTests` or
+  `SWIPRUITests` without a device.
 - `-derivedDataPath ./.derivedData` is required inside a restricted sandbox: the
   default `~/Library/Developer/Xcode/DerivedData` is not writable.
 - `-Xfrontend -disable-sandbox` is required for the same reason (SwiftUI macro
@@ -61,7 +61,7 @@ xcodebuild build-for-testing -project Swiper.xcodeproj -scheme Swiper \
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 TMPDIR=$PWD/.tmp \
-xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
+xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
   -destination 'platform=iOS,id=00008030-000669DE3408802E' \
   -derivedDataPath ./.derivedData -allowProvisioningUpdates \
   OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'
@@ -76,11 +76,11 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SwiperKitTests` | 127 | 0 failures |
-  | `SwiperAppTests` | 31 | 0 failures |
-  | `SwiperUITests` | 47 | 0 failures |
+  | `SWIPRKitTests` | 127 | 0 failures |
+  | `SWIPRAppTests` | 31 | 0 failures |
+  | `SWIPRUITests` | 47 | 0 failures |
 
-  205 tests, 0 failures. `SwiperUITests` is 33 cases plus the 14
+  205 tests, 0 failures. `SWIPRUITests` is 33 cases plus the 14
   `PlaySessionUITests` cases described below; the control redesign replaced the
   rail-order case and added six cluster cases.
 - Previously, 2026-09-21 21:09: **188 tests, 0 failures** (126 + 31 + 31), result
@@ -102,7 +102,7 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
     showing `available (paired)` was followed by automation-mode timeouts;
     `xcrun devicectl device info details --device <udid>` brought it to
     `connected` and the run then worked.
-- The original `SwiperUITests` cases take about 6 minutes because each test
+- The original `SWIPRUITests` cases take about 6 minutes because each test
   relaunches the app and several hold a drag for 1.5 s; the play suite below adds
   about 10 minutes.
 - Inside a restricted sandbox the run fails before any test starts:
@@ -113,7 +113,7 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 
 ## Playing the app like a user (device)
 
-`SwiperUITests/PlaySessionUITests.swift` walks the app the way a curious person
+`SWIPRUITests/PlaySessionUITests.swift` walks the app the way a curious person
 would, entirely against the fake library: every preset, every cluster dock
 (bottom, left and right, including sliding the cluster along an edge), marking,
 review (including select mode and restoring several marks at once), deletion, the
@@ -126,11 +126,11 @@ screenshot of each arrangement.
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 TMPDIR=$PWD/.tmp \
-xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
+xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
   -destination 'platform=iOS,id=00008030-000669DE3408802E' \
   -derivedDataPath ./.derivedData -allowProvisioningUpdates \
   OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox' \
-  -only-testing:SwiperUITests/PlaySessionUITests
+  -only-testing:SWIPRUITests/PlaySessionUITests
 ```
 
 - Latest result (2026-09-22): **14 tests, 0 failures**, about 6 minutes. The
@@ -192,7 +192,7 @@ Three things about the move gesture are easy to get wrong again:
   edge, and both `dragCluster` helpers assert that frame is smaller than the
   screen before dragging.
 
-`SwiperUITests` covers this with `testTheClusterDocksToEitherSideAndBecomesAColumn`,
+`SWIPRUITests` covers this with `testTheClusterDocksToEitherSideAndBecomesAColumn`,
 `testAPlainDragNeverMovesTheCluster` (a plain drag must not shove the buttons, and
 a move must not decide), `testADockedSideClusterDoesNotCoverThePhoto`,
 `testSwitchingPresetDoesNotMoveTheCluster`, `testCloseIsSmallInTheTopLeftCorner`
@@ -201,7 +201,7 @@ and `testTheHeartIsInTheTopStripAndStillFavorites`. The play suite adds
 it along the bottom, checking at each stop that every control stays on screen,
 tappable, and clear of the top strip.
 
-`SwiperKitTests.ControlPreferencesTests` covers the storage: a legacy anchor or
+`SWIPRKitTests.ControlPreferencesTests` covers the storage: a legacy anchor or
 placement becomes a continuous position, an old `order` key is ignored rather
 than rejected, and a position is clamped to 0...1 (a non-finite one falls back to
 the centre).
@@ -212,14 +212,14 @@ UI tests attach screenshots with `lifetime = .keepAlways`. They are written into
 the run's `.xcresult` bundle:
 
 ```
-.derivedData/Logs/Test/Test-Swiper-<timestamp>.xcresult
+.derivedData/Logs/Test/Test-SWIPR-<timestamp>.xcresult
 ```
 
 Extract them with:
 
 ```sh
 xcrun xcresulttool export attachments \
-  --path .derivedData/Logs/Test/Test-Swiper-<timestamp>.xcresult \
+  --path .derivedData/Logs/Test/Test-SWIPR-<timestamp>.xcresult \
   --output-path ./screenshots
 ```
 

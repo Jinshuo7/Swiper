@@ -1,6 +1,6 @@
-# Swiper
+# SWIPR
 
-Swiper exists to make cleaning a photo library fast, physical and safe on an
+SWIPR exists to make cleaning a photo library fast, physical and safe on an
 iPhone. After granting photo access, one photo fills the screen and a small,
 configurable gesture or button decides its fate. Nothing is deleted while the
 user is swiping: deletions only happen after an explicit, system-backed final
@@ -13,7 +13,7 @@ videos are deliberately out of scope.
 
 Photo libraries grow past the point where sorting through them is pleasant.
 Most cleaners optimise for gamification, statistics and aggressive deletion.
-Swiper optimises for three things instead:
+SWIPR optimises for three things instead:
 
 1. **Low thumb effort.** The decision is a swipe or a button near the thumb.
 2. **Reversibility.** Marking is not deleting. Marks survive mode changes and
@@ -23,7 +23,7 @@ Swiper optimises for three things instead:
 
 ## Experience in one paragraph
 
-Open Swiper, grant access, and decide: **Continue sorting** if an unfinished
+Open SWIPR, grant access, and decide: **Continue sorting** if an unfinished
 session exists, **Review & delete · N** if photos are already marked, **Recent**
 to start at the newest photo, **Start Here** to pick a starting point from a
 scrollable grid, or **Tumbler** for a repeat-free random walk. Decide each photo

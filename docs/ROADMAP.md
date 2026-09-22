@@ -1,6 +1,6 @@
 # Roadmap
 
-Swiper is delivered as vertical slices. Each slice is a working, testable path
+SWIPR is delivered as vertical slices. Each slice is a working, testable path
 through the product; later slices are not started until the previous one builds
 and is proven on a device.
 
@@ -35,7 +35,7 @@ In scope for this slice:
 * Undo, persisted session and deletion list, stale-asset reconciliation.
 * Deletion review with single restore and drag-select batch restore.
 * Result feedback plus current-session and lifetime statistics.
-* `SwiperKit` logic framework with unit tests; UI test of the fake-library flow.
+* `SWIPRKit` logic framework with unit tests; UI test of the fake-library flow.
 
 Proven when the path above runs on a real iPhone and in the Simulator, and the
 logic tests pass.

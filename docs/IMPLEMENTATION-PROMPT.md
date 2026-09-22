@@ -61,7 +61,7 @@ elsewhere. No phone passcode changes, lock bypass, simulator installation, globa
 Xcode selection changes, user-data deletion, remote push, or app publication.
 
 Use DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer for Xcode commands.
-Discover the physical iPhone with xcrun devicectl list devices. Use Swiper.xcodeproj,
+Discover the physical iPhone with xcrun devicectl list devices. Use SWIPR.xcodeproj,
 Swiper scheme, platform=iOS,id=<UDID>, and provisioning updates if needed.
 A locked phone cannot run UI tests. Bound readiness waits and capture the exact
 failure. Continue with Scripts/run-kit-tests.sh, Scripts/typecheck-ios.sh and
@@ -81,7 +81,7 @@ Run full feasible suites after integration. If a device check is blocked, leave 
 explicitly pending and don't close its issue as verified. Later independent local
 work may continue, but don't pretend native blockers or acceptance criteria passed.
 
-Keep Foundation-only SwiperKit, iOS 17 compatibility, public APIs and explicit
+Keep Foundation-only SWIPRKit, iOS 17 compatibility, public APIs and explicit
 review confirmation. Never promise impossible crash-proof guarantees. Atomic local
 writes do not make PhotoKit and storage one transaction; handle recovery explicitly.
 When adding/removing/renaming sources, regenerate the project with the existing

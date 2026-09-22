@@ -12,7 +12,7 @@ repository names as they are because tooling references the checkout path.
 `Scripts/generate_project.rb` is the source of truth: change it and regenerate,
 rather than editing the project file by hand.
 
-- Framework module `SwiperKit` to `SWIPRKit`, and every `import` in the app and
+- Framework module `SWIPRKit` to `SWIPRKit`, and every `import` in the app and
   every test target follows.
 - Source directories, targets, scheme and product names: `SWIPR`, `SWIPRKit`,
   `SWIPRKitTests`, `SWIPRAppTests`, `SWIPRUITests`.

@@ -4,14 +4,14 @@ This is the contract a build must satisfy. It describes behaviour, not code.
 
 ## 1. Access
 
-1. On first launch Swiper asks for read-write photo access, because both
-   favouriting and deleting mutate the library. Swiper never requests more than
+1. On first launch SWIPR asks for read-write photo access, because both
+   favouriting and deleting mutate the library. SWIPR never requests more than
    this.
-2. Before asking, Swiper explains what access is for and that all data stays on
+2. Before asking, SWIPR explains what access is for and that all data stays on
    the device.
-3. Limited-library access is supported: Swiper shows the visible subset and
+3. Limited-library access is supported: SWIPR shows the visible subset and
    offers a control to select more photos.
-4. If access is denied or restricted, Swiper explains how to change it in
+4. If access is denied or restricted, SWIPR explains how to change it in
    Settings and does not present the library.
 
 ## 2. Entry
@@ -27,7 +27,7 @@ The entry screen offers exactly these choices:
   newest asset whatever the default direction is set to.
 * **Start Here** — open a lazily loaded grid of the whole library, grouped into
   calendar months with the newest first, and begin at the chosen asset. The
-  screen states what it is for (choosing where to begin, after which Swiper walks
+  screen states what it is for (choosing where to begin, after which SWIPR walks
   in the default direction and skips anything already decided or marked). A month menu
   jumps straight to any point in the library, and a control flips the order
   between newest and oldest, so no one has to scroll in from one end. Only
@@ -130,7 +130,7 @@ the top strip instead.
 
 ## 4a. Teaching
 
-1. The first time a photo is presented, Swiper explains the flow once: how to
+1. The first time a photo is presented, SWIPR explains the flow once: how to
    mark for deletion, how to keep, that nothing is deleted until review is
    confirmed, and that accepted decisions are saved as they are made.
 2. The explanation matches the selected preset: the Swipe preset describes the
@@ -158,7 +158,7 @@ the top strip instead.
    never clears a mark. Photos marked for deletion are skipped by every sorting
    entry point, so a photo is decided once.
 7. Stored state carries a schema version. Data written by a newer version of
-   Swiper, or data that cannot be read, is reported to the user and is never
+   SWIPR, or data that cannot be read, is reported to the user and is never
    overwritten as if the session were empty. See
    [ADR-0004](adr/0004-schema-versioned-session-persistence.md).
 8. A decision is acknowledged only after it has been saved. A failed save pauses
@@ -178,7 +178,7 @@ the top strip instead.
    dropped.
 5. No statistics or reclaimed-storage totals are displayed during review.
 6. Tapping Delete in review is the explicit final action; it asks the system to
-   delete the remaining marked photos. Swiper adds **no confirmation dialog of
+   delete the remaining marked photos. SWIPR adds **no confirmation dialog of
    its own** — the single confirmation is the system's, which PhotoKit always
    presents and which is the only thing that authorises the deletion. The review
    screen states what the commit will do, since that explanation no longer lives
@@ -187,11 +187,11 @@ the top strip instead.
    Unsuccessful or cancelled deletions stay marked and are not counted.
 8. Leaving review returns to the place it was opened from, or home when there is
    no active sorting session.
-9. Local storage and PhotoKit are not one transaction. Swiper never claims a
+9. Local storage and PhotoKit are not one transaction. SWIPR never claims a
    deletion it did not confirm: after a commit it re-reads the library, removes
    only confirmed-deleted assets from the list, keeps unsuccessful ones marked,
    and re-checks stored state against the library on the next launch. Assets that
-   vanished outside Swiper are dropped from the list without being counted as
+   vanished outside SWIPR are dropped from the list without being counted as
    deletions, and a retry never re-requests or re-counts an asset that is already
    gone.
 
@@ -208,9 +208,9 @@ the top strip instead.
 
 ## 8. Safety invariants
 
-* Swiper never deletes while swiping.
+* SWIPR never deletes while swiping.
 * Deleting requires two deliberate acts: tapping Delete in review, then allowing
-  it in the system prompt. Swiper never adds a third.
+  it in the system prompt. SWIPR never adds a third.
 * A marked photo is reversible until the final commit.
 * Restored photos become kept and leave the deletion list.
 * An acknowledged decision is always saved first; a failed save is visible and

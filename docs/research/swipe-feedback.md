@@ -37,7 +37,7 @@ threshold feedback remain open for visual evaluation.
 
 ## Current implementation evidence
 
-`Swiper/Views/ViewerView.swift` moves the photo with the drag but gives no
+`SWIPR/Views/ViewerView.swift` moves the photo with the drag but gives no
 outcome-specific visual feedback. A low-opacity sentence at the bottom attempts
 to explain all gestures instead. On an iPhone 11 Pro the current photo view
 expands to 812 × 812 points inside a 375 × 812-point display, pushing controls

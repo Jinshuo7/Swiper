@@ -1,6 +1,6 @@
 # CONTEXT
 
-The shared language for Swiper. This file is a glossary only: it defines the
+The shared language for SWIPR. This file is a glossary only: it defines the
 project's words, never its implementation.
 
 ## Sessions and traversal
@@ -39,7 +39,7 @@ clear a mark. Restoring a photo drops the Undo entries that could reapply its
 mark.
 
 **Traversal direction**:
-Whether the session walks toward older or newer photos. Swiper defaults toward
+Whether the session walks toward older or newer photos. SWIPR defaults toward
 older photos and remembers the user's preference.
 
 **Tumbler**:
@@ -81,7 +81,7 @@ were only marked, or that a failed or cancelled commit left in place, never
 count.
 
 **Limited library**:
-The photo access state where only user-selected photos are visible. Swiper
+The photo access state where only user-selected photos are visible. SWIPR
 supports it and offers to expand the selection.
 
 **Estimated size**:

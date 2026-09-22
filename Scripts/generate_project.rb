@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Generates Swiper.xcodeproj from the source tree using the xcodeproj gem.
+# Generates SWIPR.xcodeproj from the source tree using the xcodeproj gem.
 #
 # Regenerate after adding or removing source files:
 #   gem install --user-install xcodeproj
@@ -14,12 +14,13 @@ require "xcodeproj"
 require "fileutils"
 
 ROOT = File.expand_path("..", __dir__)
-PROJECT_PATH = File.join(ROOT, "Swiper.xcodeproj")
+PROJECT_PATH = File.join(ROOT, "SWIPR.xcodeproj")
 DEPLOYMENT_TARGET = "17.0"
-# Personal team used for device builds. "com.swiper.app" is globally taken, so
-# the app needs a team-unique bundle identifier to install on a physical phone.
+# Personal team used for device builds. The bundle identifier has to be unique to
+# the team, so the app cannot use "com.swipr.app"; changing it starts the phone
+# fresh, because saved state and preferences live in the app's container.
 DEVELOPMENT_TEAM = "47926SW685"
-APP_BUNDLE_ID = "com.zhangjinshuo.swiper"
+APP_BUNDLE_ID = "com.zhangjinshuo.swipr"
 
 FileUtils.rm_rf(PROJECT_PATH)
 project = Xcodeproj::Project.new(PROJECT_PATH)
@@ -40,23 +41,23 @@ def add_sources(project, target, directory)
   end
 end
 
-app = project.new_target(:application, "Swiper", :ios, DEPLOYMENT_TARGET)
-kit = project.new_target(:framework, "SwiperKit", :ios, DEPLOYMENT_TARGET)
-unit_tests = project.new_target(:unit_test_bundle, "SwiperKitTests", :ios, DEPLOYMENT_TARGET)
-app_tests = project.new_target(:unit_test_bundle, "SwiperAppTests", :ios, DEPLOYMENT_TARGET)
-ui_tests = project.new_target(:ui_test_bundle, "SwiperUITests", :ios, DEPLOYMENT_TARGET)
+app = project.new_target(:application, "SWIPR", :ios, DEPLOYMENT_TARGET)
+kit = project.new_target(:framework, "SWIPRKit", :ios, DEPLOYMENT_TARGET)
+unit_tests = project.new_target(:unit_test_bundle, "SWIPRKitTests", :ios, DEPLOYMENT_TARGET)
+app_tests = project.new_target(:unit_test_bundle, "SWIPRAppTests", :ios, DEPLOYMENT_TARGET)
+ui_tests = project.new_target(:ui_test_bundle, "SWIPRUITests", :ios, DEPLOYMENT_TARGET)
 
 project.build_configurations.each do |config|
   config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = DEPLOYMENT_TARGET
   config.build_settings["SWIFT_VERSION"] = "5.0"
 end
 
-# --- SwiperKit -----------------------------------------------------------------
-add_sources(project, kit, "SwiperKit")
+# --- SWIPRKit ------------------------------------------------------------------
+add_sources(project, kit, "SWIPRKit")
 settings(kit, {
-  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperKit",
+  "PRODUCT_BUNDLE_IDENTIFIER" => "com.zhangjinshuo.swipr.kit",
   "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
-  "PRODUCT_NAME" => "SwiperKit",
+  "PRODUCT_NAME" => "SWIPRKit",
   "DEFINES_MODULE" => "YES",
   "SKIP_INSTALL" => "YES",
   "GENERATE_INFOPLIST_FILE" => "YES",
@@ -67,18 +68,18 @@ settings(kit, {
   "LD_RUNPATH_SEARCH_PATHS" => ["$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"],
 })
 
-# --- Swiper --------------------------------------------------------------------
-add_sources(project, app, "Swiper")
-assets = project.main_group.new_file("Swiper/Resources/Assets.xcassets")
+# --- SWIPR ---------------------------------------------------------------------
+add_sources(project, app, "SWIPR")
+assets = project.main_group.new_file("SWIPR/Resources/Assets.xcassets")
 app.resources_build_phase.add_file_reference(assets)
 settings(app, {
   "PRODUCT_BUNDLE_IDENTIFIER" => APP_BUNDLE_ID,
   "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
-  "PRODUCT_NAME" => "Swiper",
+  "PRODUCT_NAME" => "SWIPR",
   "GENERATE_INFOPLIST_FILE" => "YES",
-  "INFOPLIST_KEY_CFBundleDisplayName" => "Swiper",
+  "INFOPLIST_KEY_CFBundleDisplayName" => "SWIPR",
   "INFOPLIST_KEY_NSPhotoLibraryUsageDescription" =>
-    "Swiper shows your photos one at a time so you can keep, favorite or queue them for deletion. Favorites and confirmed deletions change your library. Everything stays on this device.",
+    "SWIPR shows your photos one at a time so you can keep, favorite or queue them for deletion. Favorites and confirmed deletions change your library. Everything stays on this device.",
   "INFOPLIST_KEY_UILaunchScreen_Generation" => "YES",
   "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" => "YES",
   "INFOPLIST_KEY_UISupportedInterfaceOrientations" => "UIInterfaceOrientationPortrait",
@@ -99,16 +100,16 @@ embed.dst_subfolder_spec = "10"
 embed_build_file = embed.add_file_reference(kit.product_reference)
 embed_build_file.settings = { "ATTRIBUTES" => %w[CodeSignOnCopy RemoveHeadersOnCopy] }
 
-# --- SwiperKitTests ------------------------------------------------------------
-add_sources(project, unit_tests, "SwiperKitTests")
+# --- SWIPRKitTests -------------------------------------------------------------
+add_sources(project, unit_tests, "SWIPRKitTests")
 settings(unit_tests, {
-  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperKitTests",
+  "PRODUCT_BUNDLE_IDENTIFIER" => "com.zhangjinshuo.swipr.kit.tests",
   "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
-  "PRODUCT_NAME" => "SwiperKitTests",
+  "PRODUCT_NAME" => "SWIPRKitTests",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "CODE_SIGN_STYLE" => "Automatic",
   "SWIFT_EMIT_LOC_STRINGS" => "YES",
-  "TEST_HOST" => "$(BUILT_PRODUCTS_DIR)/Swiper.app/Swiper",
+  "TEST_HOST" => "$(BUILT_PRODUCTS_DIR)/SWIPR.app/SWIPR",
   "BUNDLE_LOADER" => "$(TEST_HOST)",
   "LD_RUNPATH_SEARCH_PATHS" => ["$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"],
 })
@@ -116,19 +117,19 @@ unit_tests.add_dependency(kit)
 unit_tests.add_dependency(app)
 unit_tests.frameworks_build_phase.add_file_reference(kit.product_reference)
 
-# --- SwiperAppTests ------------------------------------------------------------
+# --- SWIPRAppTests -------------------------------------------------------------
 # App-level integration tests: AppModel operations against the fake photo
 # library and a controllable persistence store. These need UIKit/PhotoKit, so
-# they cannot live in the macOS-runnable SwiperKitTests bundle.
-add_sources(project, app_tests, "SwiperAppTests")
+# they cannot live in the macOS-runnable SWIPRKitTests bundle.
+add_sources(project, app_tests, "SWIPRAppTests")
 settings(app_tests, {
-  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperAppTests",
+  "PRODUCT_BUNDLE_IDENTIFIER" => "com.zhangjinshuo.swipr.app.tests",
   "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
-  "PRODUCT_NAME" => "SwiperAppTests",
+  "PRODUCT_NAME" => "SWIPRAppTests",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "CODE_SIGN_STYLE" => "Automatic",
   "SWIFT_EMIT_LOC_STRINGS" => "YES",
-  "TEST_HOST" => "$(BUILT_PRODUCTS_DIR)/Swiper.app/Swiper",
+  "TEST_HOST" => "$(BUILT_PRODUCTS_DIR)/SWIPR.app/SWIPR",
   "BUNDLE_LOADER" => "$(TEST_HOST)",
   "LD_RUNPATH_SEARCH_PATHS" => ["$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"],
 })
@@ -136,15 +137,15 @@ app_tests.add_dependency(kit)
 app_tests.add_dependency(app)
 app_tests.frameworks_build_phase.add_file_reference(kit.product_reference)
 
-# --- SwiperUITests -------------------------------------------------------------
-add_sources(project, ui_tests, "SwiperUITests")
+# --- SWIPRUITests --------------------------------------------------------------
+add_sources(project, ui_tests, "SWIPRUITests")
 settings(ui_tests, {
-  "PRODUCT_BUNDLE_IDENTIFIER" => "com.swiper.SwiperUITests",
+  "PRODUCT_BUNDLE_IDENTIFIER" => "com.zhangjinshuo.swipr.ui.tests",
   "DEVELOPMENT_TEAM" => DEVELOPMENT_TEAM,
-  "PRODUCT_NAME" => "SwiperUITests",
+  "PRODUCT_NAME" => "SWIPRUITests",
   "GENERATE_INFOPLIST_FILE" => "YES",
   "CODE_SIGN_STYLE" => "Automatic",
-  "TEST_TARGET_NAME" => "Swiper",
+  "TEST_TARGET_NAME" => "SWIPR",
 })
 ui_tests.add_dependency(app)
 
@@ -156,7 +157,7 @@ scheme.set_launch_target(app)
 scheme.add_test_target(unit_tests)
 scheme.add_test_target(app_tests)
 scheme.add_test_target(ui_tests)
-scheme.save_as(PROJECT_PATH, "Swiper", true)
+scheme.save_as(PROJECT_PATH, "SWIPR", true)
 
 project.save
 puts "Generated #{PROJECT_PATH}"
