@@ -12,15 +12,11 @@ and Undo history are session-scoped; the [deletion
 list](#sessions-and-traversal) is not.
 
 **Decision**:
-The user's verdict on the current photo: keep, favorite, or mark for deletion.
-Undo is an action that reverses a decision, not a decision of its own.
+The user's verdict on the current photo: keep or mark for deletion. Undo is an
+action that reverses a decision, not a decision of its own.
 
 **Keep**:
 A decision that marks a photo as reviewed and leaves it in the library.
-
-**Favorite**:
-A decision that marks the asset as an Apple Photos favorite, keeps it, and
-advances.
 
 **Mark for deletion**:
 A reversible decision that adds a photo to the deletion list. It never removes
@@ -48,12 +44,21 @@ older photos and remembers the user's preference.
 
 **Tumbler**:
 A repeat-free randomised traversal of the library. It uses a persisted,
-deterministic random order of identifiers.
+deterministic random order of identifiers. Its entry point is **Random**, inside
+Start Here.
 
 **Start Here**:
 The screen for choosing where a sorting session begins. It presents the library
 grouped into calendar months, newest first by default, with a menu that jumps
-straight to a month.
+straight to a month, and it starts the two named traversals itself: **Newest**,
+which begins at the newest photo and walks toward older ones, and **Random**,
+which is the Tumbler. It is the only door into sorting; the entry screen reaches
+it and never starts a session on its own.
+
+**Entry screen**:
+The first screen: the SWIPR wordmark, one action that opens Start Here, a resume
+action shown only while a session is waiting, and a chip into deletion review
+shown only while photos are marked.
 
 **Deletion review**:
 The dedicated screen where marked photos are inspected, restored, or confirmed
@@ -112,12 +117,26 @@ The one-time explanation of marking, keeping, review confirmation and automatic
 saving, shown with the first photo and replayable from Settings → How to use. It
 is teaching state, not saved work.
 
-**Control preset**:
-The chosen interaction style: Swipe, Thumb, Delete only, or Extended. It changes
-which controls are shown, never the full-screen photo experience.
+**Control cluster**:
+The viewer's three controls: Trash, Undo and Checkmark. It is shown only while
+buttons are shown, and it never resizes or shifts the photo.
 
-**Control placement**:
-Where the floating controls sit: left, center or right, for handedness.
+**Control position**:
+Where the cluster sits: a row centred near the bottom edge, or a column centred in
+the middle of the lower half at the left or right edge. One of exactly three fixed
+places, chosen by the user and remembered.
+
+**Grip**:
+The three-dot handle on the cluster. Dragging it is how the cluster is moved.
+
+**Puck**:
+The small circle the grip becomes while it is dragged, carrying the three dots and
+following the finger. The cluster stays where it is until the puck is released.
+
+**Slot**:
+A candidate control position, drawn as a phantom outline while the puck is being
+dragged. The nearest slot is highlighted; releasing in it moves the cluster there,
+and releasing anywhere else changes nothing.
 
 _Avoid_: "progress" for anything other than the current session's confirmed
-deletion totals, which are only shown on the statistics screen.
+deletion totals, which are shown in Settings.
