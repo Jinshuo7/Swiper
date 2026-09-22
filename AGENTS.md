@@ -23,6 +23,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   restricted sandbox fails before any test runs with
   `IDEPseudoTerminalDomain … ErrorCode: 7 Errno: 1 (Operation not permitted)`.
   With full access the whole suite runs green on the connected iPhone.
+- A **locked** iPhone makes a device run wait in silence
+  (`deviceprep Code=-3 "Unlock iPhone to Continue"`), and `devicectl` cannot
+  report the lock state. Ask the owner to unlock the phone before starting a
+  device run, and kill and ask again if that error appears.
 - Device builds sign with the personal team and a unique app bundle id set in
   `Scripts/generate_project.rb`; `com.swiper.app` is globally taken, so it cannot
   be registered. Personal-team provisioning profiles expire after 7 days.

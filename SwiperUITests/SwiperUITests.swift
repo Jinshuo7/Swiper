@@ -265,21 +265,76 @@ final class SwiperUITests: XCTestCase {
 
     // MARK: - Control rail stability (user report, 2026-09-21)
 
-    /// Reaches Settings from wherever the test is — including from inside the
-    /// viewer — chooses the rail, and returns home. The presence of
-    /// `entry.settings` cannot be used to decide whether we are already there,
-    /// because it exists on the entry screen too.
-    private func useRail(_ app: XCUIApplication, _ rail: String) {
-        if app.buttons["control.close"].exists {
-            app.buttons["control.close"].tap()
+    // MARK: - Moving the control cluster (user request, 2026-09-22)
+
+    /// What the cluster says about where it is docked, once it has finished
+    /// settling after a move: the lift is held briefly so a button under the
+    /// finger cannot decide as the touch ends.
+    private func clusterDock(_ app: XCUIApplication) -> String {
+        let deadline = Date().addingTimeInterval(3)
+        var value = rawClusterDock(app)
+        while value.hasPrefix("Moving"), Date() < deadline {
+            usleep(100_000)
+            value = rawClusterDock(app)
         }
-        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
-        app.buttons["entry.settings"].tap()
-        let option = app.buttons["settings.rail.\(rail)"]
-        XCTAssertTrue(option.waitForExistence(timeout: 10), "no rail option \(rail)")
-        option.tap()
-        app.buttons["Back"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        return value
+    }
+
+    private func rawClusterDock(_ app: XCUIApplication) -> String {
+        (app.descendants(matching: .any)["viewer.cluster"].value as? String) ?? ""
+    }
+
+    /// Touch and hold the cluster's edge, then drag it, the way a person moves
+    /// it. A hold is what lifts it: a plain drag must never move it.
+    private func dragCluster(_ app: XCUIApplication, by offset: CGVector) {
+        let cluster = app.descendants(matching: .any)["viewer.cluster"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "there is no control cluster")
+        // Guard the query itself: a cluster reporting the whole screen would
+        // make every drag below start on the photo instead.
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(cluster.frame.width, window.width, "viewer.cluster should be the cluster, not the screen")
+        XCTAssertLessThan(cluster.frame.height, window.height, "viewer.cluster should be the cluster, not the screen")
+        // The tray beside the first control. The controls themselves claim their
+        // own touches, because they are buttons, so the tray around and between
+        // them is the handle.
+        let delete = app.buttons["control.delete"]
+        XCTAssertTrue(delete.exists, "the cluster has no Delete control")
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: delete.frame.minX - 8, dy: delete.frame.midY))
+        start.press(
+            forDuration: 0.7,
+            thenDragTo: start.withOffset(offset),
+            withVelocity: .slow,
+            thenHoldForDuration: 0.2
+        )
+        // Let the cluster settle before the next grab reads its frame.
+        _ = clusterDock(app)
+        usleep(300_000)
+    }
+
+    /// The three buttons are one column when the cluster is docked to a side,
+    /// and one row at the bottom.
+    private func assertClusterIsAColumn(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let delete = app.buttons["control.delete"]
+        let undo = app.buttons["control.undo"]
+        let keep = app.buttons["control.keep"]
+        for control in [delete, undo, keep] {
+            XCTAssertTrue(control.exists, "a control is missing from the cluster", file: file, line: line)
+        }
+        XCTAssertEqual(delete.frame.midX, undo.frame.midX, accuracy: 1, "a column lines up", file: file, line: line)
+        XCTAssertEqual(undo.frame.midX, keep.frame.midX, accuracy: 1, "a column lines up", file: file, line: line)
+        XCTAssertLessThan(delete.frame.midY, undo.frame.midY, file: file, line: line)
+        XCTAssertLessThan(undo.frame.midY, keep.frame.midY, file: file, line: line)
+    }
+
+    private func assertClusterIsARow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let delete = app.buttons["control.delete"]
+        let undo = app.buttons["control.undo"]
+        let keep = app.buttons["control.keep"]
+        XCTAssertEqual(delete.frame.midY, undo.frame.midY, accuracy: 1, "a row lines up", file: file, line: line)
+        XCTAssertEqual(undo.frame.midY, keep.frame.midY, accuracy: 1, "a row lines up", file: file, line: line)
+        XCTAssertLessThan(delete.frame.midX, undo.frame.midX, file: file, line: line)
+        XCTAssertLessThan(undo.frame.midX, keep.frame.midX, file: file, line: line)
     }
 
     private func useButtonPreset(_ app: XCUIApplication, _ preset: String) {
@@ -306,124 +361,156 @@ final class SwiperUITests: XCTestCase {
             XCTAssertTrue(keep.waitForExistence(timeout: 10), "no Keep control at step \(step)")
             frames.append(keep.frame)
             capture("Controls — fixture step \(step)")
-            if step < 3 { photoElement(app).swipeRight() }
+            if step < 3 { keep.tap() }
         }
 
         for (index, frame) in frames.enumerated().dropFirst() {
             XCTAssertEqual(
                 frame,
                 frames[0],
-                "the rail moved between photos: step 0 at \(frames[0]), step \(index) at \(frame)"
+                "the cluster moved between photos: step 0 at \(frames[0]), step \(index) at \(frame)"
             )
         }
 
         let window = app.windows.firstMatch.frame
-        XCTAssertTrue(window.contains(frames[0]), "the rail must stay on screen")
+        XCTAssertTrue(window.contains(frames[0]), "the cluster must stay on screen")
         XCTAssertGreaterThan(
             frames[0].midY,
             window.height * 0.8,
-            "a bottom rail must sit in the lower part of the screen, got \(frames[0]) in \(window)"
+            "a bottom-docked cluster must sit in the lower part of the screen, got \(frames[0]) in \(window)"
         )
     }
 
-    /// The rail is the handedness choice: it must be able to run down either
-    /// side, with Close at the top and Keep at the bottom.
-    func testControlRailCanMoveToEitherSideRail() {
+    /// The cluster is movable: hold it, drag it, and it docks to whichever of
+    /// the three edges it was dropped nearest, becoming a column at the sides.
+    func testTheClusterDocksToEitherSideAndBecomesAColumn() {
         let app = launchApp()
-        useButtonPreset(app, "thumb")
-        useRail(app, "trailing")
         _ = startViewer(app)
+        assertClusterIsARow(app)
+        let photoBefore = photoElement(app).label
 
-        let close = app.buttons["control.close"]
-        let keep = app.buttons["control.keep"]
-        XCTAssertTrue(close.waitForExistence(timeout: 10))
-        XCTAssertTrue(keep.exists)
-
+        dragCluster(app, by: CGVector(dx: -220, dy: -240))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
         let window = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(close.frame.midX, window.midX, "the right rail must be on the right")
-        XCTAssertLessThan(close.frame.midY, keep.frame.midY, "Close must sit above Keep on a vertical rail")
-        XCTAssertTrue(window.contains(close.frame) && window.contains(keep.frame))
-        capture("Controls — right side rail")
+        XCTAssertLessThan(app.buttons["control.keep"].frame.midX, window.midX, "the left dock sits on the left")
+        assertClusterIsAColumn(app)
+        capture("Controls — docked to the left edge")
 
-        useRail(app, "leading")
-        _ = startViewer(app)
-        let leftClose = app.buttons["control.close"]
-        XCTAssertTrue(leftClose.waitForExistence(timeout: 10))
-        XCTAssertLessThan(leftClose.frame.midX, window.midX, "the left rail must be on the left")
-        XCTAssertLessThan(leftClose.frame.midY, app.buttons["control.keep"].frame.midY)
-        XCTAssertTrue(window.contains(leftClose.frame))
-        capture("Controls — left side rail")
+        dragCluster(app, by: CGVector(dx: 320, dy: 0))
+        XCTAssertEqual(clusterDock(app), "Docked right edge")
+        XCTAssertGreaterThan(app.buttons["control.keep"].frame.midX, window.midX, "the right dock sits on the right")
+        assertClusterIsAColumn(app)
+        capture("Controls — docked to the right edge")
+
+        dragCluster(app, by: CGVector(dx: -180, dy: 220))
+        XCTAssertEqual(clusterDock(app), "Docked bottom")
+        assertClusterIsARow(app)
+        capture("Controls — docked back to the bottom")
+
+        // Moving the cluster is not a decision, however the grab lands.
+        XCTAssertEqual(photoElement(app).label, photoBefore, "moving the cluster must not decide anything")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "moving the cluster must not mark the photo")
     }
 
-    /// The order half of the handedness choice: with Keep first the decisions
-    /// move to the other end of the rail, which is what a left thumb on a bottom
-    /// rail needs.
-    func testTheRailOrderCanBeFlipped() {
+    /// Holding is what lifts the cluster. A plain drag is the gesture that
+    /// decides a photo, so it must never shove the buttons around.
+    func testAPlainDragNeverMovesTheCluster() {
         let app = launchApp()
-        useButtonPreset(app, "thumb")
         _ = startViewer(app)
+        let keep = app.buttons["control.keep"]
+        let before = keep.frame
+        let photoBefore = photoElement(app).label
 
-        let closeFirst = app.buttons["control.close"].frame
-        let keepFirst = app.buttons["control.keep"].frame
-        XCTAssertLessThan(closeFirst.midX, keepFirst.midX, "Close should start at the leading end")
-
-        app.buttons["control.close"].tap()
-        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
-        app.buttons["entry.settings"].tap()
-        let flipped = app.buttons["settings.order.keepFirst"]
-        XCTAssertTrue(flipped.waitForExistence(timeout: 10))
-        flipped.tap()
-        app.buttons["Back"].firstMatch.tap()
-
-        _ = startViewer(app)
-        let newClose = app.buttons["control.close"]
-        XCTAssertTrue(newClose.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(
-            newClose.frame.midX,
-            app.buttons["control.keep"].frame.midX,
-            "with Keep first the decisions should be at the leading end"
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: before.minX - 8, dy: before.midY))
+        start.press(
+            forDuration: 0.05,
+            thenDragTo: start.withOffset(CGVector(dx: -200, dy: -200)),
+            withVelocity: .fast,
+            thenHoldForDuration: 0
         )
-        capture("Controls — Keep first order")
+
+        XCTAssertEqual(clusterDock(app), "Docked bottom", "a plain drag moved the cluster")
+        XCTAssertEqual(keep.frame, before, "a plain drag moved the cluster")
+        XCTAssertEqual(photoElement(app).label, photoBefore, "a drag on a control must decide nothing")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "a drag on a control must not mark the photo")
     }
 
-    /// A vertical rail reserves a lane: the photo is fitted beside it, not
+    /// A side-docked column reserves a lane: the photo is fitted beside it, not
     /// underneath the buttons.
-    func testASideRailDoesNotCoverThePhoto() {
+    func testADockedSideClusterDoesNotCoverThePhoto() {
         let app = launchApp()
-        useButtonPreset(app, "thumb")
-        useRail(app, "trailing")
         _ = startViewer(app)
+        dragCluster(app, by: CGVector(dx: -220, dy: -240))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
 
         let photo = photoElement(app)
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
-        let close = app.buttons["control.close"]
-        XCTAssertTrue(close.waitForExistence(timeout: 10))
-
-        let overlap = photo.frame.intersection(close.frame)
-        XCTAssertTrue(
-            overlap.isNull || overlap.width < 1 || overlap.height < 1,
-            "the rail overlaps the photo: photo \(photo.frame), Close \(close.frame)"
-        )
+        for identifier in ["control.delete", "control.undo", "control.keep"] {
+            let control = app.buttons[identifier]
+            let overlap = photo.frame.intersection(control.frame)
+            XCTAssertTrue(
+                overlap.isNull || overlap.width < 1 || overlap.height < 1,
+                "\(identifier) overlaps the photo: photo \(photo.frame), control \(control.frame)"
+            )
+        }
     }
 
-    /// Only the rail choice may move a control: the preset changes which
-    /// controls exist, never where they are.
-    func testSwitchingPresetDoesNotMoveTheRail() {
+    /// Only moving the cluster moves it: the preset changes how a decision can
+    /// be made, never where the buttons are.
+    func testSwitchingPresetDoesNotMoveTheCluster() {
         let app = launchApp()
+        _ = startViewer(app)
+        let before = app.buttons["control.keep"].frame
+
+        app.buttons["viewer.close"].tap()   // back home
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
         useButtonPreset(app, "thumb")
         _ = startViewer(app)
 
-        let before = app.buttons["control.close"].frame
-        app.buttons["control.close"].tap()   // back home
-        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
-        useButtonPreset(app, "extended")
+        XCTAssertEqual(
+            app.buttons["control.keep"].frame,
+            before,
+            "switching preset moved the cluster"
+        )
+    }
+
+    /// Close left the cluster for the top left corner, drawn smaller than the
+    /// decision controls but keeping a full tap region.
+    func testCloseIsSmallInTheTopLeftCorner() {
+        let app = launchApp()
         _ = startViewer(app)
 
-        XCTAssertEqual(
-            app.buttons["control.close"].frame,
-            before,
-            "switching preset moved the rail"
+        let close = app.buttons["viewer.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(close.frame.midX, window.midX, "Close belongs in the top left")
+        XCTAssertLessThan(close.frame.midY, window.height * 0.2, "Close belongs in the top strip")
+        XCTAssertLessThan(
+            close.frame.width,
+            app.buttons["control.keep"].frame.width,
+            "Close is drawn smaller than a decision control"
         )
+        XCTAssertGreaterThanOrEqual(close.frame.width, 44, "Close keeps a full tap region")
+        capture("Controls — close in the top left")
+    }
+
+    /// The heart moved to the top strip, where it costs the decision controls
+    /// nothing. It still favorites the photo and moves on.
+    func testTheHeartIsInTheTopStripAndStillFavorites() {
+        let app = launchApp()
+        _ = startViewer(app)
+
+        let window = app.windows.firstMatch.frame
+        let favorite = app.buttons["viewer.favorite"]
+        XCTAssertTrue(favorite.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(favorite.frame.midX, window.midX, "the heart sits on the right with Review")
+        XCTAssertLessThan(favorite.frame.midY, window.height * 0.2, "the heart belongs in the top strip")
+
+        let before = photoElement(app).label
+        favorite.tap()
+        XCTAssertNotEqual(photoElement(app).label, before, "favoriting also advances")
+        capture("Controls — heart in the top strip")
     }
 
     /// Marking a photo makes the Review bar appear. That must not shove the
@@ -469,7 +556,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertFalse(tutorialElement(app).waitForExistence(timeout: 2))
 
         // Settings → How to use replays it.
-        app.buttons["control.close"].tap()
+        app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 5))
         app.buttons["entry.settings"].tap()
         let howTo = app.buttons["settings.howToUse"]
@@ -490,7 +577,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertTrue(tutorialElement(app).waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Trash marks for deletion"].exists)
         XCTAssertFalse(
-            app.staticTexts["Drag left to mark for deletion"].exists,
+            app.staticTexts["Drag left to delete"].exists,
             "a button preset must not be told to swipe"
         )
     }
@@ -545,8 +632,8 @@ final class SwiperUITests: XCTestCase {
         _ = startViewer(app)
 
         for (identifier, label) in [
-            ("control.close", "Close"),
-            ("control.favorite", "Favorite"),
+            ("viewer.close", "Close"),
+            ("viewer.favorite", "Favorite"),
             ("control.undo", "Undo"),
         ] {
             let control = app.buttons[identifier]
@@ -604,7 +691,7 @@ final class SwiperUITests: XCTestCase {
     }
 
     private func assertControlsInsideScreen(_ app: XCUIApplication, window: CGRect) {
-        for identifier in ["control.close", "control.favorite", "control.undo"] {
+        for identifier in ["viewer.close", "viewer.favorite", "control.undo"] {
             let control = app.buttons[identifier]
             XCTAssertTrue(control.exists, "\(identifier) is missing from the viewer")
             XCTAssertTrue(
@@ -649,7 +736,7 @@ final class SwiperUITests: XCTestCase {
         let markedLabel = photo.label
         photo.swipeLeft()
 
-        app.buttons["control.close"].tap()
+        app.buttons["viewer.close"].tap()
 
         let review = app.buttons["entry.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
@@ -667,7 +754,7 @@ final class SwiperUITests: XCTestCase {
         let app = launchApp()
         let photo = startViewer(app)
         photo.swipeLeft()
-        app.buttons["control.close"].tap()
+        app.buttons["viewer.close"].tap()
 
         let review = app.buttons["entry.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
@@ -686,7 +773,7 @@ final class SwiperUITests: XCTestCase {
         let photo = startViewer(app)
         let markedLabel = photo.label
         photo.swipeLeft()
-        app.buttons["control.close"].tap()
+        app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
 
         app.terminate()
@@ -701,7 +788,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertNotEqual(resumed.label, markedLabel)
 
         // A brand-new mode also skips it.
-        relaunched.buttons["control.close"].tap()
+        relaunched.buttons["viewer.close"].tap()
         XCTAssertTrue(relaunched.buttons["entry.tumbler"].waitForExistence(timeout: 5))
         relaunched.buttons["entry.tumbler"].tap()
         let tumblerPhoto = photoElement(relaunched)
@@ -801,7 +888,7 @@ final class SwiperUITests: XCTestCase {
         XCTAssertEqual(review.label, "1 photo marked for deletion")
         XCTAssertEqual(review.value as? String, "Nothing deleted yet.")
 
-        app.buttons["control.close"].tap()
+        app.buttons["viewer.close"].tap()
         XCTAssertEqual(app.buttons["entry.review"].label, "Review & delete · 1")
     }
 
@@ -832,9 +919,10 @@ final class SwiperUITests: XCTestCase {
         let app = launchApp()
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
         app.buttons["entry.settings"].tap()
-        XCTAssertTrue(app.buttons["settings.preset.extended"].waitForExistence(timeout: 10))
-        app.buttons["settings.preset.extended"].tap()
+        XCTAssertTrue(app.buttons["settings.preset.swipe"].waitForExistence(timeout: 10))
         app.buttons["settings.preset.thumb"].tap()
+        app.buttons["settings.preset.deleteOnly"].tap()
+        app.buttons["settings.preset.swipe"].tap()
         app.buttons["Back"].firstMatch.tap()
         XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
     }

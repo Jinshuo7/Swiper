@@ -11,8 +11,53 @@ struct ViewerView: View {
     @State private var cachedIDs: [String] = []
     @State private var haptics = UIImpactFeedbackGenerator(style: .light)
 
+    /// Where the move gesture is: idle, lifted and held, or following the finger.
+    ///
+    /// This is a `@GestureState` on purpose. A gesture state resets itself when
+    /// the gesture ends *or is cancelled*, so a drag that is interrupted can
+    /// never leave the cluster stuck in the air with its buttons refusing to
+    /// work.
+    @GestureState private var clusterMove = ClusterMove.idle
+    @State private var didSendLiftHaptic = false
+    /// Set for a moment after a drop, so the control that was under the finger
+    /// cannot deliver its action as the touch ends.
+    @State private var isSettlingAfterMove = false
+    @State private var moveHaptics = UIImpactFeedbackGenerator(style: .medium)
+
+    private enum ClusterMove: Equatable {
+        case idle
+        case lifting
+        case dragging(CGSize)
+
+        var isActive: Bool { self != .idle }
+
+        var translation: CGSize {
+            if case .dragging(let translation) = self { return translation }
+            return .zero
+        }
+    }
+
+    private var isMovingControls: Bool { clusterMove.isActive || isSettlingAfterMove }
+
+    /// The cluster fades a little after a few quiet seconds, and comes back on
+    /// the next touch. It never hides: the buttons are the non-gesture way to
+    /// decide, so they have to stay findable.
+    @State private var isClusterIdle = false
+    /// Bumped by anything the user does, to restart the idle countdown.
+    @State private var activityToken = 0
+
     /// How far the photo has to travel horizontally before releasing decides.
     private let commitThreshold: CGFloat = 90
+
+    /// The controls, the tray behind them that is held to move the cluster, and
+    /// the margin the tray keeps from the screen edges.
+    private let controlSize: CGFloat = 56
+    private let controlSpacing: CGFloat = 14
+    private let trayInset: CGFloat = 16
+    private let clusterMargin: CGFloat = 20
+    /// The cluster never reaches into the top strip, whatever edge it is docked
+    /// to, so Close, the Live Photo badge and Review stay reachable.
+    private let topStripClearance: CGFloat = 54
 
     private var preset: ControlPreset { model.preferences.preset }
 
@@ -31,7 +76,7 @@ struct ViewerView: View {
                         .id(asset.id)
                         .gesture(swipeGesture, including: preset.usesSwipeGestures ? .all : .none)
                         .onTapGesture {
-                            if preset == .deleteOnly { model.apply(.keep) }
+                            if preset.tapToKeep { model.apply(.keep) }
                         }
                         .allowsHitTesting(!model.isDecisionInputBlocked)
                         .accessibilityIdentifier("viewer.photo")
@@ -48,11 +93,13 @@ struct ViewerView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
             .overlay { dragFeedback }
             .overlay(alignment: .top) { topBar }
-            .overlay(alignment: railAlignment) { controlRail }
+            .overlay(alignment: .topLeading) { controlCluster(in: geometry.size) }
+            .task(id: activityToken) { await fadeClusterWhenIdle() }
         }
         .task(id: currentID) {
             updatePrefetch()
             model.presentTutorialIfNeeded()
+            activityToken += 1
         }
         .onDisappear { clearPrefetch() }
     }
@@ -84,12 +131,13 @@ struct ViewerView: View {
         return CGSize(width: max(1, full.width - railLaneWidth), height: full.height)
     }
 
-    /// Width reserved for a vertical rail, so the photo is fitted *beside* it
-    /// rather than running underneath the controls. A control sitting on a busy
-    /// photo is the "half-buried" feel this design exists to remove.
+    /// Width reserved for a side-docked cluster, so the photo is fitted *beside*
+    /// it rather than running underneath the controls. A control sitting on a
+    /// busy photo is the "half-buried" feel this design exists to remove.
     private var railLaneWidth: CGFloat { model.preferences.rail.isVertical ? 88 : 0 }
 
-    /// How far the photo shifts to stay centred in the area the rail leaves free.
+    /// How far the photo shifts to stay centred in the area the cluster leaves
+    /// free.
     private var photoLaneOffset: CGFloat {
         switch model.preferences.rail {
         case .bottom: return 0
@@ -103,23 +151,6 @@ struct ViewerView: View {
             forPixelSize: CGSize(width: asset.pixelWidth, height: asset.pixelHeight),
             in: canvasSize(in: geometry)
         )
-    }
-
-    /// Where the rail is anchored. Only the rail's own edge and anchor decide
-    /// this, so nothing about the current photo or the number of marks can move
-    /// a control.
-    private var railAlignment: Alignment {
-        switch (model.preferences.rail, model.preferences.anchor) {
-        case (.bottom, .start): return .bottomLeading
-        case (.bottom, .center): return .bottom
-        case (.bottom, .end): return .bottomTrailing
-        case (.leading, .start): return .topLeading
-        case (.leading, .center): return .leading
-        case (.leading, .end): return .bottomLeading
-        case (.trailing, .start): return .topTrailing
-        case (.trailing, .center): return .trailing
-        case (.trailing, .end): return .bottomTrailing
-        }
     }
 
     // MARK: - Gestures
@@ -181,8 +212,8 @@ struct ViewerView: View {
     // MARK: - Drag feedback
 
     /// Feedback only: the corner wells are revealed by the drag and are not
-    /// separate tap targets, so nobody has to swipe. Button presets remain the
-    /// alternative for anyone who cannot or does not want to gesture.
+    /// separate tap targets, so nobody has to swipe. The three controls remain
+    /// the alternative for anyone who cannot or does not want to gesture.
     @ViewBuilder
     private var dragFeedback: some View {
         if let direction = dragDirection {
@@ -209,7 +240,7 @@ struct ViewerView: View {
                         if direction == .queueDeletion {
                             outcomeWell(
                                 systemImage: "trash.fill",
-                                title: "Mark for deletion",
+                                title: "Delete",
                                 tint: outcomeTint(direction),
                                 armed: armed,
                                 progress: progress
@@ -265,32 +296,25 @@ struct ViewerView: View {
 
     // MARK: - Chrome
 
-    /// Informational chrome only: what this asset is, and the way into review.
-    /// Neither can displace the rail, because the rail is anchored independently
-    /// of the top strip.
+    /// Informational chrome only: what this asset is, the way out, the favorite
+    /// and the way into review. None of it moves when the rail moves, because it
+    /// is anchored independently at the top.
     private var topBar: some View {
-        HStack(spacing: 10) {
+        ZStack {
+            // Centred, so it sits in the middle whatever the two ends are doing.
             if model.currentAsset?.isLivePhoto == true {
                 livePhotoBadge
             }
-            Spacer()
-            reviewControl
+
+            HStack(spacing: 10) {
+                closeControl
+                Spacer(minLength: 0)
+                favoriteControl
+                reviewControl
+            }
         }
-        .padding(.leading, 16 + topBarLeadingInset)
-        .padding(.trailing, 16 + topBarTrailingInset)
+        .padding(.horizontal, 16)
         .padding(.top, 6)
-    }
-
-    /// A side rail anchored at its start and the top strip both want the same
-    /// corner, and the rail is drawn last, so Close would sit on top of the Live
-    /// Photo badge or the Review entry and swallow the tap. The strip steps
-    /// around the rail's lane instead of under it.
-    private var topBarLeadingInset: CGFloat {
-        model.preferences.rail == .leading && model.preferences.anchor == .start ? railLaneWidth : 0
-    }
-
-    private var topBarTrailingInset: CGFloat {
-        model.preferences.rail == .trailing && model.preferences.anchor == .start ? railLaneWidth : 0
     }
 
     /// Says plainly that this asset has motion, so nobody has to guess why a
@@ -314,6 +338,30 @@ struct ViewerView: View {
         .accessibilityLabel("Live Photo")
         .accessibilityHint("Press and hold the photo to play its motion")
         .accessibilityIdentifier("viewer.liveBadge")
+    }
+
+    /// Leaving is always the same corner, the way a Back button is on every
+    /// other screen. Drawn smaller than the decision controls, but with a full
+    /// tap region so it is still easy to hit.
+    private var closeControl: some View {
+        CircleControl(
+            systemImage: "xmark",
+            label: "Close",
+            identifier: "viewer.close",
+            visualSize: 34,
+            hitSize: 44
+        ) {
+            model.closeViewer()
+        }
+    }
+
+    /// The heart keeps a place in the top strip, where it costs the decision
+    /// controls nothing. It is not in the bottom cluster because it is used far
+    /// less often than delete, undo and keep.
+    private var favoriteControl: some View {
+        CircleControl(systemImage: "heart", label: "Favorite", identifier: "viewer.favorite") {
+            model.apply(.favorite)
+        }
     }
 
     /// A compact, always-reachable way into deletion review. It states the
@@ -341,77 +389,226 @@ struct ViewerView: View {
         }
     }
 
-    /// The one place the controls live. They never move: not between photos of
-    /// different shapes, not when a mark appears, not between presets — only
-    /// when the user chooses a different rail.
+    // MARK: - The movable control cluster
+
+    /// How long the three controls are end to end, and how big the tray behind
+    /// them is. The tray is what is held to move the cluster, so it is part of
+    /// every measurement: nothing may push it off the screen.
+    private var clusterLength: CGFloat { controlSize * 3 + controlSpacing * 2 }
+
+    private var buttonsSize: CGSize {
+        model.preferences.rail.isVertical
+            ? CGSize(width: controlSize, height: clusterLength)
+            : CGSize(width: clusterLength, height: controlSize)
+    }
+
+    private var clusterSize: CGSize {
+        CGSize(
+            width: buttonsSize.width + trayInset * 2,
+            height: buttonsSize.height + trayInset * 2
+        )
+    }
+
+    /// Where the cluster's centre sits for the current dock and position, before
+    /// any in-progress drag. Everything is clamped inside the safe area and
+    /// below the top strip, so no drop can leave a control unreachable.
+    private func clusterCentre(in size: CGSize) -> CGPoint {
+        let half = model.preferences.rail.isVertical ? clusterSize.height / 2 : clusterSize.width / 2
+        let position = ControlPreferences.clamped(model.preferences.position)
+
+        switch model.preferences.rail {
+        case .bottom:
+            let travel = max(0, size.width - clusterSize.width - clusterMargin * 2)
+            return CGPoint(
+                x: clusterMargin + half + travel * position,
+                y: size.height - clusterMargin - clusterSize.height / 2
+            )
+        case .leading, .trailing:
+            let top = topStripClearance + clusterMargin
+            let travel = max(0, size.height - top - clusterMargin - clusterSize.height)
+            return CGPoint(
+                x: model.preferences.rail == .leading
+                    ? clusterMargin + clusterSize.width / 2
+                    : size.width - clusterMargin - clusterSize.width / 2,
+                y: top + half + travel * position
+            )
+        }
+    }
+
+    /// The cluster, at its remembered place, following the finger while it is
+    /// being moved.
     ///
-    /// Order is fixed and runs from the least to the most thumb-accessible:
-    /// Close first, then Favorite and Undo, then the decision pair with Keep
-    /// last, so on a side rail Close sits at the top and Keep at the bottom.
-    private var controlRail: some View {
-        Group {
+    /// The tray is the handle. A plain `Button` claims the touches that land on
+    /// it, so a hold on one of the three controls cannot move the cluster; the
+    /// tray around and between them can, and drawing it makes the thing that
+    /// moves obvious instead of leaving the grab area invisible.
+    private func controlCluster(in size: CGSize) -> some View {
+        let centre = clusterCentre(in: size)
+        let trayRadius = controlSize / 2 + trayInset
+        return ZStack {
+            // The tray carries the move gesture itself, rather than the container
+            // around the buttons. It sits behind the controls, so it cannot
+            // interfere with their taps, and the ring and gaps between them are
+            // its own hit area.
+            RoundedRectangle(cornerRadius: trayRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: trayRadius, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: trayRadius, style: .continuous))
+                .gesture(moveControlsGesture(in: size))
             if model.preferences.rail.isVertical {
-                VStack(spacing: 14) { railControls }
+                VStack(spacing: controlSpacing) { clusterControls }
             } else {
-                HStack(spacing: 14) { railControls }
+                HStack(spacing: controlSpacing) { clusterControls }
             }
         }
-        .disabled(model.isDecisionInputBlocked)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 20)
+        .frame(width: clusterSize.width, height: clusterSize.height)
+        .opacity(isClusterIdle && !isMovingControls ? 0.55 : 1)
+        .scaleEffect(isMovingControls ? 1.06 : 1)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
+        // The accessibility element has to be the cluster itself. Applying these
+        // after `.position` would report the whole screen instead, because
+        // `.position` fills its parent.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("viewer.cluster")
+        .accessibilityLabel("Photo controls")
+        .accessibilityValue(
+            isMovingControls
+                ? "Moving, docked \(model.preferences.rail.title)"
+                : "Docked \(model.preferences.rail.title)"
+        )
+        // A drag is not available to everyone, so the dock can also be stepped
+        // through without one.
+        .accessibilityAction(named: "Move to the next edge") { cycleControlEdge() }
+        // Offset from the top-leading corner rather than `.position`: `.position`
+        // wraps the view in a full-screen container, which both mis-reports the
+        // cluster's frame and stopped its gesture from ever being recognised.
+        .offset(
+            x: centre.x + clusterMove.translation.width - clusterSize.width / 2,
+            y: centre.y + clusterMove.translation.height - clusterSize.height / 2
+        )
     }
 
     @ViewBuilder
-    private var railControls: some View {
-        if model.preferences.order == .keepFirst {
-            keepControl
-            deleteControl
-            undoControl
-            favoriteControl
-            closeControl
-        } else {
-            closeControl
-            favoriteControl
-            undoControl
-            deleteControl
-            keepControl
+    private var clusterControls: some View {
+        CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
+            clusterAction { model.apply(.queueDeletion) }
         }
-    }
-
-    private var closeControl: some View {
-        CircleControl(systemImage: "xmark", label: "Close") {
-            model.closeViewer()
-        }
-    }
-
-    private var favoriteControl: some View {
-        CircleControl(systemImage: "heart", label: "Favorite") {
-            model.apply(.favorite)
-        }
-    }
-
-    private var undoControl: some View {
         CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
-            model.apply(.undo)
+            clusterAction { model.apply(.undo) }
+        }
+        CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
+            clusterAction { model.apply(.keep) }
         }
     }
 
-    @ViewBuilder
-    private var deleteControl: some View {
-        if preset.showsDeleteButton {
-            CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
-                model.apply(.queueDeletion)
+    /// A control press counts as activity, so a tap after the cluster has faded
+    /// both does its job and brings the cluster back to full strength. It is
+    /// refused while the cluster is being moved: a move must never decide.
+    private func clusterAction(_ action: () -> Void) {
+        guard !isMovingControls else { return }
+        activityToken += 1
+        haptics.impactOccurred()
+        action()
+    }
+
+    private func fadeClusterWhenIdle() async {
+        isClusterIdle = false
+        try? await Task.sleep(nanoseconds: 5_000_000_000)
+        guard !Task.isCancelled else { return }
+        isClusterIdle = true
+    }
+
+    /// Hold the cluster's tray, then drag: it lifts, follows the finger, and
+    /// docks to the nearest of the bottom, left and right edges when released. A
+    /// plain drag never moves it, so swiping can never shove the buttons around.
+    private func moveControlsGesture(in size: CGSize) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .updating($clusterMove) { value, state, _ in
+                switch value {
+                case .first(true):
+                    state = .lifting
+                case .second(true, let drag):
+                    state = .dragging(drag?.translation ?? .zero)
+                default:
+                    state = .idle
+                }
             }
+            .onChanged { value in
+                guard case .first(true) = value, !didSendLiftHaptic else { return }
+                didSendLiftHaptic = true
+                activityToken += 1
+                moveHaptics.impactOccurred()
+            }
+            .onEnded { value in
+                guard case .second(true, let drag) = value else { return }
+                finishMovingControls(in: size, translation: drag?.translation ?? .zero)
+            }
+    }
+
+    private func finishMovingControls(in size: CGSize, translation: CGSize) {
+        let centre = clusterCentre(in: size)
+        let dropped = CGPoint(
+            x: centre.x + translation.width,
+            y: centre.y + translation.height
+        )
+        let (rail, position) = dock(for: dropped, in: size)
+
+        var preferences = model.preferences
+        preferences.rail = rail
+        preferences.position = position
+        model.updatePreferences(preferences)
+
+        didSendLiftHaptic = false
+        activityToken += 1
+        // Settle for a moment before the buttons can decide again. A control
+        // under the finger can deliver its action as the touch ends, and moving
+        // the cluster must never keep, delete or favorite a photo.
+        isSettlingAfterMove = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            isSettlingAfterMove = false
         }
     }
 
-    @ViewBuilder
-    private var keepControl: some View {
-        if preset.showsKeepButton {
-            CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
-                model.apply(.keep)
-            }
+    /// The edge a dropped cluster lands on: whichever of the three edges its
+    /// centre is nearest, so the lower left corner ties between the bottom and
+    /// the left edge and either is a fair answer.
+    private func dock(for centre: CGPoint, in size: CGSize) -> (ControlRail, Double) {
+        let distances: [(rail: ControlRail, distance: CGFloat)] = [
+            (.leading, centre.x),
+            (.trailing, size.width - centre.x),
+            (.bottom, size.height - centre.y),
+        ]
+        let rail = distances.min { $0.distance < $1.distance }?.rail ?? .bottom
+        let half = rail.isVertical ? clusterSize.height / 2 : clusterSize.width / 2
+
+        switch rail {
+        case .bottom:
+            let travel = max(1, size.width - clusterSize.width - clusterMargin * 2)
+            let raw = (centre.x - clusterMargin - half) / travel
+            return (.bottom, ControlPreferences.clamped(raw))
+        case .leading, .trailing:
+            let top = topStripClearance + clusterMargin
+            let travel = max(1, size.height - top - clusterMargin - clusterSize.height)
+            let raw = (centre.y - top - half) / travel
+            return (rail, ControlPreferences.clamped(raw))
         }
+    }
+
+    /// Steps the dock round the three edges, for anyone who cannot drag.
+    private func cycleControlEdge() {
+        var preferences = model.preferences
+        switch preferences.rail {
+        case .bottom: preferences.rail = .leading
+        case .leading: preferences.rail = .trailing
+        case .trailing: preferences.rail = .bottom
+        }
+        if !preferences.rail.isVertical { preferences.position = 0.5 }
+        model.updatePreferences(preferences)
     }
 
     private var finishedOverlay: some View {

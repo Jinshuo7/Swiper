@@ -48,15 +48,15 @@ settings. Statistics are not otherwise visible.
    against black and as large as the display allows. It is never cropped merely
    to fill the screen; unused area stays black. Live Photos show their still and
    can play their motion.
-2. A Live Photo is labelled as one — a "LIVE" chip beside Close, with the
-   `livephoto` symbol and the word, plus a spoken hint that press-and-hold plays
-   the motion — so the asset kind is never something the user has to infer.
+2. A Live Photo is labelled as one — a "LIVE" chip centred in the top strip, with
+   the `livephoto` symbol and the word, plus a spoken hint that press-and-hold
+   plays the motion — so the asset kind is never something the user has to infer.
 3. Only the current asset's display image and a small prefetch window of
    neighbours are requested. Requests for assets that are no longer current are
    cancelled.
 4. Every control and overlay stays inside the viewport and its safe area, so
-   Close, Favorite and Undo are always reachable. There is no permanent
-   instruction text over the photo.
+   Close, the heart and the three decision controls are always reachable. There
+   is no permanent instruction text over the photo.
 5. Whenever photos are marked for deletion, the viewer shows a compact
    `Review · N` control that opens deletion review without ending the session.
 6. Default Swipe preset gestures. The photo follows the finger, and the drag
@@ -71,8 +71,9 @@ settings. Statistics are not otherwise visible.
 8. Reduce Motion removes the spring-back animation and the well's scale change;
    the meaning is still carried by symbol, wording and stroke, never by colour or
    motion alone.
-9. A heart control marks the asset as an Apple Photos favorite, keeps it and
-   advances. It is always available, so nobody has to perform a gesture.
+9. A heart control in the top strip marks the asset as an Apple Photos favorite,
+   keeps it and advances. It is always available, so nobody has to perform a
+   gesture, and it costs the decision controls no space.
 10. Undo reverses the most recent decision of this session, including removing a
    just-marked photo from the deletion list, and returns to that photo. Undo
    never deletes.
@@ -81,40 +82,51 @@ settings. Statistics are not otherwise visible.
    continues in the other direction if undecided assets remain.
 12. Nothing is ever deleted from the viewer.
 
-## 4. Control rail and presets
+## 4. The control cluster and presets
 
-Every control lives on **one rail**. Nothing about the current photo, the number
-of marks or the active preset moves a control: the rail is anchored to the screen,
-not to the photo, and the review entry sits in the separate top strip rather than
-in the rail.
+Every decision control lives on **one cluster of three**: Trash, Undo and
+Checkmark, in that order. Nothing about the current photo, the number of marks or
+the active preset moves it. The way out, the favorite and the review entry live in
+the top strip instead.
 
-* The rail runs along one edge: **Bottom**, **Left side** or **Right side**.
-  This is the handedness choice — a right thumb reaches the bottom or right rail,
-  a left thumb the bottom or left one.
-* Along that edge it is anchored at the start, centre or end (left/centre/right on
-  a bottom rail; top/middle/bottom on a side rail).
-* The order is the other half of the handedness choice. **Close first** (the
-  default) runs least to most thumb-accessible — Close, Favorite, Undo, then the
-  decision pair with Keep last — so a side rail has Close at the top and Keep at
-  the bottom. **Keep first** mirrors it, which is what a left thumb on a bottom
-  rail needs: the decisions come to the near end and Close goes to the far one.
-  The fixed set of actions is the same either way; only the ends swap.
-* The preset decides which controls exist, never where they are:
+* **Close** is always the top left corner, drawn smaller than the decision
+  controls, the way a Back button is on every other screen. **Favorite** and the
+  compact `Review · N` entry share the top right, and a Live Photo's **LIVE** chip
+  is centred between them.
+* The cluster **docks to the lower part of one of three edges**: the bottom as a
+  row, or the left or right edge as a column. It never reaches into the top strip.
+* The user moves it by **touching and holding the bar behind the controls**, then
+  dragging. The controls themselves claim their own taps, so the bar around and
+  between them is the handle, and it is drawn so the thing that moves is visible.
+  A plain drag never moves the cluster, because a plain drag on the photo is how a
+  decision is made. Dropping it docks it to whichever of the three edges its
+  centre is nearest, and the position along that edge is continuous, so it can be
+  parked where a particular thumb reaches.
+* The dock and the position are persisted immediately, and **Reset control
+  position** in Settings brings the cluster back to the bottom centre. The dock
+  can also be stepped through from the cluster's accessibility actions, for
+  anyone who cannot drag.
+* A side-docked cluster reserves a lane: the photo is fitted beside it, so a
+  control never sits on top of the photo.
+* The cluster **fades to 55%** after five seconds without a touch, and comes back
+  on the next one. It never hides: the buttons are the non-gesture way to decide.
+* The preset decides only how a decision can be made, never which controls exist:
 
-| Preset | Keep | Delete | Favorite | Undo | Swipe gestures |
-| --- | --- | --- | --- | --- | --- |
-| Swipe | gesture | gesture | rail | rail | yes |
-| Thumb | rail | rail | rail | rail | no |
-| Delete only | advancing | rail | rail | rail | no |
-| Extended | rail | rail | rail | rail | no |
+| Preset | Swipe gestures | Tap to keep |
+| --- | --- | --- |
+| Swipe (default) | yes | no |
+| Buttons only | no | no |
+| Tap to keep | no | yes |
 
-* In **Delete only**, advancing (tapping the photo) keeps it; only the Delete
-  control marks it.
-* The rail, its anchor, the preset and the direction are persisted immediately,
-  and no choice ever removes the full-screen photo.
+* **Swipe** also offers the drags: left past the threshold marks for deletion,
+  right past it keeps, and the wells read **Delete** and **Keep**. In **Buttons
+  only** and **Tap to keep** a drag decides nothing, so a stray swipe can never
+  mark a photo. In **Tap to keep**, tapping the photo keeps it.
+* Preferences written when the controls varied by preset, or when the rail had
+  three anchors, still load: `Extended` behaves as `Swipe`, and an old anchor or
+  placement becomes a continuous position.
 * A Live Photo is labelled in the top strip; the review entry appears there once
-  photos are marked. A side rail anchored at its start sits *beside* that strip
-  rather than over it, so the badge and the review entry stay tappable.
+  photos are marked.
 
 ## 4a. Teaching
 

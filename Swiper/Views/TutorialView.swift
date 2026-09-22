@@ -98,12 +98,12 @@ struct TutorialView: View {
 
     private var instructions: [Instruction] {
         switch preset {
-        case .swipe:
+        case .swipe, .extended:
             return [
                 Instruction(
                     symbol: "hand.draw",
-                    title: "Drag left to mark for deletion",
-                    detail: "The photo follows your finger. Past the threshold it arms, and releasing marks it.",
+                    title: "Drag left to delete",
+                    detail: "The photo follows your finger. Past the threshold it arms, and releasing marks it. Nothing is deleted yet.",
                     tint: .red
                 ),
                 Instruction(
@@ -113,16 +113,43 @@ struct TutorialView: View {
                     tint: .green
                 ),
                 Instruction(
-                    symbol: "heart",
-                    title: "Favorite keeps the photo",
-                    detail: "The heart on the control rail marks it as an Apple Photos favorite.",
-                    tint: .pink
+                    symbol: "trash",
+                    title: "Or use the three buttons",
+                    detail: "Trash, Undo and Checkmark are always on the photo. Hold the bar behind them to drag the cluster to another edge.",
+                    tint: .orange
                 ),
                 Instruction(
+                    symbol: "heart",
+                    title: "Favorite keeps the photo",
+                    detail: "The heart at the top right marks it as an Apple Photos favorite.",
+                    tint: .pink
+                ),
+            ]
+        case .thumb:
+            return [
+                Instruction(
                     symbol: "trash",
-                    title: "Review before anything is deleted",
-                    detail: "Open Review from the photo or from home to restore or confirm.",
-                    tint: .orange
+                    title: "Trash marks for deletion",
+                    detail: "The photo is only marked. Nothing leaves your library.",
+                    tint: .red
+                ),
+                Instruction(
+                    symbol: "checkmark",
+                    title: "Checkmark keeps the photo",
+                    detail: "The photo stays and the session moves on.",
+                    tint: .green
+                ),
+                Instruction(
+                    symbol: "arrow.uturn.backward",
+                    title: "Undo reverses the last decision",
+                    detail: "Undo never deletes anything.",
+                    tint: .white
+                ),
+                Instruction(
+                    symbol: "heart",
+                    title: "Favorite keeps the photo",
+                    detail: "The heart at the top right favorites it in Apple Photos as well.",
+                    tint: .pink
                 ),
             ]
         case .deleteOnly:
@@ -140,37 +167,10 @@ struct TutorialView: View {
                     tint: .green
                 ),
                 Instruction(
-                    symbol: "trash",
-                    title: "Review before anything is deleted",
-                    detail: "Open Review from the photo or from home to restore or confirm.",
-                    tint: .orange
-                ),
-            ]
-        case .thumb, .extended:
-            return [
-                Instruction(
-                    symbol: "trash",
-                    title: "Trash marks for deletion",
-                    detail: "The photo is only marked. Nothing leaves your library.",
-                    tint: .red
-                ),
-                Instruction(
-                    symbol: "checkmark",
-                    title: "Checkmark keeps the photo",
-                    detail: "The photo stays and the session moves on.",
-                    tint: .green
-                ),
-                Instruction(
                     symbol: "heart",
                     title: "Favorite keeps the photo",
-                    detail: "Use the heart on the rail to favorite it in Apple Photos as well.",
+                    detail: "The heart at the top right favorites it in Apple Photos as well.",
                     tint: .pink
-                ),
-                Instruction(
-                    symbol: "arrow.uturn.backward",
-                    title: "Undo reverses the last decision",
-                    detail: "Undo never deletes anything.",
-                    tint: .white
                 ),
             ]
         }

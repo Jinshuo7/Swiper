@@ -10,62 +10,28 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     settingSection(title: "Interaction") {
-                        ForEach(ControlPreset.allCases) { preset in
+                        ForEach(ControlPreset.selectable) { preset in
                             presetRow(preset)
                         }
+                        Text("Trash, Undo and Checkmark are always on the photo.")
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.top, 6)
                     }
 
-                    settingSection(title: "Control rail") {
-                        ForEach(ControlRail.allCases) { rail in
-                            optionRow(
-                                title: rail.title,
-                                subtitle: rail.subtitle,
-                                isSelected: model.preferences.rail == rail,
-                                identifier: "settings.rail.\(rail.rawValue)"
-                            ) {
-                                var preferences = model.preferences
-                                preferences.rail = rail
-                                model.updatePreferences(preferences)
-                            }
+                    settingSection(title: "Controls") {
+                        buttonRow(
+                            systemImage: "hand.draw",
+                            title: "Reset control position",
+                            subtitle: "Docked to the \(model.preferences.rail.title) edge. Brings the three buttons back to the bottom centre.",
+                            identifier: "settings.resetControls"
+                        ) {
+                            var preferences = model.preferences
+                            preferences.rail = .bottom
+                            preferences.position = 0.5
+                            model.updatePreferences(preferences)
                         }
-
-                        Text("Position on the rail")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.top, 6)
-
-                        ForEach(ControlAnchor.allCases) { anchor in
-                            optionRow(
-                                title: anchor.title(for: model.preferences.rail),
-                                subtitle: nil,
-                                isSelected: model.preferences.anchor == anchor,
-                                identifier: "settings.anchor.\(anchor.rawValue)"
-                            ) {
-                                var preferences = model.preferences
-                                preferences.anchor = anchor
-                                model.updatePreferences(preferences)
-                            }
-                        }
-
-                        Text("Order on the rail")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.top, 6)
-
-                        ForEach(ControlOrder.allCases) { order in
-                            optionRow(
-                                title: order.title,
-                                subtitle: order.subtitle,
-                                isSelected: model.preferences.order == order,
-                                identifier: "settings.order.\(order.rawValue)"
-                            ) {
-                                var preferences = model.preferences
-                                preferences.order = order
-                                model.updatePreferences(preferences)
-                            }
-                        }
-
-                        Text("Every control lives on this one rail, so it never moves between photos. Pick the edge your thumb reaches; a left-handed grip usually wants the left side, a right-handed one the right side or the bottom.")
+                        Text("Touch and hold the buttons on a photo to move them. They dock to the bottom, left or right edge, and Swiper remembers where you put them.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)
@@ -73,54 +39,25 @@ struct SettingsView: View {
                     }
 
                     settingSection(title: "Statistics") {
-                        Button {
+                        buttonRow(
+                            systemImage: "chart.pie",
+                            title: "Deletion statistics",
+                            subtitle: "Confirmed deletions and estimated storage reclaimed.",
+                            identifier: "settings.statistics"
+                        ) {
                             model.route = .statistics
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "chart.pie")
-                                    .foregroundStyle(.white)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Deletion statistics")
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.white)
-                                    Text("Confirmed deletions and estimated storage reclaimed.")
-                                        .font(.footnote)
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.white.opacity(0.4))
-                            }
-                            .padding(.vertical, 6)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.statistics")
                     }
 
                     settingSection(title: "Help") {
-                        Button {
+                        buttonRow(
+                            systemImage: "questionmark.circle",
+                            title: "How to use Swiper",
+                            subtitle: "Replay the explanation of marking, keeping, review and saving.",
+                            identifier: "settings.howToUse"
+                        ) {
                             model.replayTutorial()
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "questionmark.circle")
-                                    .foregroundStyle(.white)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("How to use Swiper")
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.white)
-                                    Text("Replay the explanation of marking, keeping, review and saving.")
-                                        .font(.footnote)
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer()
-                            }
-                            .padding(.vertical, 6)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.howToUse")
                     }
 
                     settingSection(title: "Default direction") {
@@ -187,31 +124,32 @@ struct SettingsView: View {
         .accessibilityIdentifier("settings.preset.\(preset.rawValue)")
     }
 
-    /// A labelled choice row. Buttons carry their own identifiers, which a
-    /// segmented `Picker` does not expose — and it matches the preset list above.
-    private func optionRow(
+    /// A tappable row that opens something or does one thing. Buttons carry
+    /// their own identifiers, which a segmented `Picker` does not expose.
+    private func buttonRow(
+        systemImage: String,
         title: String,
-        subtitle: String?,
-        isSelected: Bool,
+        subtitle: String,
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(isSelected ? Color.blue : Color.white.opacity(0.4))
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.white)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.4))
             }
             .padding(.vertical, 6)
         }

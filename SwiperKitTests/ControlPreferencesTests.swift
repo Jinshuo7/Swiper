@@ -2,51 +2,54 @@ import XCTest
 @testable import SwiperKit
 
 final class ControlPreferencesTests: XCTestCase {
+    /// The preset now decides only how a decision can be made. The three rail
+    /// controls are always there, so no preset hides any of them.
     func testPresetCapabilities() {
         XCTAssertTrue(ControlPreset.swipe.usesSwipeGestures)
-        XCTAssertFalse(ControlPreset.swipe.showsDeleteButton)
-        XCTAssertFalse(ControlPreset.swipe.showsAnyDecisionControl)
+        XCTAssertFalse(ControlPreset.swipe.tapToKeep)
 
-        XCTAssertTrue(ControlPreset.thumb.showsKeepButton)
-        XCTAssertTrue(ControlPreset.thumb.showsDeleteButton)
-        XCTAssertFalse(ControlPreset.thumb.showsFavoriteButton)
-        XCTAssertTrue(ControlPreset.thumb.showsAnyDecisionControl)
+        XCTAssertFalse(ControlPreset.thumb.usesSwipeGestures)
+        XCTAssertFalse(ControlPreset.thumb.tapToKeep)
 
-        XCTAssertFalse(ControlPreset.deleteOnly.showsKeepButton)
-        XCTAssertTrue(ControlPreset.deleteOnly.showsDeleteButton)
         XCTAssertFalse(ControlPreset.deleteOnly.usesSwipeGestures)
+        XCTAssertTrue(ControlPreset.deleteOnly.tapToKeep)
 
-        XCTAssertTrue(ControlPreset.extended.showsKeepButton)
-        XCTAssertTrue(ControlPreset.extended.showsDeleteButton)
-        XCTAssertTrue(ControlPreset.extended.showsFavoriteButton)
-        XCTAssertTrue(ControlPreset.extended.showsUndoButton)
+        // `extended` is the old name for `swipe`, kept only for decoding.
+        XCTAssertTrue(ControlPreset.extended.usesSwipeGestures)
+        XCTAssertFalse(ControlPreset.selectable.contains(.extended))
+        XCTAssertEqual(ControlPreset.selectable.count, 3)
     }
 
     func testDefaults() {
         let preferences = ControlPreferences.default
         XCTAssertEqual(preferences.preset, .swipe)
         XCTAssertEqual(preferences.rail, .bottom)
-        XCTAssertEqual(preferences.anchor, .center)
-        XCTAssertEqual(preferences.order, .closeFirst)
+        XCTAssertEqual(preferences.position, 0.5)
         XCTAssertEqual(preferences.defaultDirection, .older)
     }
 
-    func testAnchorTitlesFollowTheRail() {
-        XCTAssertEqual(ControlAnchor.start.title(for: .bottom), "Left")
-        XCTAssertEqual(ControlAnchor.end.title(for: .bottom), "Right")
-        XCTAssertEqual(ControlAnchor.start.title(for: .leading), "Top")
-        XCTAssertEqual(ControlAnchor.end.title(for: .trailing), "Bottom")
+    func testRailNamesAndOrientation() {
         XCTAssertFalse(ControlRail.bottom.isVertical)
         XCTAssertTrue(ControlRail.leading.isVertical)
         XCTAssertTrue(ControlRail.trailing.isVertical)
+        XCTAssertEqual(ControlRail.bottom.title, "bottom")
+        XCTAssertEqual(ControlRail.leading.title, "left edge")
+        XCTAssertEqual(ControlRail.trailing.title, "right edge")
+    }
+
+    func testPositionIsClampedAndNonFinitePositionsFallBackToTheCentre() {
+        XCTAssertEqual(ControlPreferences(position: -2).position, 0)
+        XCTAssertEqual(ControlPreferences(position: 4).position, 1)
+        XCTAssertEqual(ControlPreferences(position: .nan).position, 0.5)
+        XCTAssertEqual(ControlPreferences(position: .infinity).position, 0.5)
+        XCTAssertEqual(ControlPreferences(position: 0.42).position, 0.42)
     }
 
     func testRoundTripsThroughCodable() throws {
         let preferences = ControlPreferences(
-            preset: .extended,
+            preset: .thumb,
             rail: .leading,
-            anchor: .start,
-            order: .keepFirst,
+            position: 0.2,
             defaultDirection: .newer
         )
         let data = try JSONEncoder().encode(preferences)
@@ -54,10 +57,36 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(decoded, preferences)
     }
 
-    /// Preferences written before the rail existed stored a three-way
-    /// horizontal placement. That choice must survive as the anchor on the
-    /// bottom rail rather than being silently reset to the default.
-    func testLegacyPlacementIsMigratedToTheRailAnchor() throws {
+    /// Preferences written before the cluster could be dragged stored one of
+    /// three stops. That choice must survive as a continuous position rather
+    /// than being silently reset to the centre.
+    func testTheOldAnchorBecomesAContinuousPosition() throws {
+        let decoder = JSONDecoder()
+
+        let start = try decoder.decode(
+            ControlPreferences.self,
+            from: Data(#"{"preset":"thumb","rail":"leading","anchor":"start"}"#.utf8)
+        )
+        XCTAssertEqual(start.rail, .leading)
+        XCTAssertEqual(start.position, 0)
+
+        let middle = try decoder.decode(
+            ControlPreferences.self,
+            from: Data(#"{"preset":"swipe","rail":"bottom","anchor":"center"}"#.utf8)
+        )
+        XCTAssertEqual(middle.position, 0.5)
+
+        let end = try decoder.decode(
+            ControlPreferences.self,
+            from: Data(#"{"preset":"swipe","rail":"trailing","anchor":"end"}"#.utf8)
+        )
+        XCTAssertEqual(end.rail, .trailing)
+        XCTAssertEqual(end.position, 1)
+    }
+
+    /// Preferences written before the rail existed stored a three-way horizontal
+    /// placement on an implicit bottom rail.
+    func testLegacyPlacementBecomesAContinuousPositionOnTheBottomRail() throws {
         let decoder = JSONDecoder()
 
         let left = try decoder.decode(
@@ -66,48 +95,45 @@ final class ControlPreferencesTests: XCTestCase {
         )
         XCTAssertEqual(left.preset, .thumb)
         XCTAssertEqual(left.rail, .bottom)
-        XCTAssertEqual(left.anchor, .start)
+        XCTAssertEqual(left.position, 0)
         XCTAssertEqual(left.defaultDirection, .newer)
 
         let centre = try decoder.decode(
             ControlPreferences.self,
             from: Data(#"{"preset":"swipe","placement":"center","defaultDirection":"older"}"#.utf8)
         )
-        XCTAssertEqual(centre.anchor, .center)
+        XCTAssertEqual(centre.position, 0.5)
 
         let right = try decoder.decode(
             ControlPreferences.self,
             from: Data(#"{"placement":"right"}"#.utf8)
         )
         XCTAssertEqual(right.rail, .bottom)
-        XCTAssertEqual(right.anchor, .end)
+        XCTAssertEqual(right.position, 1)
         XCTAssertEqual(right.preset, .swipe, "a missing preset falls back to the default")
     }
 
-    func testRailOrderDefaultsToCloseFirstWhenAbsent() throws {
+    /// The rail order preference is gone, but old state that contains it still
+    /// has to load.
+    func testAnOldOrderKeyIsIgnoredRatherThanRejected() throws {
         let decoded = try JSONDecoder().decode(
             ControlPreferences.self,
-            from: Data(#"{"preset":"thumb","rail":"bottom","anchor":"center"}"#.utf8)
+            from: Data(#"{"preset":"thumb","rail":"bottom","anchor":"center","order":"keepFirst"}"#.utf8)
         )
-        XCTAssertEqual(decoded.order, .closeFirst)
+        XCTAssertEqual(decoded.rail, .bottom)
+        XCTAssertEqual(decoded.position, 0.5)
     }
 
-    func testRailOrderRoundTrips() throws {
-        let preferences = ControlPreferences(preset: .thumb, rail: .bottom, anchor: .start, order: .keepFirst)
-        let decoded = try JSONDecoder().decode(
-            ControlPreferences.self,
-            from: JSONEncoder().encode(preferences)
+    func testEncodedPreferencesWriteThePositionAndNoLegacyKeys() throws {
+        let data = try JSONEncoder().encode(
+            ControlPreferences(preset: .thumb, rail: .trailing, position: 0.25)
         )
-        XCTAssertEqual(decoded.order, .keepFirst)
-        XCTAssertEqual(decoded, preferences)
-    }
-
-    func testEncodedPreferencesDoNotWriteTheLegacyKey() throws {
-        let data = try JSONEncoder().encode(ControlPreferences(preset: .thumb, rail: .trailing, anchor: .end))
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertNil(object["placement"])
+        XCTAssertNil(object["anchor"])
+        XCTAssertNil(object["order"])
         XCTAssertEqual(object["rail"] as? String, "trailing")
-        XCTAssertEqual(object["anchor"] as? String, "end")
+        XCTAssertEqual(object["position"] as? Double, 0.25)
     }
 
     func testAnUnknownRailIsRejectedSoTheStoreFallsBackToTheDefault() {
@@ -121,9 +147,9 @@ final class ControlPreferencesTests: XCTestCase {
     func testInMemoryStorePersistsPreferences() {
         let store = InMemorySessionStore()
         XCTAssertEqual(store.loadPreferences(), .default)
-        store.savePreferences(ControlPreferences(preset: .thumb, rail: .trailing, anchor: .end))
+        store.savePreferences(ControlPreferences(preset: .thumb, rail: .trailing, position: 0.8))
         XCTAssertEqual(store.loadPreferences().preset, .thumb)
         XCTAssertEqual(store.loadPreferences().rail, .trailing)
-        XCTAssertEqual(store.loadPreferences().anchor, .end)
+        XCTAssertEqual(store.loadPreferences().position, 0.8)
     }
 }

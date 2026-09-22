@@ -20,7 +20,7 @@ UI test launches with `-uiTestingFakeLibrary`.
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
 ```
 
-- Latest result (2026-09-22, Xcode 27.0): **126 tests, 0 failures**, exit 0.
+- Latest result (2026-09-22, Xcode 27.0): **127 tests, 0 failures**, exit 0.
 - The same suite also passed **on the device** in the full run below.
 - The script honours `$DEVELOPER_DIR` if set, otherwise uses `xcode-select -p`.
 - It detects the host architecture with `uname -m` and the installed macOS SDK
@@ -76,12 +76,13 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SwiperKitTests` | 126 | 0 failures |
+  | `SwiperKitTests` | 127 | 0 failures |
   | `SwiperAppTests` | 31 | 0 failures |
-  | `SwiperUITests` | 45 | 0 failures |
+  | `SwiperUITests` | 47 | 0 failures |
 
-  202 tests, 0 failures. `SwiperUITests` is the original 31 plus the 14
-  `PlaySessionUITests` cases described below.
+  205 tests, 0 failures. `SwiperUITests` is 33 cases plus the 14
+  `PlaySessionUITests` cases described below; the control redesign replaced the
+  rail-order case and added six cluster cases.
 - Previously, 2026-09-21 21:09: **188 tests, 0 failures** (126 + 31 + 31), result
   bundle `.derivedData/final4.xcresult`.
 - The interrupted-session case runs on the device too:
@@ -92,7 +93,11 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
   * The device must be **unlocked**. A locked phone fails with
     `deviceprep Code=-3 "Unlock iPhone to Continue"`, and if it locks between the
     runner launching and enabling automation the runner reports
-    "Timed out while enabling automation mode."
+    "Timed out while enabling automation mode." Nothing in `xcrun devicectl`
+    reports the lock state, and a run that meets a locked phone **waits in
+    silence** instead of failing, so ask the owner to unlock the phone before
+    starting a device run, and kill the run and ask again the moment
+    `Unlock iPhone to Continue` appears rather than letting it sit.
   * It helps to force a full connection first. `xcrun devicectl list devices`
     showing `available (paired)` was followed by automation-mode timeouts;
     `xcrun devicectl device info details --device <udid>` brought it to
@@ -109,13 +114,14 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
 ## Playing the app like a user (device)
 
 `SwiperUITests/PlaySessionUITests.swift` walks the app the way a curious person
-would, entirely against the fake library: every preset, every rail edge and
-anchor, marking, review (including select mode and restoring several marks at
-once), deletion, the empty library, Tumbler played to the end, preferences across
-a relaunch, the persistence banners, and every screen at the largest
-accessibility text size. It asserts the invariants that must hold in all of those
-states — controls on screen, tappable, and never covering each other or the top
-strip — and attaches a screenshot of each arrangement.
+would, entirely against the fake library: every preset, every cluster dock
+(bottom, left and right, including sliding the cluster along an edge), marking,
+review (including select mode and restoring several marks at once), deletion, the
+empty library, Tumbler played to the end, preferences across a relaunch, the
+persistence banners, and every screen at the largest accessibility text size. It
+asserts the invariants that must hold in all of those states — controls on screen,
+tappable, and never covering each other or the top strip — and attaches a
+screenshot of each arrangement.
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -127,8 +133,8 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
   -only-testing:SwiperUITests/PlaySessionUITests
 ```
 
-- Latest result (2026-09-22): **14 tests, 0 failures**, about 10 minutes. The rail
-  matrix needs ~3 minutes of that; the largest-text walk ~1.5 minutes.
+- Latest result (2026-09-22): **14 tests, 0 failures**, about 6 minutes. The
+  largest-text walk needs ~1.5 minutes of that.
 - `testPlayEveryScreenAtTheLargestAccessibilityTextSize` launches the app with
   `-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL`.
   That argument **does** take effect on the device — the attached screenshot is
@@ -152,6 +158,53 @@ xcodebuild test -project Swiper.xcodeproj -scheme Swiper \
     four times the column width. Both cells now own their size and the thumbnail
     is an overlay on it.
 
+
+### The control redesign (2026-09-22, second round)
+
+The viewer was redesigned after the owner used it on the phone:
+
+- Close is fixed in the top left, drawn at 34 pt inside a 44 pt tap region. The
+  heart and the Review entry share the top right, and the LIVE chip is centred
+  between them.
+- The five-control rail became a **cluster of three** (Trash, Undo, Checkmark)
+  inside a tray that the user holds and drags. It docks to the bottom (a row), the
+  left edge or the right edge (a column), slides continuously along that edge, and
+  is remembered. Settings gains **Reset control position**, and the cluster's
+  accessibility actions step the dock round the edges for anyone who cannot drag.
+- The preset list now decides only whether swipe gestures decide anything and
+  whether a tap keeps. `Extended` survives as a decoding alias for `Swipe` and is
+  no longer offered; order-on-the-rail is gone with the rail.
+- The drag wells read **Delete** and **Keep**. The review copy still says
+  "marked for deletion", because that is the screen where deletion is real.
+
+Three things about the move gesture are easy to get wrong again:
+
+- The move gesture lives on the **tray**, which is a sibling *behind* the three
+  controls, not on the container around them. A `.gesture` on the container was
+  never recognised at all (the hold left the cluster idle), and
+  `.simultaneousGesture` on it worked but swallowed the buttons' taps, so tapping
+  Trash stopped marking anything.
+- The move state is a **`@GestureState`**, which resets when a gesture ends *or is
+  cancelled*. With a plain `@State` an interrupted drag left the cluster stuck
+  reporting "Moving", scaled up, with its buttons refusing to work.
+- The accessibility frame of the cluster is whatever its children report, so the
+  tests grab the tray beside the first control rather than trusting a computed
+  edge, and both `dragCluster` helpers assert that frame is smaller than the
+  screen before dragging.
+
+`SwiperUITests` covers this with `testTheClusterDocksToEitherSideAndBecomesAColumn`,
+`testAPlainDragNeverMovesTheCluster` (a plain drag must not shove the buttons, and
+a move must not decide), `testADockedSideClusterDoesNotCoverThePhoto`,
+`testSwitchingPresetDoesNotMoveTheCluster`, `testCloseIsSmallInTheTopLeftCorner`
+and `testTheHeartIsInTheTopStripAndStillFavorites`. The play suite adds
+`testPlayEveryClusterDock`, which drags the cluster to all three edges and slides
+it along the bottom, checking at each stop that every control stays on screen,
+tappable, and clear of the top strip.
+
+`SwiperKitTests.ControlPreferencesTests` covers the storage: a legacy anchor or
+placement becomes a continuous position, an old `order` key is ignored rather
+than rejected, and a position is clamped to 0...1 (a non-finite one falls back to
+the centre).
 
 ## Screenshots
 
@@ -187,15 +240,18 @@ Attachments the suite produces, and what each one is for:
 | `Settings — How to use` | same | Settings entry that replays it |
 | `Save failure — Retry offered` | `testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession` | The visible save-failure banner and its Retry action |
 | `Viewer — Live Photo labelled` | `testLivePhotosAreLabelledInTheViewer` | The "LIVE" chip in the top strip, with symbol and word |
-| `Controls — fixture step 0…3` | `testControlRailDoesNotMoveBetweenPhotos` | The bottom rail in the same place for every aspect ratio |
-| `Controls — right side rail` | `testControlRailCanMoveToEitherSideRail` | The rail moved to the right edge, Close at top and Keep at bottom |
-| `Controls — left side rail` | same | The rail moved to the left edge, with the photo fitted beside its lane |
+| `Controls — fixture step 0…3` | `testControlRailDoesNotMoveBetweenPhotos` | The bottom cluster in the same place for every aspect ratio (`controls-01-bottom-cluster.png`) |
+| `Controls — docked to the right edge` | `testTheClusterDocksToEitherSideAndBecomesAColumn` | The cluster rotated to a column at the right edge, with the photo fitted beside its lane (`controls-02-right-edge-column.png`) |
+| `Controls — docked to the left edge` | same | The same column at the left edge (`controls-03-left-edge-column.png`) |
+| `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-04-close-top-left.png`) |
+| `Controls — heart in the top strip` | `testTheHeartIsInTheTopStripAndStillFavorites` | The heart on the right of the strip (`controls-05-heart-top-strip.png`) |
 | `Settings — statistics row` | `testStatisticsIsReachedFromSettings` | Statistics now inside Settings, reached from a row |
 | `Start Here — explanation, months, jump and sort` | `testStartHereExplainsItselfAndGroupsTheLibraryByMonth` | The explanation, month sections with sticky headers, the month menu and the order toggle |
 | `Start Here — oldest first` | same | The order toggle actually reversing the month sections |
 | `Start Here — jumped to a month` | `testStartHereCanJumpStraightToAMonth` | A month reached by the menu, far beyond one screen of scrolling |
-| `Controls — Keep first order` | `testTheRailOrderCanBeFlipped` | The rail order flipped so the decisions sit at the near end |
-| `Play — rail <edge>, anchor <anchor>` (9) | `testPlayThroughEveryRailAndAnchor` | Each rail position with a Live Photo badge and a Review entry in the top strip, and the controls clear of both. Committed as `play-rail-leading-anchor-start.png` and `play-rail-trailing-anchor-start.png` |
+| `Play — cluster docked bottom / left / right`, `Play — cluster slid along the bottom edge` | `testPlayEveryClusterDock` | The cluster at each of the three docks and slid along the bottom, with a Live Photo badge and a Review entry in the top strip and every control clear of both (`play-cluster-*.png`) |
+| `Play — cluster dock after relaunch` | `testPlayPreferencesSurviveRelaunch` | The dock surviving a relaunch (`play-cluster-after-relaunch.png`) |
+| `Play — tap-to-keep preset` | `testPlayEachPresetDoesWhatSettingsPromises` | The preset that keeps on a tap and ignores drags (`play-tap-to-keep.png`) |
 | `Play — Start Here direction wording` | `testPlayTheDirectionChoiceMatchesWhereStartHereWalks` | Start Here naming the direction the user chose (`play-starthere-newer-first.png`) |
 | `Play — Start Here grid columns` | `testPlayStartHereCellsStayInTheirColumns` | Every cell one column wide, including the 4:1 panorama thumbnails (`play-starthere-grid-columns.png`) |
 | `Play — Start Here with a marked photo` | `testPlayStartHereRefusesToStartOnAMarkedPhoto` | The badged, dimmed cell that refuses to start a session (`play-starthere-marked.png`) |

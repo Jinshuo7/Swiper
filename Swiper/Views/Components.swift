@@ -56,20 +56,29 @@ struct AdaptiveButtonStyle: ButtonStyle {
 struct CircleControl: View {
     let systemImage: String
     let label: String
+    /// Defaults to `control.<label>`. Close and Favorite name their own, because
+    /// they live in the top strip rather than on the decision cluster.
+    var identifier: String?
     var tint: Color = .white
+    /// The drawn circle, and the tap region around it. Close is drawn smaller
+    /// than the decision controls but keeps a full 44 pt tap region.
+    var visualSize: CGFloat = 56
+    var hitSize: CGFloat = 56
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 22, weight: .semibold))
-                .frame(width: 56, height: 56)
+                .font(.system(size: visualSize * 0.39, weight: .semibold))
+                .frame(width: visualSize, height: visualSize)
                 .background(.ultraThinMaterial, in: Circle())
                 .foregroundStyle(tint)
                 .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .frame(width: max(visualSize, hitSize), height: max(visualSize, hitSize))
+                .contentShape(Rectangle())
         }
         .accessibilityLabel(label)
-        .accessibilityIdentifier("control.\(label.lowercased())")
+        .accessibilityIdentifier(identifier ?? "control.\(label.lowercased())")
     }
 }
 

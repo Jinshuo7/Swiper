@@ -11,9 +11,14 @@ import XCTest
 /// arrangement is attached as a screenshot, because a green assertion does not
 /// prove the screen reads well.
 final class PlaySessionUITests: XCTestCase {
-    /// Every control that can appear on the rail, in rail order.
-    private let allRailControls = [
-        "control.close", "control.favorite", "control.undo", "control.delete", "control.keep",
+    /// The three decision controls, in cluster order.
+    private let allClusterControls = ["control.delete", "control.undo", "control.keep"]
+
+    /// Everything fixed in the top strip. The cluster must never cover any of
+    /// it, because the strip is where the way out, the way into Review, the
+    /// favorite and the Live Photo badge live.
+    private let topStripElements = [
+        "viewer.close", "viewer.liveBadge", "viewer.favorite", "viewer.review",
     ]
 
     /// The demo fixtures are `index * 9` days after this instant; see
@@ -65,8 +70,8 @@ final class PlaySessionUITests: XCTestCase {
 
     /// Returns to the entry screen from wherever the app currently is.
     private func goHome(_ app: XCUIApplication) {
-        if app.buttons["control.close"].exists {
-            app.buttons["control.close"].tap()
+        if app.buttons["viewer.close"].exists {
+            app.buttons["viewer.close"].tap()
         }
         XCTAssertTrue(
             app.buttons["entry.settings"].waitForExistence(timeout: 10),
@@ -185,15 +190,23 @@ final class PlaySessionUITests: XCTestCase {
         )
     }
 
-    private func assertRailIsUsable(
+    /// The cluster, wherever it is docked: three controls, each on screen,
+    /// tappable, and clear of each other and of everything in the top strip.
+    private func assertClusterIsUsable(
         _ app: XCUIApplication,
         context: String,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         let window = app.windows.firstMatch.frame
-        let present = allRailControls.filter { app.buttons[$0].exists }
-        XCTAssertFalse(present.isEmpty, "\(context): nothing at all is on the rail", file: file, line: line)
+        let present = allClusterControls.filter { app.buttons[$0].exists }
+        XCTAssertEqual(
+            present.count,
+            allClusterControls.count,
+            "\(context): the cluster should hold all three controls",
+            file: file,
+            line: line
+        )
 
         for identifier in present {
             let control = app.buttons[identifier]
@@ -216,142 +229,204 @@ final class PlaySessionUITests: XCTestCase {
                 assertNoOverlap(
                     app.buttons[identifier],
                     app.buttons[other],
-                    "\(context) rail controls",
+                    "\(context) cluster controls",
                     file: file,
                     line: line
                 )
             }
         }
 
-        // The top strip carries the Live Photo badge and the way into Review.
-        // The rail is drawn above it, so it must not reach into it.
         for identifier in present {
-            assertNoOverlap(
-                app.buttons[identifier],
-                element(app, "viewer.liveBadge"),
-                "\(context) rail vs Live Photo badge",
-                file: file,
-                line: line
-            )
-            assertNoOverlap(
-                app.buttons[identifier],
-                app.buttons["viewer.review"],
-                "\(context) rail vs Review entry",
+            for fixed in topStripElements {
+                assertNoOverlap(
+                    app.buttons[identifier],
+                    element(app, fixed),
+                    "\(context) cluster vs \(fixed)",
+                    file: file,
+                    line: line
+                )
+            }
+        }
+
+        for fixed in topStripElements + ["viewer.review"] {
+            let strip = element(app, fixed)
+            guard strip.exists else { continue }
+            XCTAssertTrue(
+                window.contains(strip.frame),
+                "\(context): \(fixed) at \(strip.frame) escapes the screen",
                 file: file,
                 line: line
             )
         }
     }
 
-    // MARK: - The rail, everywhere it can be
+    // MARK: - Moving the cluster
 
-    /// A rail can sit on three edges and at three anchors. Wherever the user puts
-    /// it, every control has to stay on screen and keep clear of the other
-    /// controls and of the top strip — which is holding a Live Photo badge and a
-    /// Review entry in this walk.
-    func testPlayThroughEveryRailAndAnchor() {
-        let app = launchApp()
-        choose(app, "settings.preset.extended")
-
-        for rail in ["bottom", "leading", "trailing"] {
-            for anchor in ["start", "center", "end"] {
-                let context = "rail \(rail), anchor \(anchor)"
-                choose(app, "settings.rail.\(rail)")
-                choose(app, "settings.anchor.\(anchor)")
-
-                _ = startViewer(app)
-                if !app.buttons["viewer.review"].exists {
-                    markCurrent(app)   // the Review entry lives in the top strip
-                }
-                advanceToALivePhoto(app)
-
-                assertRailIsUsable(app, context: context)
-                assertNoOverlap(
-                    element(app, "viewer.liveBadge"),
-                    app.buttons["viewer.review"],
-                    "\(context) top strip"
-                )
-                XCTAssertTrue(
-                    app.buttons["viewer.review"].isHittable,
-                    "\(context): the Review entry is covered and cannot be tapped"
-                )
-
-                capture("Play — rail \(rail), anchor \(anchor)")
-                goHome(app)
-            }
+    /// What the cluster says about where it is docked, once it has finished
+    /// settling after a move: the lift is held briefly so a button under the
+    /// finger cannot decide as the touch ends.
+    private func clusterDock(_ app: XCUIApplication) -> String {
+        let deadline = Date().addingTimeInterval(3)
+        var value = rawClusterDock(app)
+        while value.hasPrefix("Moving"), Date() < deadline {
+            usleep(100_000)
+            value = rawClusterDock(app)
         }
+        return value
+    }
+
+    private func rawClusterDock(_ app: XCUIApplication) -> String {
+        (element(app, "viewer.cluster").value as? String) ?? ""
+    }
+
+    /// Touch and hold the cluster's edge, then drag it, the way a person moves
+    /// it. The hold is what lifts it, so a plain drag can never move it.
+    private func dragCluster(_ app: XCUIApplication, by offset: CGVector) {
+        let cluster = element(app, "viewer.cluster")
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "there is no control cluster")
+        // Guard the query itself: a cluster reporting the whole screen would
+        // make every drag below start on the photo instead.
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(cluster.frame.width, window.width, "viewer.cluster should be the cluster, not the screen")
+        XCTAssertLessThan(cluster.frame.height, window.height, "viewer.cluster should be the cluster, not the screen")
+        // The tray beside the first control: the controls are buttons and claim
+        // their own touches, so the tray is the handle.
+        let delete = app.buttons["control.delete"]
+        XCTAssertTrue(delete.exists, "the cluster has no Delete control")
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: delete.frame.minX - 8, dy: delete.frame.midY))
+        start.press(
+            forDuration: 0.7,
+            thenDragTo: start.withOffset(offset),
+            withVelocity: .slow,
+            thenHoldForDuration: 0.2
+        )
+        // Let the cluster settle before the next grab reads its frame.
+        _ = clusterDock(app)
+        usleep(300_000)
+    }
+
+    /// Wherever the cluster is docked, every control has to stay on screen and
+    /// clear of the other controls and of the top strip. The strip is carrying
+    /// everything it can carry here: a Live Photo badge and a Review entry.
+    func testPlayEveryClusterDock() {
+        let app = launchApp()
+        _ = startViewer(app)
+        if !app.buttons["viewer.review"].exists { markCurrent(app) }
+        let review = app.buttons["viewer.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5), "the Review entry should appear once a photo is marked")
+        let marksBefore = review.label
+        advanceToALivePhoto(app)
+
+        assertClusterIsUsable(app, context: "bottom centre")
+        capture("Play — cluster docked bottom")
+
+        dragCluster(app, by: CGVector(dx: -240, dy: -240))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
+        assertClusterIsUsable(app, context: "left edge")
+        capture("Play — cluster docked left")
+
+        dragCluster(app, by: CGVector(dx: 320, dy: 0))
+        XCTAssertEqual(clusterDock(app), "Docked right edge")
+        assertClusterIsUsable(app, context: "right edge")
+        capture("Play — cluster docked right")
+
+        // Back to the bottom, then slide along it: different finger lengths need
+        // somewhere in between, and sliding must not tip it onto a side edge.
+        dragCluster(app, by: CGVector(dx: -180, dy: 220))
+        XCTAssertEqual(clusterDock(app), "Docked bottom")
+        let firstStop = app.buttons["control.keep"].frame.midX
+        dragCluster(app, by: CGVector(dx: -40, dy: 0))
+        XCTAssertEqual(clusterDock(app), "Docked bottom")
+        XCTAssertLessThan(
+            app.buttons["control.keep"].frame.midX,
+            firstStop,
+            "the cluster slides along its edge for different finger lengths"
+        )
+        let window = app.windows.firstMatch.frame
+        XCTAssertTrue(window.contains(app.buttons["control.delete"].frame), "it stays on screen")
+        assertClusterIsUsable(app, context: "bottom, slid along")
+        capture("Play — cluster slid along the bottom edge")
+
+        // Three moves and a slide must not have decided anything: no button may
+        // fire just because the cluster was picked up and put down.
+        XCTAssertEqual(
+            app.buttons["viewer.review"].label,
+            marksBefore,
+            "moving the cluster decided something"
+        )
     }
 
     // MARK: - Each preset
 
-    /// Every preset must offer the controls its own description promises, and a
-    /// gesture must decide only where the preset says gestures decide.
+    /// Every preset keeps the same three controls. The preset decides only
+    /// whether dragging the photo decides anything, and Tap to keep adds a tap.
     func testPlayEachPresetDoesWhatSettingsPromises() {
         let app = launchApp()
 
-        // Swipe: gestures decide, no decision buttons are needed.
+        // Swipe: the drag decides, and the three buttons are still there.
         choose(app, "settings.preset.swipe")
         let swipePhoto = startViewer(app)
-        XCTAssertFalse(app.buttons["control.delete"].exists, "Swipe must not need a Delete button")
-        XCTAssertFalse(app.buttons["control.keep"].exists, "Swipe must not need a Keep button")
+        for identifier in allClusterControls {
+            XCTAssertTrue(app.buttons[identifier].exists, "the cluster is the same in every preset")
+        }
+        XCTAssertTrue(app.buttons["viewer.favorite"].exists, "the heart is always in the top strip")
         swipePhoto.swipeLeft()
         XCTAssertTrue(
             app.buttons["viewer.review"].waitForExistence(timeout: 5),
-            "a swipe left must mark for deletion in the Swipe preset"
+            "a swipe left must delete in the Swipe preset"
         )
         goHome(app)
 
-        // Thumb: Keep and Delete are buttons.
+        // Buttons only: a swipe decides nothing, and the buttons still decide.
         choose(app, "settings.preset.thumb")
         _ = startViewer(app)
-        XCTAssertTrue(app.buttons["control.delete"].exists)
-        XCTAssertTrue(app.buttons["control.keep"].exists)
-        goHome(app)
-
-        // Delete only: Delete is the only decision button, a tap keeps, and a
-        // swipe must decide nothing at all.
-        choose(app, "settings.preset.deleteOnly")
-        _ = startViewer(app)
-        XCTAssertTrue(app.buttons["control.delete"].exists)
-        XCTAssertFalse(app.buttons["control.keep"].exists, "Delete only advances by tapping, not by a Keep button")
         let beforeSwipe = element(app, "viewer.photo").label
         element(app, "viewer.photo").swipeLeft()
         XCTAssertEqual(
             element(app, "viewer.photo").label,
             beforeSwipe,
-            "a button preset must not decide on a swipe"
+            "Buttons only must not decide on a swipe"
+        )
+        app.buttons["control.delete"].tap()
+        XCTAssertTrue(
+            app.buttons["viewer.review"].waitForExistence(timeout: 5),
+            "the Trash button still decides"
+        )
+        goHome(app)
+
+        // Tap to keep: the tap keeps, and dragging still decides nothing.
+        choose(app, "settings.preset.deleteOnly")
+        _ = startViewer(app)
+        let beforeTap = element(app, "viewer.photo").label
+        element(app, "viewer.photo").swipeLeft()
+        XCTAssertEqual(
+            element(app, "viewer.photo").label,
+            beforeTap,
+            "Tap to keep must not decide on a swipe"
         )
         element(app, "viewer.photo").tap()
         XCTAssertNotEqual(
             element(app, "viewer.photo").label,
-            beforeSwipe,
+            beforeTap,
             "tapping the photo must keep it and advance"
         )
-        goHome(app)
-
-        // Extended: all four decision controls exist, plus the gesture.
-        choose(app, "settings.preset.extended")
-        _ = startViewer(app)
-        for identifier in ["control.keep", "control.delete", "control.favorite", "control.undo"] {
-            XCTAssertTrue(app.buttons[identifier].exists, "Extended must offer \(identifier)")
-        }
-        capture("Play — extended preset rail")
+        capture("Play — tap-to-keep preset")
     }
 
     // MARK: - Preferences across a relaunch
 
-    /// The rail choice is physical, so it has to survive a relaunch — and the
-    /// direction choice has to come back with it.
+    /// Where the cluster is docked is physical, so it has to survive a relaunch,
+    /// and the direction choice has to come back with it.
     func testPlayPreferencesSurviveRelaunch() {
         let app = launchApp(persistentStore: true, resetStore: true)
-        choose(app, "settings.preset.extended")
-        choose(app, "settings.rail.trailing")
-        choose(app, "settings.anchor.start")
-        choose(app, "settings.order.keepFirst")
+        choose(app, "settings.preset.swipe")
         chooseDirection(app, "Newer first")
 
         _ = startViewer(app)
-        let closeFrame = app.buttons["control.close"].frame
+        dragCluster(app, by: CGVector(dx: -240, dy: -240))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
+        let closeFrame = app.buttons["viewer.close"].frame
         goHome(app)
 
         app.terminate()
@@ -359,16 +434,16 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(relaunched.buttons["entry.recent"].waitForExistence(timeout: 10))
         _ = startViewer(relaunched)
         XCTAssertEqual(
-            relaunched.buttons["control.close"].frame,
+            clusterDock(relaunched),
+            "Docked left edge",
+            "the dock must survive a relaunch"
+        )
+        XCTAssertEqual(
+            relaunched.buttons["viewer.close"].frame,
             closeFrame,
-            "the rail choice must survive a relaunch"
+            "the top strip must not move between launches"
         )
-        XCTAssertGreaterThan(
-            relaunched.buttons["control.close"].frame.midX,
-            relaunched.windows.firstMatch.frame.midX,
-            "a trailing rail must still be on the right after a relaunch"
-        )
-        capture("Play — preferences after relaunch")
+        capture("Play — cluster dock after relaunch")
 
         goHome(relaunched)
         relaunched.buttons["entry.startHere"].tap()
@@ -389,7 +464,7 @@ final class PlaySessionUITests: XCTestCase {
     /// promise the user something Recent does not do.
     func testPlayTheDirectionChoiceMatchesWhereStartHereWalks() {
         let app = launchApp()
-        choose(app, "settings.preset.extended")
+        choose(app, "settings.preset.swipe")
 
         // Older first is the default: fake-19's older neighbour is fake-18.
         startAt(app, cell: "fake-19")
@@ -836,7 +911,7 @@ final class PlaySessionUITests: XCTestCase {
         capture("Play — tutorial at the largest text size")
         app.buttons["viewer.tutorial.dismiss"].tap()
 
-        assertRailIsUsable(app, context: context)
+        assertClusterIsUsable(app, context: context)
         capture("Play — viewer at the largest text size")
 
         // Mark one and walk the whole deletion flow. Each of these is the only
@@ -865,8 +940,7 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
         app.buttons["entry.settings"].tap()
         for identifier in [
-            "settings.preset.extended", "settings.rail.trailing", "settings.anchor.end",
-            "settings.order.keepFirst",
+            "settings.preset.thumb", "settings.resetControls",
         ] {
             assertReachable(app, identifier, context, scrollUpTo: 10)
         }
