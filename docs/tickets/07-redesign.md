@@ -11,7 +11,7 @@ records, before any behaviour changes, so the rename and the code that follows
 are written against settled vocabulary.
 
 - Five ADRs in `docs/adr/`, following the existing format: the photo never moves
-  for chrome; three fixed control positions moved with a puck; Start Here owns
+  for chrome; three fixed control positions moved with a puck; Choose a photo owns
   every entry into sorting; swipe is always available and buttons are optional;
   favourite is out of scope.
 - Correct `CONTEXT.md`. It currently defines *Control preset* as "Swipe, Thumb,

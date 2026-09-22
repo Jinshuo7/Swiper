@@ -26,7 +26,7 @@ row with a chevron.
 - A **decision** is keep or mark for deletion. Favourite leaves the product.
 - The **entry screen** is a wordmark, one circular `Start here` action, `Resume`
   only while a session is waiting, and a deletion-review chip in the top bar.
-- **Start Here** absorbs the old Recent and Tumbler entries as `Newest` and
+- **Choose a photo** absorbs the old Recent and Tumbler entries as `Newest` and
   `Random`, so it is the single door into sorting.
 - The viewer's controls sit at **three fixed positions**, moved by a three-dot
   grip that detaches into a puck. The photo never moves for chrome.
@@ -41,7 +41,7 @@ row with a chevron.
 2. As the owner, I can resume the session I was in the middle of, and I can see
    at a glance that there are photos waiting in deletion review.
 3. As the owner, when I want the newest photos or a random order, I find both
-   inside Start Here rather than on the front page.
+   inside Choose a photo rather than on the front page.
 4. As the owner, I move the controls to the hand I am using, and the photo does
    not move or resize while I do it.
 5. As the owner, I put the controls where I am about to reach, and the app
@@ -131,12 +131,12 @@ row with a chevron.
   one line, "No photos to sort."
 - Text contrast is at least `4.5:1` against the background.
 
-### 7. Start Here
+### 7. Choose a photo
 
 - Gains `Newest` and `Random` as a row of two buttons between the explanation and
   the grid. `Newest` starts the session the old Recent did; `Random` is the
   Tumbler. The month sections, the jump menu and the order toggle are unchanged.
-- Opening Start Here leaves a resumable session alone. Choosing a photo replaces
+- Opening Choose a photo leaves a resumable session alone. Choosing a photo replaces
   it. The deletion list is never at risk.
 
 ### 8. Settings
@@ -178,7 +178,7 @@ row with a chevron.
 ## Further Notes
 
 - Five ADRs come out of this: the photo never moves for chrome; three fixed
-  positions with the puck move; Start Here owns every entry; swipe is always
+  positions with the puck move; Choose a photo owns every entry; swipe is always
   available and buttons are optional; favourite is out of scope.
 - The previous round's research on the movable bar,
   `docs/research/movable-controls.md`, is superseded for placement decisions by

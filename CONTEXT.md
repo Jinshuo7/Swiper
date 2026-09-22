@@ -45,9 +45,9 @@ older photos and remembers the user's preference.
 **Tumbler**:
 A repeat-free randomised traversal of the library. It uses a persisted,
 deterministic random order of identifiers. Its entry point is **Random**, inside
-Start Here.
+Choose a photo.
 
-**Start Here**:
+**Choose a photo**:
 The screen for choosing where a sorting session begins. It presents the library
 grouped into calendar months, newest first by default, with a menu that jumps
 straight to a month, and it starts the two named traversals itself: **Newest**,
@@ -56,7 +56,7 @@ which is the Tumbler. It is the only door into sorting; the entry screen reaches
 it and never starts a session on its own.
 
 **Entry screen**:
-The first screen: the SWIPR wordmark, one action that opens Start Here, a resume
+The first screen: the SWIPR wordmark, one action that opens Choose a photo, a resume
 action shown only while a session is waiting, and a chip into deletion review
 shown only while photos are marked.
 

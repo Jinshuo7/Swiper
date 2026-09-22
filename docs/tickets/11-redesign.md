@@ -1,4 +1,4 @@
-# Entry screen, Start Here and Settings
+# Entry screen, Choose a photo and Settings
 
 ## Parent
 
@@ -6,7 +6,7 @@
 
 ## What to build
 
-The front of the app becomes one obvious action, Start Here becomes the only door
+The front of the app becomes one obvious action, Choose a photo becomes the only door
 into sorting, and Settings opens with what the user has achieved.
 
 - Entry screen: settings gear leading, the SWIPR wordmark dead centre, and a
@@ -16,7 +16,7 @@ into sorting, and Settings opens with what the user has achieved.
   secondary text button only while a session is waiting. No footer.
 - With no photos: same layout, the circle disabled with a neutral fill, one line,
   "No photos to sort."
-- Start Here: `Newest` and `Random` as a row of two between the explanation and
+- Choose a photo: `Newest` and `Random` as a row of two between the explanation and
   the grid, starting the sessions the old Recent and Tumbler started. Opening the
   screen leaves a resumable session alone; choosing a photo replaces it.
 - Settings: a `Show buttons` toggle (on by default, hiding the cluster and its
@@ -25,6 +25,8 @@ into sorting, and Settings opens with what the user has achieved.
   top with lifetime deleted, lifetime storage reclaimed, sessions completed, and a
   this-session row only while a session is active; Help and Default direction
   unchanged; `Tap to keep` and the preset list gone.
+- Retitle the screen Choose a photo, which is Start Here today, and rename its
+  route and accessibility identifiers to match, so the code and the title agree.
 - Tutorial copy follows the new controls and the removal of favouriting, and
   teaches how to move the cluster.
 
@@ -40,7 +42,7 @@ into sorting, and Settings opens with what the user has achieved.
       value the statistics store holds after a scripted run.
 - [ ] `Newest` and `Random` start the same sessions the removed entries started,
       proven by the photo the viewer opens on.
-- [ ] A resumable session survives opening Start Here and is replaced only by
+- [ ] A resumable session survives opening Choose a photo and is replaced only by
       choosing a photo.
 - [ ] The disabled empty state shows exactly one line of copy and no enabled
       action.
