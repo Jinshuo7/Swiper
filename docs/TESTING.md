@@ -167,11 +167,14 @@ The viewer's controls were replaced again, following `docs/adr/0006`–`0009`:
 
 - Close is fixed in the top left, drawn at 34 pt inside a 44 pt tap region. The
   Review entry shares the top strip, and the LIVE chip is centred between them.
-- The cluster of three (Trash, Undo, Checkmark) now sits at exactly **three fixed
+- The cluster of three (Trash, Keep, Undo) now sits at exactly **three fixed
   positions** — a bottom row centred 20 pt above the bottom safe edge, and
   columns centred at 75% of the safe-area height 20 pt inside the left and right
   edges — stored as a three-way `ControlPosition`. The continuous position, the
   rail and the anchor migration are gone.
+- Trash and Keep stay adjacent; Undo sits at an outer end chosen by the two-way
+  `undoSide` setting, and the grip moves to the opposite end
+  (`docs/adr/0011-undo-at-the-outer-end.md`).
 - It is moved by dragging a **three-dot grip** in the tray's leading end, in a
   44 x 44 pt hit region. The grip lifts a translucent **puck** that follows the
   finger one-to-one while the cluster stays put; the three positions appear as
@@ -203,8 +206,9 @@ Two things about the move gesture are easy to get wrong again:
 `testAReleaseAwayFromEverySlotChangesNothing`,
 `testAPlainSwipeNeverMovesTheCluster`,
 `testThePhotoFrameIsIdenticalAtEveryControlPosition`,
-`testTheClusterKeepsItsPlaceBetweenPhotos`, `testCloseIsSmallInTheTopLeftCorner`
-and `testShowButtonsToggleHidesAndRestoresTheCluster`. The play suite adds
+`testTheClusterKeepsItsPlaceBetweenPhotos`, `testCloseIsSmallInTheTopLeftCorner`,
+`testShowButtonsToggleHidesAndRestoresTheCluster` and
+`testUndoSitsAtAnOuterEndAndMovesWithTheSetting`. The play suite adds
 `testPlayEveryControlPosition`, which walks all three positions and checks at
 reach that every control stays on screen, tappable, and clear of the top strip.
 

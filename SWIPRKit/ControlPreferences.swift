@@ -38,6 +38,25 @@ public enum ControlPosition: String, Codable, CaseIterable, Identifiable, Sendab
     }
 }
 
+/// Which outer end of the cluster the Undo button occupies.
+///
+/// Undo is the least frequent decision and the only reversible one, so it does
+/// not sit between Trash and Keep; it sits at an end, and the user picks which
+/// end so it falls under the thumb they actually use (`docs/adr/0011`).
+public enum UndoSide: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// The start of the cluster: the left of a bottom row, the top of a column.
+    case leading
+    /// The end of the cluster: the right of a bottom row, the bottom of a column.
+    case trailing
+
+    public var id: String { rawValue }
+
+    /// Spoken name, phrased for the bottom row the setting is usually read in.
+    public var title: String { self == .leading ? "Left" : "Right" }
+
+    public var opposite: UndoSide { self == .leading ? .trailing : .leading }
+}
+
 /// The user's persisted interaction preferences.
 public struct ControlPreferences: Codable, Equatable, Sendable {
     /// Which of the three fixed places the cluster sits in.
@@ -46,6 +65,8 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     /// are always available either way (`docs/adr/0009-swipe-always-buttons-
     /// optional.md`).
     public var showButtons: Bool
+    /// Which outer end of the cluster Undo occupies.
+    public var undoSide: UndoSide
     /// Direction a new session starts in. The user can change this and it is
     /// remembered.
     public var defaultDirection: TraversalDirection
@@ -53,10 +74,12 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     public init(
         position: ControlPosition = .bottom,
         showButtons: Bool = true,
+        undoSide: UndoSide = .leading,
         defaultDirection: TraversalDirection = .older
     ) {
         self.position = position
         self.showButtons = showButtons
+        self.undoSide = undoSide
         self.defaultDirection = defaultDirection
     }
 
@@ -65,6 +88,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case position
         case showButtons
+        case undoSide
         case defaultDirection
         // Written by older builds. Read so a stored choice is not thrown away;
         // nothing writes them.
@@ -79,6 +103,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         defaultDirection = try container.decodeIfPresent(TraversalDirection.self, forKey: .defaultDirection) ?? .older
         showButtons = try container.decodeIfPresent(Bool.self, forKey: .showButtons) ?? true
+        undoSide = try container.decodeIfPresent(UndoSide.self, forKey: .undoSide) ?? .leading
 
         if let stored = try? container.decode(ControlPosition.self, forKey: .position) {
             position = stored
@@ -98,6 +123,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(position, forKey: .position)
         try container.encode(showButtons, forKey: .showButtons)
+        try container.encode(undoSide, forKey: .undoSide)
         try container.encode(defaultDirection, forKey: .defaultDirection)
     }
 }
@@ -152,17 +178,43 @@ public enum ControlClusterLayout {
         }
     }
 
-    /// Where the grip sits for a given cluster position: the leading end of the
-    /// tray in both orientations. A drag starts here, and the puck then follows
-    /// the finger from this point.
-    public static func gripCentre(for position: ControlPosition, in size: CGSize) -> CGPoint {
+    /// The cluster's controls in their left-to-right (or top-to-bottom) order.
+    ///
+    /// Trash and Keep are always adjacent and in that order, so the swipe wells'
+    /// mapping — delete left, keep right — is repeated by the buttons. Undo sits
+    /// at the end opposite the grip, and the user chooses which end.
+    public enum ClusterControl: String, CaseIterable, Identifiable, Sendable {
+        case grip
+        case trash
+        case keep
+        case undo
+
+        public var id: String { rawValue }
+    }
+
+    public static func order(for undoSide: UndoSide) -> [ClusterControl] {
+        switch undoSide {
+        case .leading: return [.undo, .trash, .keep, .grip]
+        case .trailing: return [.grip, .trash, .keep, .undo]
+        }
+    }
+
+    /// Where the grip sits: the outer end opposite Undo, in both orientations.
+    /// A drag starts here, and the puck then follows the finger from this point.
+    public static func gripCentre(
+        for position: ControlPosition,
+        in size: CGSize,
+        undoSide: UndoSide
+    ) -> CGPoint {
         let cluster = clusterSize(for: position)
         let centre = centre(for: position, in: size)
         let half = (position.isVertical ? cluster.height : cluster.width) / 2
         let offset = half - trayInset - gripHitSize / 2
+        let gripIsLeading = undoSide == .trailing
+        let signed = gripIsLeading ? -offset : offset
         return position.isVertical
-            ? CGPoint(x: centre.x, y: centre.y - offset)
-            : CGPoint(x: centre.x - offset, y: centre.y)
+            ? CGPoint(x: centre.x, y: centre.y + signed)
+            : CGPoint(x: centre.x + signed, y: centre.y)
     }
 
     /// The rectangular area a slot occupies.

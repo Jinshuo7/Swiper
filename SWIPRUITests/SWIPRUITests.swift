@@ -316,8 +316,13 @@ final class SWIPRUITests: XCTestCase {
         }
         XCTAssertEqual(delete.frame.midX, undo.frame.midX, accuracy: 1, "a column lines up", file: file, line: line)
         XCTAssertEqual(undo.frame.midX, keep.frame.midX, accuracy: 1, "a column lines up", file: file, line: line)
-        XCTAssertLessThan(delete.frame.midY, undo.frame.midY, file: file, line: line)
-        XCTAssertLessThan(undo.frame.midY, keep.frame.midY, file: file, line: line)
+        XCTAssertLessThan(delete.frame.midY, keep.frame.midY, "Trash and Keep keep their order", file: file, line: line)
+        XCTAssertTrue(
+            undo.frame.midY < delete.frame.midY || undo.frame.midY > keep.frame.midY,
+            "Undo sits at an outer end of the column, not between Trash and Keep",
+            file: file,
+            line: line
+        )
     }
 
     private func assertClusterIsARow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
@@ -326,8 +331,13 @@ final class SWIPRUITests: XCTestCase {
         let keep = app.buttons["control.keep"]
         XCTAssertEqual(delete.frame.midY, undo.frame.midY, accuracy: 1, "a row lines up", file: file, line: line)
         XCTAssertEqual(undo.frame.midY, keep.frame.midY, accuracy: 1, "a row lines up", file: file, line: line)
-        XCTAssertLessThan(delete.frame.midX, undo.frame.midX, file: file, line: line)
-        XCTAssertLessThan(undo.frame.midX, keep.frame.midX, file: file, line: line)
+        XCTAssertLessThan(delete.frame.midX, keep.frame.midX, "Trash and Keep keep their order", file: file, line: line)
+        XCTAssertTrue(
+            undo.frame.midX < delete.frame.midX || undo.frame.midX > keep.frame.midX,
+            "Undo sits at an outer end of the row, not between Trash and Keep",
+            file: file,
+            line: line
+        )
     }
 
     /// The cluster starts as a bottom row and can be moved to either side, where
@@ -869,10 +879,40 @@ final class SWIPRUITests: XCTestCase {
         capture("Settings — inline statistics")
     }
 
+    /// Undo is the least frequent decision and the only reversible one, so it
+    /// sits at an outer end, away from the Trash/Keep pair. The setting moves it
+    /// to either end.
+    func testUndoSitsAtAnOuterEndAndMovesWithTheSetting() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let delete = app.buttons["control.delete"]
+        let keep = app.buttons["control.keep"]
+        let undo = app.buttons["control.undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        XCTAssertLessThan(delete.frame.midX, keep.frame.midX, "Trash and Keep stay paired")
+        XCTAssertLessThan(undo.frame.midX, delete.frame.midX, "Undo defaults to the outer left end")
+
+        // Flip it to the other outer end in Settings.
+        app.buttons["viewer.close"].tap()
+        app.buttons["entry.settings"].tap()
+        let right = app.buttons["settings.undoSide.trailing"]
+        XCTAssertTrue(right.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !right.isHittable { app.swipeUp() }
+        right.tap()
+        app.buttons["Back"].firstMatch.tap()
+
+        _ = startViewer(app)
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(undo.frame.midX, keep.frame.midX, "Undo moves to the outer right end")
+    }
+
     func testSettingsOffersTheThreePositionsAndAReset() {
         let app = launchApp()
         app.buttons["entry.settings"].tap()
-        for identifier in ["settings.position.bottom", "settings.position.leading", "settings.position.trailing", "settings.resetControls"] {
+        for identifier in [
+            "settings.position.bottom", "settings.position.leading", "settings.position.trailing",
+            "settings.undoSide.leading", "settings.undoSide.trailing", "settings.resetControls",
+        ] {
             let row = app.buttons[identifier]
             for _ in 0..<4 where !row.isHittable { app.swipeUp() }
             XCTAssertTrue(row.exists, "\(identifier) is missing from Settings")

@@ -6,7 +6,15 @@ final class ControlPreferencesTests: XCTestCase {
         let preferences = ControlPreferences.default
         XCTAssertEqual(preferences.position, .bottom)
         XCTAssertTrue(preferences.showButtons)
+        XCTAssertEqual(preferences.undoSide, .leading)
         XCTAssertEqual(preferences.defaultDirection, .older)
+    }
+
+    func testUndoSideNamesAndOpposite() {
+        XCTAssertEqual(UndoSide.leading.title, "Left")
+        XCTAssertEqual(UndoSide.trailing.title, "Right")
+        XCTAssertEqual(UndoSide.leading.opposite, .trailing)
+        XCTAssertEqual(UndoSide.trailing.opposite, .leading)
     }
 
     func testPositionNamesAndOrientation() {
@@ -22,7 +30,12 @@ final class ControlPreferencesTests: XCTestCase {
     }
 
     func testRoundTripsThroughCodable() throws {
-        let preferences = ControlPreferences(position: .leading, showButtons: false, defaultDirection: .newer)
+        let preferences = ControlPreferences(
+            position: .leading,
+            showButtons: false,
+            undoSide: .trailing,
+            defaultDirection: .newer
+        )
         let data = try JSONEncoder().encode(preferences)
         let decoded = try JSONDecoder().decode(ControlPreferences.self, from: data)
         XCTAssertEqual(decoded, preferences)
@@ -52,6 +65,7 @@ final class ControlPreferencesTests: XCTestCase {
         )
         XCTAssertEqual(bottom.position, .bottom)
         XCTAssertTrue(bottom.showButtons)
+        XCTAssertEqual(bottom.undoSide, .leading, "preferences written before the setting get the default")
     }
 
     /// Placement predates the rail and was horizontal-only, so it is a bottom
@@ -138,20 +152,41 @@ final class ControlClusterLayoutTests: XCTestCase {
         XCTAssertEqual(right.y, safeArea.height * 0.75, accuracy: 0.5)
     }
 
-    func testTheGripSitsAtTheLeadingEndOfTheTray() {
+    /// Trash and Keep stay adjacent and in the swipe wells' order; Undo is at
+    /// one outer end, never between them.
+    func testUndoSitsAtAnOuterEndAwayFromThePair() {
+        XCTAssertEqual(ControlClusterLayout.order(for: .leading), [.undo, .trash, .keep, .grip])
+        XCTAssertEqual(ControlClusterLayout.order(for: .trailing), [.grip, .trash, .keep, .undo])
+        for side in UndoSide.allCases {
+            let order = ControlClusterLayout.order(for: side)
+            let trash = order.firstIndex(of: .trash)
+            let keep = order.firstIndex(of: .keep)
+            XCTAssertEqual(keep, trash.map { $0 + 1 }, "Trash and Keep must stay adjacent")
+            let undo = order.firstIndex(of: .undo)
+            XCTAssertTrue(
+                undo == 0 || undo == order.count - 1,
+                "Undo must sit at an outer end, got index \(String(describing: undo))"
+            )
+        }
+    }
+
+    func testTheGripSitsAtTheEndOppositeUndo() {
         for position in ControlPosition.allCases {
             let centre = ControlClusterLayout.centre(for: position, in: safeArea)
-            let grip = ControlClusterLayout.gripCentre(for: position, in: safeArea)
+            let gripWhenUndoTrailing = ControlClusterLayout.gripCentre(for: position, in: safeArea, undoSide: .trailing)
+            let gripWhenUndoLeading = ControlClusterLayout.gripCentre(for: position, in: safeArea, undoSide: .leading)
             XCTAssertTrue(
-                ControlClusterLayout.slotRect(for: position, in: safeArea).contains(grip),
+                ControlClusterLayout.slotRect(for: position, in: safeArea).contains(gripWhenUndoTrailing),
                 "the grip must be inside its own tray at \(position)"
             )
             if position.isVertical {
-                XCTAssertEqual(grip.x, centre.x, accuracy: 0.5)
-                XCTAssertLessThan(grip.y, centre.y, "a column's grip leads at the top")
+                XCTAssertLessThan(gripWhenUndoTrailing.y, centre.y, "grip leads when Undo trails")
+                XCTAssertGreaterThan(gripWhenUndoLeading.y, centre.y, "grip trails when Undo leads")
+                XCTAssertEqual(gripWhenUndoTrailing.x, centre.x, accuracy: 0.5)
             } else {
-                XCTAssertEqual(grip.y, centre.y, accuracy: 0.5)
-                XCTAssertLessThan(grip.x, centre.x, "a row's grip leads at the left")
+                XCTAssertLessThan(gripWhenUndoTrailing.x, centre.x, "grip leads when Undo trails")
+                XCTAssertGreaterThan(gripWhenUndoLeading.x, centre.x, "grip trails when Undo leads")
+                XCTAssertEqual(gripWhenUndoTrailing.y, centre.y, accuracy: 0.5)
             }
         }
     }

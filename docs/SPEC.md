@@ -92,8 +92,10 @@ visible thumbnails are decoded; full images are not loaded.
 
 ## 4. The control cluster
 
-Every decision control lives on **one cluster of three**: Trash, Undo and
-Checkmark, in that order. Nothing about the current photo, the number of marks,
+Every decision control lives on **one cluster of three**: Trash and Keep, which
+stay adjacent in the swipe wells' order (delete left, keep right), and Undo,
+which sits at an outer end away from both. Nothing about the current photo, the
+number of marks,
 or where the cluster sits moves it, and the photo never resizes or shifts for it
 ([ADR-0006](adr/0006-photo-never-moves-for-chrome.md)). The way out and the
 review entry live in the top strip instead.
@@ -106,6 +108,10 @@ review entry live in the top strip instead.
   centred on the screen width `20 pt` above the bottom safe edge, and columns
   centred at `75%` of the safe-area height `20 pt` inside the left or right edge.
   Nothing between them ([ADR-0007](adr/0007-three-fixed-control-positions.md)).
+* **Undo side** is a two-way setting: Undo sits at the leading end (the left of a
+  bottom row, the top of a column) or the trailing end, and the grip sits at the
+  opposite end. Trash and Keep never move relative to each other
+  ([ADR-0011](adr/0011-undo-at-the-outer-end.md)).
 * A three-dot **grip** sits in the tray's leading end, in a `44 x 44 pt` hit
   region. Dragging it lifts a translucent **puck** that follows the finger
   one-to-one; the cluster itself stays put. The three positions appear as phantom

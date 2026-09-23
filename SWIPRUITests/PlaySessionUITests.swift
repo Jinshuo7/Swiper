@@ -868,7 +868,7 @@ final class PlaySessionUITests: XCTestCase {
         )
         capture("Play — settings at the largest text size")
         for identifier in [
-            "settings.showButtons", "settings.position.bottom", "settings.resetControls",
+            "settings.showButtons", "settings.position.bottom", "settings.undoSide.leading", "settings.resetControls",
         ] {
             assertReachable(app, identifier, context, scrollUpTo: 10)
         }

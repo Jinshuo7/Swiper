@@ -118,8 +118,10 @@ saving, shown with the first photo and replayable from Settings → How to use. 
 is teaching state, not saved work.
 
 **Control cluster**:
-The viewer's three controls: Trash, Undo and Checkmark. It is shown only while
-buttons are shown, and it never resizes or shifts the photo.
+The viewer's three controls: Trash, Undo and Checkmark. Trash and Keep stay
+adjacent in the swipe wells' order; Undo sits at one outer end, on whichever side
+the user chooses. It is shown only while buttons are shown, and it never resizes
+or shifts the photo.
 
 **Control position**:
 Where the cluster sits: a row centred near the bottom edge, or a column centred in

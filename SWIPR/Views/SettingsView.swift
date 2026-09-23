@@ -20,6 +20,7 @@ struct SettingsView: View {
                             identifier: "settings.showButtons"
                         )
                         positionChoices
+                        undoSideChoices
                         buttonRow(
                             systemImage: "hand.draw",
                             title: "Reset control position",
@@ -30,7 +31,7 @@ struct SettingsView: View {
                             preferences.position = .bottom
                             model.updatePreferences(preferences)
                         }
-                        Text("Swipe gestures are always available: drag left to delete or right to keep. Drag the three dots on the buttons to move them to the bottom, left or right edge — the photo never moves.")
+                        Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at the end of the buttons, away from Trash and Keep, and you can put it on either side. Drag the three dots to move the whole cluster to the bottom, left or right edge — the photo never moves.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)
@@ -197,6 +198,36 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.position.\(position.rawValue)")
+    }
+
+    private var undoSideChoices: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Undo side")
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+            ForEach(UndoSide.allCases) { side in
+                undoSideRow(side)
+            }
+        }
+    }
+
+    private func undoSideRow(_ side: UndoSide) -> some View {
+        Button {
+            var preferences = model.preferences
+            preferences.undoSide = side
+            model.updatePreferences(preferences)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: model.preferences.undoSide == side ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(model.preferences.undoSide == side ? .blue : .white.opacity(0.4))
+                Text(side == .leading ? "Undo on the left" : "Undo on the right")
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings.undoSide.\(side.rawValue)")
     }
 
     private var showButtonsBinding: Binding<Bool> {

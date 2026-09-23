@@ -363,6 +363,7 @@ struct ViewerView: View {
         let cluster = ControlClusterLayout.clusterSize(for: position)
         let centre = ControlClusterLayout.centre(for: position, in: size)
         let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+        let controls = ControlClusterLayout.order(for: model.preferences.undoSide)
 
         return ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -373,13 +374,11 @@ struct ViewerView: View {
                 )
             if position.isVertical {
                 VStack(spacing: ControlClusterLayout.controlSpacing) {
-                    grip(in: size)
-                    clusterControls
+                    ForEach(controls) { clusterControl($0, in: size) }
                 }
             } else {
                 HStack(spacing: ControlClusterLayout.controlSpacing) {
-                    grip(in: size)
-                    clusterControls
+                    ForEach(controls) { clusterControl($0, in: size) }
                 }
             }
         }
@@ -416,15 +415,30 @@ struct ViewerView: View {
     }
 
     @ViewBuilder
-    private var clusterControls: some View {
+    private func clusterControl(_ control: ControlClusterLayout.ClusterControl, in size: CGSize) -> some View {
+        switch control {
+        case .grip: grip(in: size)
+        case .trash: trashControl
+        case .keep: keepControl
+        case .undo: undoControl
+        }
+    }
+
+    private var trashControl: some View {
         CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
             clusterAction { model.apply(.queueDeletion) }
         }
-        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
-            clusterAction { model.apply(.undo) }
-        }
+    }
+
+    private var keepControl: some View {
         CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
             clusterAction { model.apply(.keep) }
+        }
+    }
+
+    private var undoControl: some View {
+        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
+            clusterAction { model.apply(.undo) }
         }
     }
 
@@ -478,7 +492,11 @@ struct ViewerView: View {
     @ViewBuilder
     private func puck(in size: CGSize) -> some View {
         if model.preferences.showButtons && gripMove.isActive {
-            let origin = ControlClusterLayout.gripCentre(for: model.preferences.position, in: size)
+            let origin = ControlClusterLayout.gripCentre(
+                for: model.preferences.position,
+                in: size,
+                undoSide: model.preferences.undoSide
+            )
             let centre = CGPoint(
                 x: origin.x + gripMove.translation.width,
                 y: origin.y + gripMove.translation.height
@@ -541,7 +559,11 @@ struct ViewerView: View {
     /// The slot a puck currently over would land in, or nil when it is over
     /// none.
     private func targetSlot(for move: GripMove, in size: CGSize) -> ControlPosition? {
-        let origin = ControlClusterLayout.gripCentre(for: model.preferences.position, in: size)
+        let origin = ControlClusterLayout.gripCentre(
+            for: model.preferences.position,
+            in: size,
+            undoSide: model.preferences.undoSide
+        )
         let point = CGPoint(
             x: origin.x + move.translation.width,
             y: origin.y + move.translation.height
