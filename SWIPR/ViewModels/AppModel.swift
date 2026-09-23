@@ -25,9 +25,8 @@ final class AppModel: ObservableObject {
         case viewer
         case review
         case result
-        case statistics
         case settings
-        case startHere
+        case choosePhoto
     }
 
     /// A decision that was computed but could not be saved. It is retried
@@ -295,7 +294,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Entry points
 
-    func startRecent() {
+    func startNewest() {
         enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .older) }
     }
 
@@ -303,7 +302,7 @@ final class AppModel: ObservableObject {
         enqueue { await self.startSession(mode: .tumbler, cursorID: nil) }
     }
 
-    func startHere(assetID: String) {
+    func startFrom(assetID: String) {
         enqueue {
             guard !self.marks.contains(assetID) else {
                 self.errorMessage = "That photo is marked for deletion, so it is skipped while sorting. Open Review to restore it."
@@ -313,7 +312,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func showStartHere() { route = .startHere }
+    func showChoosePhoto() { route = .choosePhoto }
 
     private func startSession(
         mode: SessionMode,

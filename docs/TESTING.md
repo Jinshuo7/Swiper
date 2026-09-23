@@ -20,7 +20,7 @@ UI test launches with `-uiTestingFakeLibrary`.
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/run-kit-tests.sh
 ```
 
-- Latest result (2026-09-22, Xcode 27.0): **127 tests, 0 failures**, exit 0.
+- Latest result (2026-09-23, Xcode 27.0): **130 tests, 0 failures**, exit 0.
 - The same suite also passed **on the device** in the full run below.
 - The script honours `$DEVELOPER_DIR` if set, otherwise uses `xcode-select -p`.
 - It detects the host architecture with `uname -m` and the installed macOS SDK
@@ -77,11 +77,11 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SWIPRKitTests` | 126 | 0 failures |
+  | `SWIPRKitTests` | 130 | 0 failures |
   | `SWIPRAppTests` | 31 | 0 failures |
-  | `SWIPRUITests` | 46 | 0 failures |
+  | `SWIPRUITests` | 50 | 0 failures |
 
-  203 tests, 0 failures. `SWIPRUITests` is 32 cases plus the 14
+  211 tests, 0 failures. `SWIPRUITests` is 34 cases plus the 16
   `PlaySessionUITests` cases described below; the control redesign replaced the
   rail-order case and added five cluster cases, and removing favouriting took the
   heart case with it. The framework, app and UI suites all ran on the same build.
@@ -89,7 +89,7 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
   bundle `.derivedData/final4.xcresult`.
 - The interrupted-session case runs on the device too:
   `testKillingTheAppMidSessionRestoresPositionMarksAndUndo` terminates the app
-  mid-flow, relaunches it, and checks that Continue sorting, the mark and Undo all
+  mid-flow, relaunches it, and checks that Resume, the mark and Undo all
   survive.
 - Two environmental preconditions, both previously recorded as blockers:
   * The device must be **unlocked**. A locked phone fails with
@@ -135,7 +135,7 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
   -only-testing:SWIPRUITests/PlaySessionUITests
 ```
 
-- Latest result (2026-09-22): **14 tests, 0 failures**, about 6 minutes. The
+- Latest result (2026-09-23): **16 tests, 0 failures**, about 7 minutes. The
   largest-text walk needs ~1.5 minutes of that.
 - `testPlayEveryScreenAtTheLargestAccessibilityTextSize` launches the app with
   `-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL`.
@@ -161,54 +161,58 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
     is an overlay on it.
 
 
-### The control redesign (2026-09-22, second round)
+### The control redesign (2026-09-23, third round)
 
-The viewer was redesigned after the owner used it on the phone:
+The viewer's controls were replaced again, following `docs/adr/0006`–`0009`:
 
 - Close is fixed in the top left, drawn at 34 pt inside a 44 pt tap region. The
-  heart and the Review entry share the top right, and the LIVE chip is centred
-  between them.
-- The five-control rail became a **cluster of three** (Trash, Undo, Checkmark)
-  inside a tray that the user holds and drags. It docks to the bottom (a row), the
-  left edge or the right edge (a column), slides continuously along that edge, and
-  is remembered. Settings gains **Reset control position**, and the cluster's
-  accessibility actions step the dock round the edges for anyone who cannot drag.
-- The preset list now decides only whether swipe gestures decide anything and
-  whether a tap keeps. `Extended` survives as a decoding alias for `Swipe` and is
-  no longer offered; order-on-the-rail is gone with the rail.
-- The drag wells read **Delete** and **Keep**. The review copy still says
-  "marked for deletion", because that is the screen where deletion is real.
+  Review entry shares the top strip, and the LIVE chip is centred between them.
+- The cluster of three (Trash, Undo, Checkmark) now sits at exactly **three fixed
+  positions** — a bottom row centred 20 pt above the bottom safe edge, and
+  columns centred at 75% of the safe-area height 20 pt inside the left and right
+  edges — stored as a three-way `ControlPosition`. The continuous position, the
+  rail and the anchor migration are gone.
+- It is moved by dragging a **three-dot grip** in the tray's leading end, in a
+  44 x 44 pt hit region. The grip lifts a translucent **puck** that follows the
+  finger one-to-one while the cluster stays put; the three positions appear as
+  phantom **slots** with the nearest highlighted; a release over a slot lands
+  there and a release over none changes nothing. Haptics fire on pickup, on slot
+  change and on landing.
+- The photo never resizes or shifts for the controls (`ADR-0006`): the lane
+  reservation is deleted and the fitted frame is asserted identical at all three
+  positions. Controls are drawn as translucent material over the photo.
+- Swipe gestures are always available and the buttons are an optional display
+  (`ADR-0009`): `Show buttons` hides the cluster and its grip, and the preset
+  list and `Tap to keep` are gone.
+- The three positions are reachable from Settings, from the drag, and from the
+  cluster's accessibility action, and survive a relaunch.
 
-Three things about the move gesture are easy to get wrong again:
+Two things about the move gesture are easy to get wrong again:
 
-- The move gesture lives on the **tray**, which is a sibling *behind* the three
-  controls, not on the container around them. A `.gesture` on the container was
-  never recognised at all (the hold left the cluster idle), and
-  `.simultaneousGesture` on it worked but swallowed the buttons' taps, so tapping
-  Trash stopped marking anything.
-- The move state is a **`@GestureState`**, which resets when a gesture ends *or is
-  cancelled*. With a plain `@State` an interrupted drag left the cluster stuck
-  reporting "Moving", scaled up, with its buttons refusing to work.
-- The accessibility frame of the cluster is whatever its children report, so the
-  tests grab the tray beside the first control rather than trusting a computed
-  edge, and both `dragCluster` helpers assert that frame is smaller than the
-  screen before dragging.
+- The grip is its **own view**, not the tray behind the buttons, and it carries a
+  plain `DragGesture(minimumDistance: 0)`. Attaching a gesture to a container
+  that holds `Button`s was never recognised; attaching it to the tray worked but
+  made the whole tray the handle, which is the design this replaces.
+- The drag is held in a **`@GestureState`**, which resets when a gesture ends *or
+  is cancelled*, so an interrupted drag can never leave a puck stranded.
+- The accessibility frame of the cluster is the union of its children, so both
+  `dragGrip` helpers assert that frame is smaller than the screen before
+  dragging.
 
-`SWIPRUITests` covers this with `testTheClusterDocksToEitherSideAndBecomesAColumn`,
-`testAPlainDragNeverMovesTheCluster` (a plain drag must not shove the buttons, and
-a move must not decide), `testADockedSideClusterDoesNotCoverThePhoto`,
-`testSwitchingPresetDoesNotMoveTheCluster` and
-`testCloseIsSmallInTheTopLeftCorner`. The play suite adds
-`testPlayEveryClusterDock`, which drags the cluster to all three edges and slides
-it along the bottom, checking at each stop that every control stays on screen,
-tappable, and clear of the top strip.
+`SWIPRUITests` covers this with `testTheGripMovesTheClusterToEachFixedPosition`,
+`testAReleaseAwayFromEverySlotChangesNothing`,
+`testAPlainSwipeNeverMovesTheCluster`,
+`testThePhotoFrameIsIdenticalAtEveryControlPosition`,
+`testTheClusterKeepsItsPlaceBetweenPhotos`, `testCloseIsSmallInTheTopLeftCorner`
+and `testShowButtonsToggleHidesAndRestoresTheCluster`. The play suite adds
+`testPlayEveryControlPosition`, which walks all three positions and checks at
+reach that every control stays on screen, tappable, and clear of the top strip.
 
-`SWIPRKitTests.ControlPreferencesTests` covers the storage: a legacy anchor or
-placement becomes a continuous position, an old `order` key is ignored rather
-than rejected, and a position is clamped to 0...1 (a non-finite one falls back to
-the centre). `SWIPRKitTests.SessionPersistenceTests` covers the version 3 state:
-a version 2 session holding a favourite undo entry still loads, with that entry
-treated as a keep.
+`SWIPRKitTests.ControlPreferencesTests` and `ControlClusterLayoutTests` cover the
+storage and geometry: an old three-way rail becomes the matching fixed stop, an
+unknown rail is still rejected, and the three centres, sizes, grip and slot hit
+testing match the spec. `SWIPRKitTests.SessionPersistenceTests` covers the
+version 3 state, including a version 2 session with a favourite undo entry.
 
 ## Screenshots
 
@@ -235,35 +239,25 @@ Attachments the suite produces, and what each one is for:
 
 | Attachment | Produced by | Shows |
 | --- | --- | --- |
-| `Viewer — complete photo, fixture step N` | `testViewerShowsWholePhotosWithoutCroppingOrOffscreenControls` | Portrait, landscape, square and panorama fixture with edge markers, alternating bright/dark |
-| `Partial left drag — below threshold` | `testPartialDragsShowFeedbackButDecideNothing` | Trash well below the threshold, photo following the finger |
-| `Partial right drag — below threshold` | same | Check well below the threshold |
-| `Left drag past threshold` | same | Armed trash well |
-| `Vertical drag — no decision` | `testVerticalDragDecidesNothing` | No well, no outcome |
-| `Tutorial — first photo, Swipe preset` | `testFirstPhotoTutorialExplainsAndReplaysFromSettings` | Tutorial copy and dismissal |
-| `Settings — How to use` | same | Settings entry that replays it |
+| `Viewer — complete photo, fixture step N` | `testViewerShowsWholePhotosWithoutCroppingOrOffscreenControls` | Landscape, portrait, square and panorama fixtures with edge markers (`viewer-01`–`04`) |
+| `Partial left drag — below threshold` / `Left drag past threshold` / `Partial right drag — below threshold` / `Vertical drag — no decision` | `testPartialDragsShowFeedbackButDecideNothing`, `testVerticalDragDecidesNothing` | The wells below and past the threshold, and no outcome on a vertical drag (`drag-01`–`04`) |
+| `Viewer — Live Photo labelled` | `testLivePhotosAreLabelledInTheViewer` | The "LIVE" chip in the top strip (`viewer-05`) |
+| `Tutorial — first photo` | `testFirstPhotoTutorialExplainsAndReplaysFromSettings` | The tutorial copy, including moving the buttons (`tutorial-first-photo`) |
+| `Settings — How to use` / `Settings — inline statistics` | same, `testStatisticsIsInlineAtTheTopOfSettings` | The replay entry, and the statistics block at the top of Settings (`settings-*.png`) |
 | `Save failure — Retry offered` | `testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession` | The visible save-failure banner and its Retry action |
-| `Viewer — Live Photo labelled` | `testLivePhotosAreLabelledInTheViewer` | The "LIVE" chip in the top strip, with symbol and word |
-| `Controls — fixture step 0…3` | `testControlRailDoesNotMoveBetweenPhotos` | The bottom cluster in the same place for every aspect ratio (`controls-01-bottom-cluster.png`) |
-| `Controls — docked to the right edge` | `testTheClusterDocksToEitherSideAndBecomesAColumn` | The cluster rotated to a column at the right edge, with the photo fitted beside its lane (`controls-02-right-edge-column.png`) |
-| `Controls — docked to the left edge` | same | The same column at the left edge (`controls-03-left-edge-column.png`) |
-| `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-04-close-top-left.png`) |
-| `Settings — statistics row` | `testStatisticsIsReachedFromSettings` | Statistics now inside Settings, reached from a row |
-| `Start Here — explanation, months, jump and sort` | `testStartHereExplainsItselfAndGroupsTheLibraryByMonth` | The explanation, month sections with sticky headers, the month menu and the order toggle |
-| `Start Here — oldest first` | same | The order toggle actually reversing the month sections |
-| `Start Here — jumped to a month` | `testStartHereCanJumpStraightToAMonth` | A month reached by the menu, far beyond one screen of scrolling |
-| `Play — cluster docked bottom / left / right`, `Play — cluster slid along the bottom edge` | `testPlayEveryClusterDock` | The cluster at each of the three docks and slid along the bottom, with a Live Photo badge and a Review entry in the top strip and every control clear of both (`play-cluster-*.png`) |
-| `Play — cluster dock after relaunch` | `testPlayPreferencesSurviveRelaunch` | The dock surviving a relaunch (`play-cluster-after-relaunch.png`) |
-| `Play — tap-to-keep preset` | `testPlayEachPresetDoesWhatSettingsPromises` | The preset that keeps on a tap and ignores drags (`play-tap-to-keep.png`) |
-| `Play — Start Here direction wording` | `testPlayTheDirectionChoiceMatchesWhereStartHereWalks` | Start Here naming the direction the user chose (`play-starthere-newer-first.png`) |
-| `Play — Start Here grid columns` | `testPlayStartHereCellsStayInTheirColumns` | Every cell one column wide, including the 4:1 panorama thumbnails (`play-starthere-grid-columns.png`) |
-| `Play — Start Here with a marked photo` | `testPlayStartHereRefusesToStartOnAMarkedPhoto` | The badged, dimmed cell that refuses to start a session (`play-starthere-marked.png`) |
-| `Play — home with an empty library` | `testPlayDeletingEverythingLeavesAnHonestEmptyApp` | Home after the whole library is deleted, with every photo-dependent entry disabled (`play-home-empty-library.png`) |
-| `Play — select mode with two marks chosen` / `Play — review emptied by restoring` | `testPlaySelectModeRestoresSeveralMarksAtOnce` | Select mode ticking individual cells — and the review grid's own columns — then the empty state after restoring them all (`play-review-select-mode.png`) |
-| `Play — statistics after two deletions` | `testPlayStatisticsCountConfirmedDeletionsOnly` | This-session and lifetime counts agreeing on 2 (`play-statistics-after-deletions.png`) |
-| `Play — unreadable saved progress` / `Play — saved progress from a newer version` | `testPlayUnreadableSavedProgressIsExplainedNotOverwritten`, `testPlaySavedProgressFromANewerVersionIsNotOverwritten` | The read-only banner and its Start fresh action |
-| `Play — discarded decision notice` | `testPlayAFailedSaveCanBeDiscarded` | The notice that says a discarded decision was left out |
-| `Play — <screen> at the largest text size` (8) | `testPlayEveryScreenAtTheLargestAccessibilityTextSize` | The app at AX5: home scrolling rather than clipping its footer (`play-home-ax5.png`), the tutorial scrolling with Got it pinned (`play-tutorial-ax5.png`), and the review and result screens readable (`play-review-ax5.png`) |
+| `Controls — bottom centre` / `left edge column` / `right edge column` | `testTheGripMovesTheClusterToEachFixedPosition`, `testPlayEveryControlPosition` | The cluster at each of the three fixed positions (`controls-bottom`, `controls-left-column`, `controls-right-column`) with the photo frame unchanged |
+| `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-close-top-left`) |
+| `Entry — nothing waiting` / `a session waiting` / `a session and marks waiting` | `testPlayEntryScreenInEveryState` | The three reachable entry states (`entry-01`–`03`) |
+| `Choose a photo — overview` / `oldest first` / `jumped to a month` | `testChoosePhotoExplainsItselfAndGroupsTheLibraryByMonth`, `testChoosePhotoCanJumpStraightToAMonth` | Explanation and traversals, oldest-first, and a jumped-to month (`choose-01`–`03`) |
+| `Play — cluster position after relaunch` | `testPlayPreferencesSurviveRelaunch` | The position surviving a relaunch (`play-cluster-after-relaunch`) |
+| `Play — buttons turned off` | `testPlayTurningTheButtonsOffKeepsSwipingWorking` | The viewer with the cluster and grip hidden (`play-buttons-off`) |
+| `Play — Choose a photo grid columns` / `with a marked photo` / `direction wording` | `testPlayChoosePhotoCellsStayInTheirColumns`, `testPlayChoosePhotoRefusesToStartOnAMarkedPhoto`, `testPlayTheDirectionChoiceMatchesWhereChooseAPhotoWalks` | The grid's columns, the badged cell that refuses a tap, and the direction wording (`play-choose-*`) |
+| `Play — home with an empty library` | `testPlayDeletingEverythingLeavesAnHonestEmptyApp` | Home after the whole library is deleted (`play-home-empty-library`) |
+| `Play — select mode with two marks chosen` / `review emptied by restoring` | `testPlaySelectModeRestoresSeveralMarksAtOnce` | Select mode, and the empty state after restoring every mark (`play-review-*`) |
+| `Play — statistics after two deletions` | `testPlayStatisticsCountConfirmedDeletionsOnly` | The inline lifetime count agreeing on 2 (`play-statistics-after-deletions`) |
+| `Play — unreadable saved progress` / `saved progress from a newer version` | `testPlayUnreadableSavedProgressIsExplainedNotOverwritten`, `testPlaySavedProgressFromANewerVersionIsNotOverwritten` | The read-only banner and its Start fresh action (`play-*-progress`) |
+| `Play — discarded decision notice` | `testPlayAFailedSaveCanBeDiscarded` | The notice that a discarded decision was left out |
+| `Play — <screen> at the largest text size` (7) | `testPlayEveryScreenAtTheLargestAccessibilityTextSize` | Entry, viewer, tutorial, review, result, Choose a photo and Settings at AX5 (`play-*-ax5`), with the stacking that keeps labels whole |
 
 Mid-gesture screenshots are taken while the drag is still held
 (`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` on a

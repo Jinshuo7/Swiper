@@ -43,7 +43,7 @@ final class AppModelTests: XCTestCase {
         let (model, _, store) = await bootstrapped()
         XCTAssertEqual(model.route, .entry)
 
-        model.startRecent()
+        model.startNewest()
         await model.settle()
 
         XCTAssertEqual(model.route, .viewer)
@@ -54,7 +54,7 @@ final class AppModelTests: XCTestCase {
 
     func testFailedSavePausesSortingAndKeepsTheDecisionRecoverable() async {
         let (model, _, store) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
 
         let before = model.currentAsset?.id
@@ -79,7 +79,7 @@ final class AppModelTests: XCTestCase {
 
     func testRetryAcknowledgesTheParkedDecisionExactlyOnce() async {
         let (model, _, store) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
 
@@ -104,7 +104,7 @@ final class AppModelTests: XCTestCase {
     /// retrying a parked save re-attempts the write and nothing else.
     func testRetrySavesTheParkedDecisionAgainAndTouchesNoPhotos() async {
         let (model, library, store) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
         let savesBefore = store.saveAttempts
@@ -133,7 +133,7 @@ final class AppModelTests: XCTestCase {
 
     func testASuccessfulDecisionIsSavedBeforeTheSessionAdvances() async {
         let (model, _, store) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let first = model.currentAsset?.id
 
@@ -148,7 +148,7 @@ final class AppModelTests: XCTestCase {
 
     func testDiscardingAParkedDecisionLeavesStoredStateUntouched() async {
         let (model, _, store) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let savedSession = store.state?.session
 
@@ -168,7 +168,7 @@ final class AppModelTests: XCTestCase {
     /// nor undoing may touch the library: nothing is deleted until review.
     func testMarkingThenUndoingInOneTurnLeavesTheLibraryAlone() async {
         let (model, library, _) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
 
@@ -189,7 +189,7 @@ final class AppModelTests: XCTestCase {
     func testRestartRestoresPositionAndUndoFromStoredState() async {
         let store = InMemorySessionStore()
         let first = await bootstrapped(store: store)
-        first.model.startRecent()
+        first.model.startNewest()
         await first.model.settle()
         first.model.apply(.queueDeletion)
         await first.model.settle()
@@ -215,7 +215,7 @@ final class AppModelTests: XCTestCase {
     func testUndoAfterRestartRemovesTheDurableMark() async {
         let store = InMemorySessionStore()
         let first = await bootstrapped(store: store)
-        first.model.startRecent()
+        first.model.startNewest()
         await first.model.settle()
         let marked = first.model.currentAsset?.id
         first.model.apply(.queueDeletion)
@@ -241,7 +241,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.isPersistenceReadOnly)
         XCTAssertNotNil(model.persistenceNotice)
 
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         XCTAssertEqual(model.route, .entry, "a blocked write must not open the viewer")
         XCTAssertNotNil(model.errorMessage)
@@ -257,7 +257,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(store.quarantined)
         XCTAssertFalse(model.isPersistenceReadOnly)
 
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         XCTAssertEqual(model.route, .viewer)
         XCTAssertFalse(store.savedStates.isEmpty)
@@ -270,7 +270,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.isPersistenceReadOnly)
         XCTAssertNotNil(model.persistenceNotice)
 
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         XCTAssertEqual(model.route, .entry)
         XCTAssertTrue(store.savedStates.isEmpty, "newer-version data must not be replaced")
@@ -303,7 +303,7 @@ final class AppModelTests: XCTestCase {
         let first = AppModel(library: library, store: store, defaults: isolatedDefaults())
         await first.bootstrap()
         await first.settle()
-        first.startRecent()
+        first.startNewest()
         await first.settle()
         first.apply(.keep)
         await first.settle()
@@ -321,7 +321,7 @@ final class AppModelTests: XCTestCase {
 
         // Middle: home is unambiguous about what can be resumed and reviewed.
         XCTAssertEqual(second.route, .entry)
-        XCTAssertNotNil(second.resumableSession, "the session must be offered as Continue sorting")
+        XCTAssertNotNil(second.resumableSession, "the session must be offered as Resume")
         XCTAssertEqual(second.markedIDs, marksAtKill, "marks survive the kill")
 
         second.resumeSession()
@@ -353,7 +353,7 @@ final class AppModelTests: XCTestCase {
     func testMarksSurviveSwitchingSortingMode() async {
         let store = InMemorySessionStore()
         let (model, _, _) = await bootstrapped(store: store)
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
         model.apply(.queueDeletion)
@@ -372,7 +372,7 @@ final class AppModelTests: XCTestCase {
     func testMarkedPhotosAreSkippedAfterRestart() async {
         let store = InMemorySessionStore()
         let first = await bootstrapped(store: store)
-        first.model.startRecent()
+        first.model.startNewest()
         await first.model.settle()
         let marked = first.model.currentAsset?.id
         first.model.apply(.queueDeletion)
@@ -400,7 +400,7 @@ final class AppModelTests: XCTestCase {
     func testAFinishedSessionKeepsItsMarksForLaterReview() async {
         let store = InMemorySessionStore()
         let (model, _, _) = await bootstrapped(store: store)
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
         model.apply(.queueDeletion)
@@ -421,7 +421,7 @@ final class AppModelTests: XCTestCase {
     func testRestoringFromHomeReviewUnmarksWithoutASession() async {
         let store = InMemorySessionStore()
         let (model, _, _) = await bootstrapped(store: store)
-        model.startRecent()
+        model.startNewest()
         await model.settle()
         let marked = model.currentAsset?.id
         model.apply(.queueDeletion)
@@ -440,7 +440,7 @@ final class AppModelTests: XCTestCase {
 
     func testLeaveReviewReturnsToWhereItWasOpenedFrom() async {
         let (model, _, _) = await bootstrapped()
-        model.startRecent()
+        model.startNewest()
         await model.settle()
 
         model.goToReview(from: .viewer)
@@ -458,7 +458,7 @@ final class AppModelTests: XCTestCase {
     func testStaleUndoCannotReapplyARestoredMark() async {
         let store = InMemorySessionStore()
         let first = await bootstrapped(store: store)
-        first.model.startRecent()
+        first.model.startNewest()
         await first.model.settle()
         let marked = first.model.currentAsset?.id
         first.model.apply(.queueDeletion)
@@ -507,7 +507,7 @@ final class AppModelTests: XCTestCase {
     private func markTwo(
         _ made: (model: AppModel, library: FakePhotoLibrary, store: InMemorySessionStore)
     ) async -> [String] {
-        made.model.startRecent()
+        made.model.startNewest()
         await made.model.settle()
         made.model.apply(.queueDeletion)
         await made.model.settle()
@@ -578,7 +578,7 @@ final class AppModelTests: XCTestCase {
         let library = FakePhotoLibrary.demo(count: 8)
         let store = InMemorySessionStore()
         let made = await bootstrapped(library: library, store: store)
-        made.model.startRecent()
+        made.model.startNewest()
         await made.model.settle()
         let deleted = made.model.currentAsset?.id
         made.model.apply(.queueDeletion)
@@ -616,7 +616,7 @@ final class AppModelTests: XCTestCase {
 
     func testResultContinuationReachesCompletionWithRemainingMarks() async {
         let made = await bootstrapped(library: FakePhotoLibrary.demo(count: 2))
-        made.model.startRecent()
+        made.model.startNewest()
         await made.model.settle()
         made.model.apply(.queueDeletion)
         await made.model.settle()
@@ -642,7 +642,7 @@ final class AppModelTests: XCTestCase {
 
     func testCloseLeavesEveryDecisionSaved() async {
         let made = await bootstrapped()
-        made.model.startRecent()
+        made.model.startNewest()
         await made.model.settle()
         let marked = made.model.currentAsset?.id
         made.model.apply(.queueDeletion)

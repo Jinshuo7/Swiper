@@ -1,68 +1,22 @@
+import CoreGraphics
 import Foundation
 
-/// The interaction styles the user can choose between.
+/// Where the three control buttons sit: one of exactly three fixed places,
+/// chosen by the user and remembered.
 ///
-/// Every preset keeps the same three controls on the rail: Trash, Undo and
-/// Checkmark. The preset decides only whether dragging the photo decides
-/// anything, because the buttons are always the non-gesture way to act.
-public enum ControlPreset: String, Codable, CaseIterable, Identifiable, Sendable {
-    /// Full-screen gestures: drag left to delete, drag right to keep. The three
-    /// rail controls work as well.
-    case swipe
-    /// Dragging decides nothing, so a stray swipe can never mark a photo.
-    case thumb
-    /// Like ``thumb``, and a tap on the photo keeps it.
-    case deleteOnly
-    /// The old name for ``swipe``. It is kept so saved preferences still decode,
-    /// and it is no longer offered in Settings.
-    case extended
-
-    public var id: String { rawValue }
-
-    /// The presets worth offering. `extended` became a synonym for `swipe` once
-    /// the rail's controls stopped varying by preset.
-    public static let selectable: [ControlPreset] = [.swipe, .thumb, .deleteOnly]
-
-    public var title: String {
-        switch self {
-        case .swipe, .extended: return "Swipe"
-        case .thumb: return "Buttons only"
-        case .deleteOnly: return "Tap to keep"
-        }
-    }
-
-    public var subtitle: String {
-        switch self {
-        case .swipe, .extended:
-            return "Drag left to delete or right to keep. The three controls work too."
-        case .thumb:
-            return "Dragging decides nothing, so a stray swipe can never mark a photo."
-        case .deleteOnly:
-            return "Dragging decides nothing, and tapping the photo keeps it."
-        }
-    }
-
-    /// Whether a horizontal drag on the photo decides keep or delete.
-    public var usesSwipeGestures: Bool { self == .swipe || self == .extended }
-
-    /// Whether tapping the photo is also a way to keep it.
-    public var tapToKeep: Bool { self == .deleteOnly }
-}
-
-/// Which edge the three controls dock to.
-///
-/// The user picks it by dragging the cluster: dropping it against the left or
-/// right edge docks it there as a column, and anywhere else docks it along the
-/// bottom as a row. The edge and the position along it are remembered.
-public enum ControlRail: String, Codable, CaseIterable, Identifiable, Sendable {
-    /// A horizontal row along the bottom edge.
+/// Free placement along an edge is gone (`docs/adr/0007-three-fixed-control-
+/// positions.md`). The three stops make the destinations knowable before a move
+/// starts and remove the accidental moves a continuous position produced.
+public enum ControlPosition: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// A row centred on the screen width, near the bottom edge.
     case bottom
-    /// A vertical column down the left edge.
+    /// A column down the left edge, centred in the lower half.
     case leading
-    /// A vertical column down the right edge.
+    /// A column down the right edge, centred in the lower half.
     case trailing
 
     public var id: String { rawValue }
+
     public var isVertical: Bool { self != .bottom }
 
     /// Spoken name, used by the cluster's accessibility value.
@@ -73,97 +27,174 @@ public enum ControlRail: String, Codable, CaseIterable, Identifiable, Sendable {
         case .trailing: return "right edge"
         }
     }
+
+    /// The next stop when stepping without a drag, for the accessibility action.
+    public var next: ControlPosition {
+        switch self {
+        case .bottom: return .leading
+        case .leading: return .trailing
+        case .trailing: return .bottom
+        }
+    }
 }
 
 /// The user's persisted interaction preferences.
 public struct ControlPreferences: Codable, Equatable, Sendable {
-    public var preset: ControlPreset
-    /// Which edge the controls dock to.
-    public var rail: ControlRail
-    /// How far along that edge the cluster sits: 0 at the start end (the left of
-    /// a bottom row, the top of a column), 1 at the end, 0.5 centred. The user
-    /// sets it by dragging the cluster, so it is continuous rather than one of
-    /// three stops, and it is clamped whenever it is read or written.
-    public var position: Double
-    /// Direction a new session starts in. SWIPR always starts out toward
-    /// older photos; the user can change this and it is remembered.
+    /// Which of the three fixed places the cluster sits in.
+    public var position: ControlPosition
+    /// Whether the three buttons and their grip are drawn at all. Swipe gestures
+    /// are always available either way (`docs/adr/0009-swipe-always-buttons-
+    /// optional.md`).
+    public var showButtons: Bool
+    /// Direction a new session starts in. The user can change this and it is
+    /// remembered.
     public var defaultDirection: TraversalDirection
 
     public init(
-        preset: ControlPreset = .swipe,
-        rail: ControlRail = .bottom,
-        position: Double = 0.5,
+        position: ControlPosition = .bottom,
+        showButtons: Bool = true,
         defaultDirection: TraversalDirection = .older
     ) {
-        self.preset = preset
-        self.rail = rail
-        self.position = ControlPreferences.clamped(position)
+        self.position = position
+        self.showButtons = showButtons
         self.defaultDirection = defaultDirection
     }
 
     public static let `default` = ControlPreferences()
 
-    /// Keeps a dragged or decoded position usable: finite, and inside 0...1.
-    public static func clamped(_ position: Double) -> Double {
-        guard position.isFinite else { return 0.5 }
-        return min(max(position, 0), 1)
-    }
-
-    // MARK: - Storage
-
-    /// The three-way horizontal placement written before the rail existed. It is
-    /// kept only so an existing choice carries over instead of being reset.
-    private enum LegacyPlacement: String, Codable {
-        case left
-        case center
-        case right
-    }
-
-    /// The three stops the rail used before the cluster could be dragged.
-    private enum LegacyAnchor: String, Codable {
-        case start
-        case center
-        case end
-    }
-
     private enum CodingKeys: String, CodingKey {
-        case preset
-        case rail
         case position
+        case showButtons
         case defaultDirection
-        case placement
+        // Written by older builds. Read so a stored choice is not thrown away;
+        // nothing writes them.
+        case rail
+        case preset
         case anchor
+        case placement
+        case order
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        preset = try container.decodeIfPresent(ControlPreset.self, forKey: .preset) ?? .swipe
         defaultDirection = try container.decodeIfPresent(TraversalDirection.self, forKey: .defaultDirection) ?? .older
-        rail = try container.decodeIfPresent(ControlRail.self, forKey: .rail) ?? .bottom
+        showButtons = try container.decodeIfPresent(Bool.self, forKey: .showButtons) ?? true
 
-        if let storedPosition = try container.decodeIfPresent(Double.self, forKey: .position) {
-            position = ControlPreferences.clamped(storedPosition)
-        } else if let anchor = try container.decodeIfPresent(LegacyAnchor.self, forKey: .anchor) {
-            // An older choice of one of three stops becomes a continuous position.
-            position = ControlPreferences.legacyPosition(start: anchor == .start, end: anchor == .end)
-        } else if let placement = try container.decodeIfPresent(LegacyPlacement.self, forKey: .placement) {
-            position = ControlPreferences.legacyPosition(start: placement == .left, end: placement == .right)
+        if let stored = try? container.decode(ControlPosition.self, forKey: .position) {
+            position = stored
+        } else if container.contains(.rail) {
+            // Older payloads stored the same three-way choice under `rail`, with
+            // a continuous `position` number that no longer exists. The rail is
+            // already the fixed stop, so the number is simply dropped. An
+            // unrecognised rail still throws, so a corrupt file is never guessed
+            // at.
+            position = try container.decode(ControlPosition.self, forKey: .rail)
         } else {
-            position = 0.5
+            position = .bottom
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(preset, forKey: .preset)
-        try container.encode(rail, forKey: .rail)
         try container.encode(position, forKey: .position)
+        try container.encode(showButtons, forKey: .showButtons)
         try container.encode(defaultDirection, forKey: .defaultDirection)
     }
+}
 
-    private static func legacyPosition(start: Bool, end: Bool) -> Double {
-        if start { return 0 }
-        if end { return 1 }
-        return 0.5
+/// Pure geometry for the control cluster: how big it is, where its centre sits
+/// at each of the three fixed positions, and where its grip starts a drag.
+///
+/// Kept in the framework rather than only inside the SwiftUI view so the
+/// geometry the spec pins down is directly testable on macOS.
+public enum ControlClusterLayout {
+    public static let controlSize: CGFloat = 56
+    public static let controlSpacing: CGFloat = 14
+    public static let trayInset: CGFloat = 16
+    /// The grip's hit region. The drawn three dots are much smaller; this is the
+    /// area that can be grabbed.
+    public static let gripHitSize: CGFloat = 44
+    /// How far the cluster stays from the safe-area edge.
+    public static let edgeMargin: CGFloat = 20
+    /// Columns are centred at this fraction of the safe-area height.
+    public static let columnHeightFraction: CGFloat = 0.75
+
+    // Motion values, here so a test can assert the bounce ceiling the spec sets.
+    public static let landingBounce: Double = 0.12
+    public static let landingDuration: Double = 0.32
+    public static let reduceMotionDuration: Double = 0.16
+
+    /// The cluster's size, including the tray's padding and the grip's slot.
+    ///
+    /// The short axis is 88 pt, as the spec pins it. The long axis grew past the
+    /// spec's 228 pt once the grip moved into the tray's leading end; the 228
+    /// described the three buttons alone, and is no longer the number the three
+    /// positions depend on.
+    public static func clusterSize(for position: ControlPosition) -> CGSize {
+        let controls = controlSize * 3 + controlSpacing * 2
+        let long = trayInset * 2 + gripHitSize + controlSpacing + controls
+        let short = trayInset * 2 + controlSize
+        return position.isVertical
+            ? CGSize(width: short, height: long)
+            : CGSize(width: long, height: short)
+    }
+
+    /// The cluster's centre in a safe area of `size`.
+    public static func centre(for position: ControlPosition, in size: CGSize) -> CGPoint {
+        let cluster = clusterSize(for: position)
+        switch position {
+        case .bottom:
+            return CGPoint(x: size.width / 2, y: size.height - edgeMargin - cluster.height / 2)
+        case .leading:
+            return CGPoint(x: edgeMargin + cluster.width / 2, y: size.height * columnHeightFraction)
+        case .trailing:
+            return CGPoint(x: size.width - edgeMargin - cluster.width / 2, y: size.height * columnHeightFraction)
+        }
+    }
+
+    /// Where the grip sits for a given cluster position: the leading end of the
+    /// tray in both orientations. A drag starts here, and the puck then follows
+    /// the finger from this point.
+    public static func gripCentre(for position: ControlPosition, in size: CGSize) -> CGPoint {
+        let cluster = clusterSize(for: position)
+        let centre = centre(for: position, in: size)
+        let half = (position.isVertical ? cluster.height : cluster.width) / 2
+        let offset = half - trayInset - gripHitSize / 2
+        return position.isVertical
+            ? CGPoint(x: centre.x, y: centre.y - offset)
+            : CGPoint(x: centre.x - offset, y: centre.y)
+    }
+
+    /// The rectangular area a slot occupies.
+    public static func slotRect(for position: ControlPosition, in size: CGSize) -> CGRect {
+        let cluster = clusterSize(for: position)
+        let centre = centre(for: position, in: size)
+        return CGRect(
+            x: centre.x - cluster.width / 2,
+            y: centre.y - cluster.height / 2,
+            width: cluster.width,
+            height: cluster.height
+        )
+    }
+
+    /// The slot a puck released at `point` lands in, or `nil` when it is over
+    /// none and the release must change nothing. When more than one slot
+    /// contains the point, the nearest centre wins.
+    public static func slot(
+        at point: CGPoint,
+        in size: CGSize,
+        inflation: CGFloat = 20
+    ) -> ControlPosition? {
+        var best: (position: ControlPosition, distance: CGFloat)?
+        for position in ControlPosition.allCases {
+            let rect = slotRect(for: position, in: size).insetBy(dx: -inflation, dy: -inflation)
+            guard rect.contains(point) else { continue }
+            let centre = centre(for: position, in: size)
+            let distance = hypot(point.x - centre.x, point.y - centre.y)
+            if best == nil || distance < best!.distance {
+                best = (position, distance)
+            }
+        }
+        return best?.position
     }
 }

@@ -11,55 +11,39 @@ struct ViewerView: View {
     @State private var cachedIDs: [String] = []
     @State private var haptics = UIImpactFeedbackGenerator(style: .light)
 
-    /// Where the move gesture is: idle, lifted and held, or following the finger.
+    /// Where the grip drag is: how far the finger has moved from the grip.
     ///
     /// This is a `@GestureState` on purpose. A gesture state resets itself when
-    /// the gesture ends *or is cancelled*, so a drag that is interrupted can
-    /// never leave the cluster stuck in the air with its buttons refusing to
-    /// work.
-    @GestureState private var clusterMove = ClusterMove.idle
-    @State private var didSendLiftHaptic = false
-    /// Set for a moment after a drop, so the control that was under the finger
-    /// cannot deliver its action as the touch ends.
-    @State private var isSettlingAfterMove = false
-    @State private var moveHaptics = UIImpactFeedbackGenerator(style: .medium)
+    /// the gesture ends *or is cancelled*, so an interrupted drag can never
+    /// leave a puck stranded or the cluster half-moved.
+    @GestureState private var gripMove = GripMove.idle
+    /// The slot the puck is over, or nil when it is over none.
+    @State private var highlightedSlot: ControlPosition?
+    /// One lift haptic per drag.
+    @State private var didLift = false
 
-    private enum ClusterMove: Equatable {
-        case idle
-        case lifting
-        case dragging(CGSize)
+    private let liftHaptics = UIImpactFeedbackGenerator(style: .light)
+    private let slotHaptics = UIImpactFeedbackGenerator(style: .light)
+    private let landingHaptics = UIImpactFeedbackGenerator(style: .rigid)
 
-        var isActive: Bool { self != .idle }
-
-        var translation: CGSize {
-            if case .dragging(let translation) = self { return translation }
-            return .zero
-        }
+    private struct GripMove: Equatable {
+        var translation: CGSize = .zero
+        /// The puck appears once the drag has passed a few points, matching the
+        /// drag-image rule.
+        static let liftThreshold: CGFloat = 3
+        var isActive: Bool { hypot(translation.width, translation.height) > Self.liftThreshold }
+        static let idle = GripMove()
     }
 
-    private var isMovingControls: Bool { clusterMove.isActive || isSettlingAfterMove }
-
     /// The cluster fades a little after a few quiet seconds, and comes back on
-    /// the next touch. It never hides: the buttons are the non-gesture way to
-    /// decide, so they have to stay findable.
+    /// the next touch. It never hides while buttons are shown: the buttons are
+    /// the non-gesture way to decide, so they have to stay findable.
     @State private var isClusterIdle = false
     /// Bumped by anything the user does, to restart the idle countdown.
     @State private var activityToken = 0
 
     /// How far the photo has to travel horizontally before releasing decides.
     private let commitThreshold: CGFloat = 90
-
-    /// The controls, the tray behind them that is held to move the cluster, and
-    /// the margin the tray keeps from the screen edges.
-    private let controlSize: CGFloat = 56
-    private let controlSpacing: CGFloat = 14
-    private let trayInset: CGFloat = 16
-    private let clusterMargin: CGFloat = 20
-    /// The cluster never reaches into the top strip, whatever edge it is docked
-    /// to, so Close, the Live Photo badge and Review stay reachable.
-    private let topStripClearance: CGFloat = 54
-
-    private var preset: ControlPreset { model.preferences.preset }
 
     var body: some View {
         GeometryReader { geometry in
@@ -72,12 +56,8 @@ struct ViewerView: View {
                             width: fittedSize(for: asset, in: geometry).width,
                             height: fittedSize(for: asset, in: geometry).height
                         )
-                        .offset(x: photoLaneOffset)
                         .id(asset.id)
-                        .gesture(swipeGesture, including: preset.usesSwipeGestures ? .all : .none)
-                        .onTapGesture {
-                            if preset.tapToKeep { model.apply(.keep) }
-                        }
+                        .gesture(swipeGesture)
                         .allowsHitTesting(!model.isDecisionInputBlocked)
                         .accessibilityIdentifier("viewer.photo")
                         .accessibilityLabel(accessibilityDescription(for: asset))
@@ -93,6 +73,8 @@ struct ViewerView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
             .overlay { dragFeedback }
             .overlay(alignment: .top) { topBar }
+            .overlay { controlSlots(in: geometry.size) }
+            .overlay { puck(in: geometry.size) }
             .overlay(alignment: .topLeading) { controlCluster(in: geometry.size) }
             .task(id: activityToken) { await fadeClusterWhenIdle() }
         }
@@ -124,26 +106,10 @@ struct ViewerView: View {
     /// The overlays stay inside `geometry` (the safe area) so controls are
     /// always reachable.
     private func canvasSize(in geometry: GeometryProxy) -> CGSize {
-        let full = CGSize(
-            width: geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing,
-            height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+        CGSize(
+            width: max(1, geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing),
+            height: max(1, geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom)
         )
-        return CGSize(width: max(1, full.width - railLaneWidth), height: full.height)
-    }
-
-    /// Width reserved for a side-docked cluster, so the photo is fitted *beside*
-    /// it rather than running underneath the controls. A control sitting on a
-    /// busy photo is the "half-buried" feel this design exists to remove.
-    private var railLaneWidth: CGFloat { model.preferences.rail.isVertical ? 88 : 0 }
-
-    /// How far the photo shifts to stay centred in the area the cluster leaves
-    /// free.
-    private var photoLaneOffset: CGFloat {
-        switch model.preferences.rail {
-        case .bottom: return 0
-        case .leading: return railLaneWidth / 2
-        case .trailing: return -railLaneWidth / 2
-        }
     }
 
     private func fittedSize(for asset: AssetDescriptor, in geometry: GeometryProxy) -> CGSize {
@@ -379,84 +345,46 @@ struct ViewerView: View {
         }
     }
 
-    // MARK: - The movable control cluster
+    // MARK: - The control cluster
 
-    /// How long the three controls are end to end, and how big the tray behind
-    /// them is. The tray is what is held to move the cluster, so it is part of
-    /// every measurement: nothing may push it off the screen.
-    private var clusterLength: CGFloat { controlSize * 3 + controlSpacing * 2 }
-
-    private var buttonsSize: CGSize {
-        model.preferences.rail.isVertical
-            ? CGSize(width: controlSize, height: clusterLength)
-            : CGSize(width: clusterLength, height: controlSize)
-    }
-
-    private var clusterSize: CGSize {
-        CGSize(
-            width: buttonsSize.width + trayInset * 2,
-            height: buttonsSize.height + trayInset * 2
-        )
-    }
-
-    /// Where the cluster's centre sits for the current dock and position, before
-    /// any in-progress drag. Everything is clamped inside the safe area and
-    /// below the top strip, so no drop can leave a control unreachable.
-    private func clusterCentre(in size: CGSize) -> CGPoint {
-        let half = model.preferences.rail.isVertical ? clusterSize.height / 2 : clusterSize.width / 2
-        let position = ControlPreferences.clamped(model.preferences.position)
-
-        switch model.preferences.rail {
-        case .bottom:
-            let travel = max(0, size.width - clusterSize.width - clusterMargin * 2)
-            return CGPoint(
-                x: clusterMargin + half + travel * position,
-                y: size.height - clusterMargin - clusterSize.height / 2
-            )
-        case .leading, .trailing:
-            let top = topStripClearance + clusterMargin
-            let travel = max(0, size.height - top - clusterMargin - clusterSize.height)
-            return CGPoint(
-                x: model.preferences.rail == .leading
-                    ? clusterMargin + clusterSize.width / 2
-                    : size.width - clusterMargin - clusterSize.width / 2,
-                y: top + half + travel * position
-            )
+    /// The cluster, at its remembered position. It no longer follows a drag: the
+    /// grip lifts a separate puck and only the landing moves the cluster, so a
+    /// move is never mistaken for a decision and the buttons never travel under
+    /// a wandering finger.
+    @ViewBuilder
+    private func controlCluster(in size: CGSize) -> some View {
+        if model.preferences.showButtons {
+            clusterBody(in: size)
         }
     }
 
-    /// The cluster, at its remembered place, following the finger while it is
-    /// being moved.
-    ///
-    /// The tray is the handle. A plain `Button` claims the touches that land on
-    /// it, so a hold on one of the three controls cannot move the cluster; the
-    /// tray around and between them can, and drawing it makes the thing that
-    /// moves obvious instead of leaving the grab area invisible.
-    private func controlCluster(in size: CGSize) -> some View {
-        let centre = clusterCentre(in: size)
-        let trayRadius = controlSize / 2 + trayInset
+    private func clusterBody(in size: CGSize) -> some View {
+        let position = model.preferences.position
+        let cluster = ControlClusterLayout.clusterSize(for: position)
+        let centre = ControlClusterLayout.centre(for: position, in: size)
+        let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+
         return ZStack {
-            // The tray carries the move gesture itself, rather than the container
-            // around the buttons. It sits behind the controls, so it cannot
-            // interfere with their taps, and the ring and gaps between them are
-            // its own hit area.
-            RoundedRectangle(cornerRadius: trayRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: trayRadius, style: .continuous)
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 1)
                 )
-                .contentShape(RoundedRectangle(cornerRadius: trayRadius, style: .continuous))
-                .gesture(moveControlsGesture(in: size))
-            if model.preferences.rail.isVertical {
-                VStack(spacing: controlSpacing) { clusterControls }
+            if position.isVertical {
+                VStack(spacing: ControlClusterLayout.controlSpacing) {
+                    grip(in: size)
+                    clusterControls
+                }
             } else {
-                HStack(spacing: controlSpacing) { clusterControls }
+                HStack(spacing: ControlClusterLayout.controlSpacing) {
+                    grip(in: size)
+                    clusterControls
+                }
             }
         }
-        .frame(width: clusterSize.width, height: clusterSize.height)
-        .opacity(isClusterIdle && !isMovingControls ? 0.55 : 1)
-        .scaleEffect(isMovingControls ? 1.06 : 1)
+        .frame(width: cluster.width, height: cluster.height)
+        .opacity(isClusterIdle && !gripMove.isActive ? 0.55 : 1)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
         // The accessibility element has to be the cluster itself. Applying these
         // after `.position` would report the whole screen instead, because
@@ -464,21 +392,27 @@ struct ViewerView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("viewer.cluster")
         .accessibilityLabel("Photo controls")
-        .accessibilityValue(
-            isMovingControls
-                ? "Moving, docked \(model.preferences.rail.title)"
-                : "Docked \(model.preferences.rail.title)"
-        )
-        // A drag is not available to everyone, so the dock can also be stepped
-        // through without one.
-        .accessibilityAction(named: "Move to the next edge") { cycleControlEdge() }
+        .accessibilityValue(gripMove.isActive ? "Moving controls" : "Docked \(position.title)")
+        // A drag is not available to everyone, so the position can also be
+        // stepped through without one.
+        .accessibilityAction(named: "Move to the next position") { cycleControlPosition() }
         // Offset from the top-leading corner rather than `.position`: `.position`
         // wraps the view in a full-screen container, which both mis-reports the
         // cluster's frame and stopped its gesture from ever being recognised.
-        .offset(
-            x: centre.x + clusterMove.translation.width - clusterSize.width / 2,
-            y: centre.y + clusterMove.translation.height - clusterSize.height / 2
-        )
+        .offset(x: centre.x - cluster.width / 2, y: centre.y - cluster.height / 2)
+    }
+
+    /// The three-dot handle. Dragging it is the only way to move the cluster, so
+    /// a swipe on the photo can never shove the buttons around.
+    private func grip(in size: CGSize) -> some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.75))
+            .frame(width: ControlClusterLayout.gripHitSize, height: ControlClusterLayout.gripHitSize)
+            .contentShape(Rectangle())
+            .gesture(moveGesture(in: size))
+            .accessibilityLabel("Move controls")
+            .accessibilityIdentifier("viewer.grip")
     }
 
     @ViewBuilder
@@ -496,9 +430,9 @@ struct ViewerView: View {
 
     /// A control press counts as activity, so a tap after the cluster has faded
     /// both does its job and brings the cluster back to full strength. It is
-    /// refused while the cluster is being moved: a move must never decide.
+    /// refused while the grip is being dragged: a move must never decide.
     private func clusterAction(_ action: () -> Void) {
-        guard !isMovingControls else { return }
+        guard !gripMove.isActive else { return }
         activityToken += 1
         haptics.impactOccurred()
         action()
@@ -511,93 +445,122 @@ struct ViewerView: View {
         isClusterIdle = true
     }
 
-    /// Hold the cluster's tray, then drag: it lifts, follows the finger, and
-    /// docks to the nearest of the bottom, left and right edges when released. A
-    /// plain drag never moves it, so swiping can never shove the buttons around.
-    private func moveControlsGesture(in size: CGSize) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.45)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .updating($clusterMove) { value, state, _ in
-                switch value {
-                case .first(true):
-                    state = .lifting
-                case .second(true, let drag):
-                    state = .dragging(drag?.translation ?? .zero)
-                default:
-                    state = .idle
+    /// The three phantom slots, shown only while the puck is in the air. The
+    /// nearest one to the puck is highlighted; releasing over it lands there.
+    @ViewBuilder
+    private func controlSlots(in size: CGSize) -> some View {
+        if model.preferences.showButtons && gripMove.isActive {
+            ZStack {
+                ForEach(ControlPosition.allCases) { position in
+                    let cluster = ControlClusterLayout.clusterSize(for: position)
+                    let centre = ControlClusterLayout.centre(for: position, in: size)
+                    let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color.white.opacity(highlightedSlot == position ? 0.12 : 0.04))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .stroke(
+                                    Color.white.opacity(highlightedSlot == position ? 0.95 : 0.28),
+                                    lineWidth: highlightedSlot == position ? 3 : 1
+                                )
+                        )
+                        .frame(width: cluster.width, height: cluster.height)
+                        .position(centre)
                 }
             }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// The translucent circle the grip becomes while it is dragged. It tracks
+    /// the finger one-to-one and carries no animation of its own.
+    @ViewBuilder
+    private func puck(in size: CGSize) -> some View {
+        if model.preferences.showButtons && gripMove.isActive {
+            let origin = ControlClusterLayout.gripCentre(for: model.preferences.position, in: size)
+            let centre = CGPoint(
+                x: origin.x + gripMove.translation.width,
+                y: origin.y + gripMove.translation.height
+            )
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1))
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .frame(width: ControlClusterLayout.controlSize, height: ControlClusterLayout.controlSize)
+            .position(centre)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// Drag the grip: a puck lifts and follows the finger, the three slots
+    /// appear, and releasing over one moves the cluster there. Releasing over no
+    /// slot, or cancelling, changes nothing.
+    private func moveGesture(in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .updating($gripMove) { value, state, _ in
+                state = GripMove(translation: value.translation)
+            }
             .onChanged { value in
-                guard case .first(true) = value, !didSendLiftHaptic else { return }
-                didSendLiftHaptic = true
-                activityToken += 1
-                moveHaptics.impactOccurred()
+                let move = GripMove(translation: value.translation)
+                guard move.isActive else { return }
+                if !didLift {
+                    didLift = true
+                    activityToken += 1
+                    liftHaptics.impactOccurred()
+                }
+                let target = targetSlot(for: move, in: size)
+                if target != highlightedSlot {
+                    highlightedSlot = target
+                    if target != nil { slotHaptics.impactOccurred() }
+                }
             }
             .onEnded { value in
-                guard case .second(true, let drag) = value else { return }
-                finishMovingControls(in: size, translation: drag?.translation ?? .zero)
+                let move = GripMove(translation: value.translation)
+                let target = targetSlot(for: move, in: size)
+                highlightedSlot = nil
+                didLift = false
+                guard let target else { return }
+                if target != model.preferences.position {
+                    var preferences = model.preferences
+                    preferences.position = target
+                    withAnimation(landingAnimation) {
+                        model.updatePreferences(preferences)
+                    }
+                }
+                activityToken += 1
+                landingHaptics.impactOccurred()
             }
     }
 
-    private func finishMovingControls(in size: CGSize, translation: CGSize) {
-        let centre = clusterCentre(in: size)
-        let dropped = CGPoint(
-            x: centre.x + translation.width,
-            y: centre.y + translation.height
+    /// The slot a puck currently over would land in, or nil when it is over
+    /// none.
+    private func targetSlot(for move: GripMove, in size: CGSize) -> ControlPosition? {
+        let origin = ControlClusterLayout.gripCentre(for: model.preferences.position, in: size)
+        let point = CGPoint(
+            x: origin.x + move.translation.width,
+            y: origin.y + move.translation.height
         )
-        let (rail, position) = dock(for: dropped, in: size)
-
-        var preferences = model.preferences
-        preferences.rail = rail
-        preferences.position = position
-        model.updatePreferences(preferences)
-
-        didSendLiftHaptic = false
-        activityToken += 1
-        // Settle for a moment before the buttons can decide again. A control
-        // under the finger can deliver its action as the touch ends, and moving
-        // the cluster must never keep or delete a photo.
-        isSettlingAfterMove = true
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            isSettlingAfterMove = false
-        }
+        return ControlClusterLayout.slot(at: point, in: size)
     }
 
-    /// The edge a dropped cluster lands on: whichever of the three edges its
-    /// centre is nearest, so the lower left corner ties between the bottom and
-    /// the left edge and either is a fair answer.
-    private func dock(for centre: CGPoint, in size: CGSize) -> (ControlRail, Double) {
-        let distances: [(rail: ControlRail, distance: CGFloat)] = [
-            (.leading, centre.x),
-            (.trailing, size.width - centre.x),
-            (.bottom, size.height - centre.y),
-        ]
-        let rail = distances.min { $0.distance < $1.distance }?.rail ?? .bottom
-        let half = rail.isVertical ? clusterSize.height / 2 : clusterSize.width / 2
-
-        switch rail {
-        case .bottom:
-            let travel = max(1, size.width - clusterSize.width - clusterMargin * 2)
-            let raw = (centre.x - clusterMargin - half) / travel
-            return (.bottom, ControlPreferences.clamped(raw))
-        case .leading, .trailing:
-            let top = topStripClearance + clusterMargin
-            let travel = max(1, size.height - top - clusterMargin - clusterSize.height)
-            let raw = (centre.y - top - half) / travel
-            return (rail, ControlPreferences.clamped(raw))
-        }
+    /// The landing is the only animated part of a move; the tracked puck is
+    /// always exactly under the finger. Reduce Motion tightens it.
+    private var landingAnimation: Animation {
+        reduceMotion
+            ? .easeOut(duration: ControlClusterLayout.reduceMotionDuration)
+            : .spring(duration: ControlClusterLayout.landingDuration, bounce: ControlClusterLayout.landingBounce)
     }
 
-    /// Steps the dock round the three edges, for anyone who cannot drag.
-    private func cycleControlEdge() {
+    /// Steps the position round the three stops, for anyone who cannot drag.
+    private func cycleControlPosition() {
         var preferences = model.preferences
-        switch preferences.rail {
-        case .bottom: preferences.rail = .leading
-        case .leading: preferences.rail = .trailing
-        case .trailing: preferences.rail = .bottom
-        }
-        if !preferences.rail.isVertical { preferences.position = 0.5 }
+        preferences.position = preferences.position.next
         model.updatePreferences(preferences)
     }
 

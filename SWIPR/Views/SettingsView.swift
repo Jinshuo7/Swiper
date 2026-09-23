@@ -3,50 +3,38 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    settingSection(title: "Interaction") {
-                        ForEach(ControlPreset.selectable) { preset in
-                            presetRow(preset)
-                        }
-                        Text("Trash, Undo and Checkmark are always on the photo.")
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.top, 6)
-                    }
+                    statisticsSection
 
                     settingSection(title: "Controls") {
+                        toggleRow(
+                            title: "Show buttons",
+                            subtitle: "Trash, Undo and Checkmark on the photo. Turning them off leaves swiping fully available.",
+                            isOn: showButtonsBinding,
+                            identifier: "settings.showButtons"
+                        )
+                        positionChoices
                         buttonRow(
                             systemImage: "hand.draw",
                             title: "Reset control position",
-                            subtitle: "Docked to the \(model.preferences.rail.title) edge. Brings the three buttons back to the bottom centre.",
+                            subtitle: "Brings the three buttons back to the bottom centre.",
                             identifier: "settings.resetControls"
                         ) {
                             var preferences = model.preferences
-                            preferences.rail = .bottom
-                            preferences.position = 0.5
+                            preferences.position = .bottom
                             model.updatePreferences(preferences)
                         }
-                        Text("Touch and hold the buttons on a photo to move them. They dock to the bottom, left or right edge, and SWIPR remembers where you put them.")
+                        Text("Swipe gestures are always available: drag left to delete or right to keep. Drag the three dots on the buttons to move them to the bottom, left or right edge — the photo never moves.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
-                    }
-
-                    settingSection(title: "Statistics") {
-                        buttonRow(
-                            systemImage: "chart.pie",
-                            title: "Deletion statistics",
-                            subtitle: "Confirmed deletions and estimated storage reclaimed.",
-                            identifier: "settings.statistics"
-                        ) {
-                            model.route = .statistics
-                        }
                     }
 
                     settingSection(title: "Help") {
@@ -67,7 +55,7 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.segmented)
                         .accessibilityIdentifier("settings.direction")
-                        Text("Start Here walks in this direction, and SWIPR remembers it. Recent always begins at the newest photo.")
+                        Text("Choose a photo walks in this direction, and SWIPR remembers it. Newest always begins at the newest photo.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                     }
@@ -98,20 +86,101 @@ struct SettingsView: View {
         .padding(.top, 6)
     }
 
-    private func presetRow(_ preset: ControlPreset) -> some View {
-        Button {
+    // MARK: - Statistics
+
+    /// Read-only, inline at the top, with no chevron: what the user has cleared
+    /// is the first thing Settings should say, not something hidden behind a
+    /// row.
+    private var statisticsSection: some View {
+        settingSection(title: "Statistics", titleIdentifier: "settings.statistics") {
+            statisticsRow(
+                title: "Photos deleted",
+                value: "\(model.statistics.lifetimeDeletedCount)",
+                identifier: "settings.statistics.lifetimeDeleted"
+            )
+            statisticsRow(
+                title: "Storage reclaimed",
+                value: "≈ \(ByteFormatter.string(fromBytes: model.statistics.lifetimeReclaimedBytes))",
+                identifier: "settings.statistics.lifetimeReclaimed"
+            )
+            statisticsRow(
+                title: "Sessions completed",
+                value: "\(model.statistics.lifetimeCompletedSessions)",
+                identifier: "settings.statistics.sessions"
+            )
+            if model.resumableSession != nil {
+                statisticsRow(
+                    title: "This session",
+                    value: "\(model.statistics.currentSessionDeletedCount) deleted · ≈ \(ByteFormatter.string(fromBytes: model.statistics.currentSessionReclaimedBytes))",
+                    identifier: "settings.statistics.currentSession"
+                )
+            }
+            Text("Only deletions confirmed by the system are counted. Storage figures are estimates.")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.5))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+        }
+    }
+
+    private func statisticsRow(title: String, value: String, identifier: String) -> some View {
+        let label = Text(title)
+            .foregroundStyle(.white.opacity(0.85))
+            .accessibilityIdentifier("\(identifier).label")
+        let valueText = Text(value)
+            .fontWeight(.semibold)
+            .foregroundStyle(.white)
+            .accessibilityIdentifier(identifier)
+        // At accessibility sizes the value is wide enough to squeeze the label
+        // into mid-word breaks, so the two stack instead of sitting side by side.
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    label
+                    valueText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack {
+                    label
+                    Spacer()
+                    valueText
+                }
+            }
+        }
+        .font(.body)
+    }
+
+    // MARK: - Controls
+
+    private var positionChoices: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(ControlPosition.allCases) { position in
+                positionRow(position)
+            }
+        }
+    }
+
+    private func positionRow(_ position: ControlPosition) -> some View {
+        let subtitle: String
+        switch position {
+        case .bottom: subtitle = "A row centred near the bottom edge."
+        case .leading: subtitle = "A column down the left edge."
+        case .trailing: subtitle = "A column down the right edge."
+        }
+        return Button {
             var preferences = model.preferences
-            preferences.preset = preset
+            preferences.position = position
             model.updatePreferences(preferences)
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: model.preferences.preset == preset ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(model.preferences.preset == preset ? .blue : .white.opacity(0.4))
+                Image(systemName: model.preferences.position == position ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(model.preferences.position == position ? .blue : .white.opacity(0.4))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(preset.title)
+                    Text("Buttons at the \(position.title)")
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                    Text(preset.subtitle)
+                    Text(subtitle)
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.6))
                         .fixedSize(horizontal: false, vertical: true)
@@ -121,7 +190,18 @@ struct SettingsView: View {
             .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("settings.preset.\(preset.rawValue)")
+        .accessibilityIdentifier("settings.position.\(position.rawValue)")
+    }
+
+    private var showButtonsBinding: Binding<Bool> {
+        Binding(
+            get: { model.preferences.showButtons },
+            set: { newValue in
+                var preferences = model.preferences
+                preferences.showButtons = newValue
+                model.updatePreferences(preferences)
+            }
+        )
     }
 
     /// A tappable row that opens something or does one thing. Buttons carry
@@ -157,6 +237,28 @@ struct SettingsView: View {
         .accessibilityIdentifier(identifier)
     }
 
+    private func toggleRow(
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>,
+        identifier: String
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(.green)
+        .padding(.vertical, 6)
+        .accessibilityIdentifier(identifier)
+    }
+
     private var directionBinding: Binding<TraversalDirection> {
         Binding(
             get: { model.preferences.defaultDirection },
@@ -168,11 +270,16 @@ struct SettingsView: View {
         )
     }
 
-    private func settingSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func settingSection<Content: View>(
+        title: String,
+        titleIdentifier: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.5))
+                .accessibilityIdentifier(titleIdentifier ?? "")
             VStack(alignment: .leading, spacing: 10) {
                 content()
             }

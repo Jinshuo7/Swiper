@@ -3,13 +3,12 @@ import SwiftUI
 
 /// The one-time explanation of how sorting works.
 ///
-/// It is deliberately short, uses words as well as symbols, and adapts to the
-/// selected preset: someone using a button preset should not be told to swipe.
-/// It is shown once for the first photo and can be replayed from
-/// Settings → How to use.
+/// It is deliberately short, uses words as well as symbols, and teaches the
+/// gestures first: dragging the photo always decides, and the three buttons are
+/// the alternative for anyone who prefers them. Swiping is never disabled, so
+/// there is no preset branch here any more.
 struct TutorialView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let preset: ControlPreset
     let onDismiss: () -> Void
 
     var body: some View {
@@ -97,64 +96,31 @@ struct TutorialView: View {
     }
 
     private var instructions: [Instruction] {
-        switch preset {
-        case .swipe, .extended:
-            return [
-                Instruction(
-                    symbol: "hand.draw",
-                    title: "Drag left to delete",
-                    detail: "The photo follows your finger. Past the threshold it arms, and releasing marks it. Nothing is deleted yet.",
-                    tint: .red
-                ),
-                Instruction(
-                    symbol: "hand.draw",
-                    title: "Drag right to keep",
-                    detail: "A short or vertical drag makes no decision, so hesitating is safe.",
-                    tint: .green
-                ),
-                Instruction(
-                    symbol: "trash",
-                    title: "Or use the three buttons",
-                    detail: "Trash, Undo and Checkmark are always on the photo. Hold the bar behind them to drag the cluster to another edge.",
-                    tint: .orange
-                ),
-            ]
-        case .thumb:
-            return [
-                Instruction(
-                    symbol: "trash",
-                    title: "Trash marks for deletion",
-                    detail: "The photo is only marked. Nothing leaves your library.",
-                    tint: .red
-                ),
-                Instruction(
-                    symbol: "checkmark",
-                    title: "Checkmark keeps the photo",
-                    detail: "The photo stays and the session moves on.",
-                    tint: .green
-                ),
-                Instruction(
-                    symbol: "arrow.uturn.backward",
-                    title: "Undo reverses the last decision",
-                    detail: "Undo never deletes anything.",
-                    tint: .white
-                ),
-            ]
-        case .deleteOnly:
-            return [
-                Instruction(
-                    symbol: "trash",
-                    title: "Trash marks for deletion",
-                    detail: "Only this button marks a photo.",
-                    tint: .red
-                ),
-                Instruction(
-                    symbol: "hand.tap",
-                    title: "Tap the photo to keep it",
-                    detail: "Tapping anywhere on the photo advances without deleting.",
-                    tint: .green
-                ),
-            ]
-        }
+        [
+            Instruction(
+                symbol: "hand.draw",
+                title: "Drag left to delete",
+                detail: "The photo follows your finger. Past the threshold it arms, and releasing marks it. Nothing is deleted yet.",
+                tint: .red
+            ),
+            Instruction(
+                symbol: "hand.draw",
+                title: "Drag right to keep",
+                detail: "A short or vertical drag makes no decision, so hesitating is safe.",
+                tint: .green
+            ),
+            Instruction(
+                symbol: "trash",
+                title: "Or use the buttons",
+                detail: "Trash, Undo and Checkmark are on the photo unless you turn them off in Settings.",
+                tint: .orange
+            ),
+            Instruction(
+                symbol: "ellipsis",
+                title: "Move the buttons",
+                detail: "Drag the three dots to put the buttons at the bottom, left or right edge. The photo stays exactly where it is.",
+                tint: .blue
+            ),
+        ]
     }
 }

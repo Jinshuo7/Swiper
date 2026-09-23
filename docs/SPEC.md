@@ -16,31 +16,40 @@ This is the contract a build must satisfy. It describes behaviour, not code.
 
 ## 2. Entry
 
-The entry screen offers exactly these choices:
+The entry screen is a wordmark, one action, and nothing else competing for
+attention.
 
-* **Continue sorting** — shown only when unfinished session state exists, and
-  resumes it at the saved position with its Undo history.
-* **Review & delete · N** — shown whenever N photos are marked for deletion, and
-  opens deletion review directly from home.
-* **Recent** — start a sequential session at the newest asset, traversing
-  toward older photos. Recent is about where it starts, so it begins at the
-  newest asset whatever the default direction is set to.
-* **Start Here** — open a lazily loaded grid of the whole library, grouped into
-  calendar months with the newest first, and begin at the chosen asset. The
-  screen states what it is for (choosing where to begin, after which SWIPR walks
-  in the default direction and skips anything already decided or marked). A month menu
-  jumps straight to any point in the library, and a control flips the order
-  between newest and oldest, so no one has to scroll in from one end. Only
-  visible thumbnails are decoded; full images are not loaded. Photos already
-  marked for deletion are badged and cannot be started on.
-* **Tumbler** — begin a randomised, repeat-free session.
+* **Start here** — a single circular action beneath a `SWIPR` wordmark. It opens
+  **Choose a photo**, the only door into sorting. It is the only prominent action;
+  with no photos it stays in place, disabled and neutral, with one line of copy:
+  "No photos to sort."
+* **Resume** — a secondary text button, shown only while an unfinished session
+  is waiting. It resumes it at the saved position with its Undo history.
+* **The review chip** — `Review · N`, trailing in the top bar, shown whenever N
+  photos are marked for deletion. Home states the agreed wording "N photos
+  marked for deletion" and "Nothing deleted yet.", so a leftover mark is never
+  mistaken for a completed deletion.
+* The **wordmark** is centred on the screen, framed by the settings gear (leading)
+  and the review chip (trailing). There is no explanatory footer; the tutorial
+  teaches the gestures.
 
-Home always states the marked count with the wording "N photos marked for
-deletion" and "Nothing deleted yet.", so a leftover mark is never mistaken for a
-completed deletion.
+There are at most two prominent actions in any state. Statistics are inline in
+Settings, never a separate entry point from home.
 
-A subtle statistics icon opens the statistics page; a settings icon opens
-settings. Statistics are not otherwise visible.
+### Choose a photo
+
+Choose a photo is the only screen that starts a session. It presents the library
+grouped into calendar months, newest first by default, with a month menu that
+jumps straight to a point in the library and a control that flips the order.
+Two named traversals sit above the grid:
+
+* **Newest** — a sequential session at the newest asset, walking toward older
+  photos whatever the default direction is set to.
+* **Random** — the Tumbler: a randomised, repeat-free session.
+
+Opening Choose a photo leaves a resumable session alone; choosing a photo replaces
+it. Photos already marked for deletion are badged and cannot be started on. Only
+visible thumbnails are decoded; full images are not loaded.
 
 ## 3. The full-screen viewer
 
@@ -55,11 +64,11 @@ settings. Statistics are not otherwise visible.
    neighbours are requested. Requests for assets that are no longer current are
    cancelled.
 4. Every control and overlay stays inside the viewport and its safe area, so
-   Close, the heart and the three decision controls are always reachable. There
+   Close and the three decision controls are always reachable. There
    is no permanent instruction text over the photo.
 5. Whenever photos are marked for deletion, the viewer shows a compact
    `Review · N` control that opens deletion review without ending the session.
-6. Default Swipe preset gestures. The photo follows the finger, and the drag
+6. Swipe gestures are always available. The photo follows the finger, and the drag
    reveals a feedback-only well in the lower corner it is heading for: trash on
    the left, check on the right. The wells are never separate tap targets.
    * drag left past the threshold and release → mark for deletion and advance;
@@ -81,68 +90,65 @@ settings. Statistics are not otherwise visible.
    continues in the other direction if undecided assets remain.
 12. Nothing is ever deleted from the viewer.
 
-## 4. The control cluster and presets
+## 4. The control cluster
 
 Every decision control lives on **one cluster of three**: Trash, Undo and
-Checkmark, in that order. Nothing about the current photo, the number of marks or
-the active preset moves it. The way out and the review entry live in
-the top strip instead.
+Checkmark, in that order. Nothing about the current photo, the number of marks,
+or where the cluster sits moves it, and the photo never resizes or shifts for it
+([ADR-0006](adr/0006-photo-never-moves-for-chrome.md)). The way out and the
+review entry live in the top strip instead.
 
 * **Close** is always the top left corner, drawn smaller than the decision
   controls, the way a Back button is on every other screen. The compact
   `Review · N` entry sits at the top right, and a Live Photo's **LIVE** chip is
   centred so the two never collide.
-* The cluster **docks to the lower part of one of three edges**: the bottom as a
-  row, or the left or right edge as a column. It never reaches into the top strip.
-* The user moves it by **touching and holding the bar behind the controls**, then
-  dragging. The controls themselves claim their own taps, so the bar around and
-  between them is the handle, and it is drawn so the thing that moves is visible.
-  A plain drag never moves the cluster, because a plain drag on the photo is how a
-  decision is made. Dropping it docks it to whichever of the three edges its
-  centre is nearest, and the position along that edge is continuous, so it can be
-  parked where a particular thumb reaches.
-* The dock and the position are persisted immediately, and **Reset control
-  position** in Settings brings the cluster back to the bottom centre. The dock
-  can also be stepped through from the cluster's accessibility actions, for
-  anyone who cannot drag.
-* A side-docked cluster reserves a lane: the photo is fitted beside it, so a
-  control never sits on top of the photo.
+* The cluster sits at exactly **three fixed positions**, safe-area relative: a row
+  centred on the screen width `20 pt` above the bottom safe edge, and columns
+  centred at `75%` of the safe-area height `20 pt` inside the left or right edge.
+  Nothing between them ([ADR-0007](adr/0007-three-fixed-control-positions.md)).
+* A three-dot **grip** sits in the tray's leading end, in a `44 x 44 pt` hit
+  region. Dragging it lifts a translucent **puck** that follows the finger
+  one-to-one; the cluster itself stays put. The three positions appear as phantom
+  **slots** once the drag passes about three points, with the nearest one
+  highlighted by border weight and brightness rather than colour alone.
+  Releasing in a slot moves the cluster there; releasing anywhere else changes
+  nothing. Haptics fire on pickup, on slot change and on landing only.
+* A drag of the grip is never a decision, and a decision is never a move.
+* The tracked puck carries no animation; only the landing animates, with a spring
+  whose bounce stays at or below `0.2`. Reduce Motion follows the drag directly
+  and tightens the landing.
+* The position is persisted immediately. **Reset control position** in Settings
+  brings the cluster back to the bottom centre, and it can also be stepped
+  through from the cluster's accessibility action.
 * The cluster **fades to 55%** after five seconds without a touch, and comes back
-  on the next one. It never hides: the buttons are the non-gesture way to decide.
-* The preset decides only how a decision can be made, never which controls exist:
-
-| Preset | Swipe gestures | Tap to keep |
-| --- | --- | --- |
-| Swipe (default) | yes | no |
-| Buttons only | no | no |
-| Tap to keep | no | yes |
-
-* **Swipe** also offers the drags: left past the threshold marks for deletion,
-  right past it keeps, and the wells read **Delete** and **Keep**. In **Buttons
-  only** and **Tap to keep** a drag decides nothing, so a stray swipe can never
-  mark a photo. In **Tap to keep**, tapping the photo keeps it.
-* Preferences written when the controls varied by preset, or when the rail had
-  three anchors, still load: `Extended` behaves as `Swipe`, and an old anchor or
-  placement becomes a continuous position.
-* A Live Photo is labelled in the top strip; the review entry appears there once
-  photos are marked.
+  on the next one. It never hides while buttons are shown: the buttons are the
+  non-gesture way to decide.
+* **Swipe gestures are always available** and the buttons are a display option
+  ([ADR-0009](adr/0009-swipe-always-buttons-optional.md)). **Show buttons** is on
+  by default; turning it off hides the cluster and its grip, and dragging the
+  photo still decides.
+* Dragging left past the threshold marks for deletion, dragging right past it
+  keeps, and the feedback wells read **Delete** and **Keep**.
+* Stored preferences from before the fixed positions still load: an old three-way
+  rail becomes the matching fixed stop, and the continuous position and preset
+  are simply dropped. A Live Photo is labelled in the top strip; the review entry
+  appears there once photos are marked.
 
 ## 4a. Teaching
 
 1. The first time a photo is presented, SWIPR explains the flow once: how to
-   mark for deletion, how to keep, that nothing is deleted until review is
-   confirmed, and that accepted decisions are saved as they are made.
-2. The explanation matches the selected preset: the Swipe preset describes the
-   drag, the button presets describe the buttons and never tell the user to
-   swipe.
-3. Dismissing it is permanent until the user replays it from Settings → How to
+   mark for deletion, how to keep, that the three buttons are an alternative to
+   swiping, that dragging the three dots moves the buttons without moving the
+   photo, that nothing is deleted until review is confirmed, and that accepted
+   decisions are saved as they are made.
+2. Dismissing it is permanent until the user replays it from Settings → How to
    use. It is teaching state, not saved work, and never blocks sorting again
    after it is dismissed.
 
 ## 5. Resume and persistence
 
 1. Progress (current asset, direction, decisions, undo history, Tumbler order)
-   is saved on device and offered as Continue sorting.
+   is saved on device and offered as Resume.
 2. The deletion list is stored separately from the sorting session and survives
    starting a new session, switching mode and relaunching. See
    [ADR-0005](adr/0005-deletion-list-outlives-sessions.md).
@@ -198,8 +204,10 @@ the top strip instead.
 
 1. After a successful deletion, a dismissible result reports the number of
    photos deleted and approximately how much storage was reclaimed.
-2. A separate statistics page shows current-session and lifetime totals for
-   confirmed deletions, plus the number of completed cleanup sessions.
+2. Statistics are a read-only block inline at the top of Settings, with no
+   chevron into a separate screen: lifetime photos deleted, lifetime storage
+   reclaimed, sessions completed, and a this-session row only while a session is
+   active.
 3. Only confirmed deletions are ever counted.
 4. Units scale naturally: bytes → KB → MB → GB → TB.
 5. Storage is presented as approximate. See

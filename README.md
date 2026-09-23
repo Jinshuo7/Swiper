@@ -139,8 +139,10 @@ device).
 
 **Keep / mark**
 
-1. Enter with **Recent**. The first photo is shown complete, with both edges
-   visible, and the one-time tutorial explains the flow.
+1. Tap **Start here**, then **Newest**. The first photo is shown complete, with
+   both edges visible, and the one-time tutorial explains the flow. The three
+   buttons sit in a tray at the bottom centre, with the three-dot grip at their
+   leading end.
 2. Drag **right** past the threshold — a check well arms with a light haptic and
    the photo is kept. Drag right only a little: nothing happens.
 3. Drag **left** past the threshold — a trash well arms and the photo is
@@ -151,7 +153,8 @@ device).
 **Deletion review and safety**
 
 6. Mark a few photos and open review from the viewer (`Review · N`) or from home
-   (`Review & delete · N`); review is reachable at any time, not only at the end.
+   (the `Review · N` chip in the top bar); review is reachable at any time, not
+   only at the end.
 7. Tap a thumbnail to inspect it full-screen; tap **Restore photo** to remove it
    from the list.
 8. Tap **Select**, then drag across thumbnails to select a batch and tap
@@ -165,16 +168,25 @@ device).
 **Persistence, marks and recovery**
 
 11. During a session, force-quit SWIPR mid-way and relaunch. The entry screen
-    offers **Continue sorting** at the saved position, and **Review & delete · N**
-    for the marks, which survive switching Recent/Start Here/Tumbler too.
+    offers **Resume** at the saved position, and the `Review · N` chip for the
+    marks, which survive opening Choose a photo and its other traversals too.
 12. Marked photos are skipped while sorting. Restoring one lets a later session
     present it again.
 
+**Moving the buttons**
+
+13. Drag the three dots on the tray. A translucent puck follows your finger, the
+    three positions appear as phantom slots and the nearest is highlighted.
+    Release over a slot to move the buttons there; release anywhere else and
+    nothing changes. The photo never resizes or shifts. The same choice is in
+    Settings, with **Reset control position**, and **Show buttons** hides the
+    tray while leaving swiping available.
+
 **Statistics**
 
-13. Open the statistics icon (chart, top-right on the entry screen). Only
-    confirmed deletions are counted. Marked-then-restored photos, cancelled
-    deletions and failed deletions are not.
+14. Statistics are at the top of Settings, inline and read-only. Only confirmed
+    deletions are counted. Marked-then-restored photos, cancelled deletions and
+    failed deletions are not.
 
 > Automated tests never touch a real library. Unit tests exercise the pure
 > `SWIPRKit` logic; UI tests launch the app with `-uiTestingFakeLibrary`, which

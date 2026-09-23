@@ -96,10 +96,10 @@ final class SessionPersistenceTests: XCTestCase {
         store.saveStatistics(statistics)
         XCTAssertEqual(store.loadStatistics(), statistics)
 
-        store.savePreferences(ControlPreferences(preset: .deleteOnly, rail: .leading, position: 0))
+        store.savePreferences(ControlPreferences(position: .leading, showButtons: false))
         XCTAssertEqual(
             store.loadPreferences(),
-            ControlPreferences(preset: .deleteOnly, rail: .leading, position: 0)
+            ControlPreferences(position: .leading, showButtons: false)
         )
 
         try await store.clearState()
@@ -115,13 +115,13 @@ final class SessionPersistenceTests: XCTestCase {
         var statistics = SessionStatistics.empty
         statistics.record(DeletionOutcome(requestedIDs: ["a"], deletedIDs: ["a"], failedIDs: [], deletedBytes: 7))
         store.saveStatistics(statistics)
-        store.savePreferences(ControlPreferences(preset: .thumb))
+        store.savePreferences(ControlPreferences(position: .trailing))
         try await store.saveState(PersistedState(marks: ["a"]))
 
         try await store.clearState()
 
         XCTAssertEqual(store.loadStatistics(), statistics)
-        XCTAssertEqual(store.loadPreferences().preset, .thumb)
+        XCTAssertEqual(store.loadPreferences().position, .trailing)
     }
 
     func testAFailedWriteIsReportedRatherThanSwallowed() async throws {

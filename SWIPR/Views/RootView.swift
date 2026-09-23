@@ -11,7 +11,7 @@ struct RootView: View {
             content
             persistenceLayer
             if model.isShowingTutorial {
-                TutorialView(preset: model.preferences.preset) {
+                TutorialView {
                     model.dismissTutorial()
                 }
                 .transition(.opacity)
@@ -52,12 +52,10 @@ struct RootView: View {
             DeletionReviewView()
         case .result:
             SessionResultView(outcome: model.lastDeletion)
-        case .statistics:
-            StatisticsView()
         case .settings:
             SettingsView()
-        case .startHere:
-            StartHereGridView()
+        case .choosePhoto:
+            ChoosePhotoView()
         }
     }
 

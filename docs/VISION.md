@@ -23,10 +23,11 @@ SWIPR optimises for three things instead:
 
 ## Experience in one paragraph
 
-Open SWIPR, grant access, and decide: **Continue sorting** if an unfinished
-session exists, **Review & delete · N** if photos are already marked, **Recent**
-to start at the newest photo, **Start Here** to pick a starting point from a
-scrollable grid, or **Tumbler** for a repeat-free random walk. Decide each photo
+Open SWIPR, grant access, and decide: **Start here** to open **Choose a photo**
+and begin, **Resume** if an unfinished session exists, and the **Review · N**
+chip if photos are already marked. Choose a photo starts the walk itself:
+**Newest** at the newest photo, or **Random** for a repeat-free random walk.
+Decide each photo
 by swiping left (mark for deletion) or right (keep), or with the three controls. Traversal remembers the preferred
 direction and defaults toward older photos, and skips photos already marked.
 

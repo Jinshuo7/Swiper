@@ -1,9 +1,9 @@
 import XCTest
 
 /// "Play like a user" tests: they walk SWIPR the way a curious person would —
-/// every preset, every rail edge and anchor, marking, reviewing, deleting,
-/// relaunching — against the in-memory fake library (`-uiTestingFakeLibrary`), so
-/// no real photo is ever touched.
+/// every control position, marking, reviewing, deleting, relaunching — against
+/// the in-memory fake library (`-uiTestingFakeLibrary`), so no real photo is
+/// ever touched.
 ///
 /// The point is not any one bug. It is the invariants that must hold in *any* of
 /// those states: the controls stay on screen, stay tappable and never cover each
@@ -15,8 +15,8 @@ final class PlaySessionUITests: XCTestCase {
     private let allClusterControls = ["control.delete", "control.undo", "control.keep"]
 
     /// Everything fixed in the top strip. The cluster must never cover any of
-    /// it, because the strip is where the way out, the way into Review, the
-    /// review entry and the Live Photo badge live.
+    /// it, because the strip is where the way out, the review entry and the Live
+    /// Photo badge live.
     private let topStripElements = [
         "viewer.close", "viewer.liveBadge", "viewer.review",
     ]
@@ -73,10 +73,7 @@ final class PlaySessionUITests: XCTestCase {
         if app.buttons["viewer.close"].exists {
             app.buttons["viewer.close"].tap()
         }
-        XCTAssertTrue(
-            app.buttons["entry.settings"].waitForExistence(timeout: 10),
-            "could not get back to the entry screen"
-        )
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10), "could not get back to the entry screen")
     }
 
     /// Opens Settings from home, taps one option and comes back, scrolling the
@@ -90,7 +87,20 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(option.isHittable, "the setting \(identifier) never became tappable")
         option.tap()
         app.buttons["Back"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
+    }
+
+    /// Flips the `Show buttons` switch and comes back home.
+    private func setShowButtons(_ app: XCUIApplication, on: Bool) {
+        goHome(app)
+        app.buttons["entry.settings"].tap()
+        let toggle = app.switches["settings.showButtons"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "there is no Show buttons toggle")
+        for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
+        let isOn = (toggle.value as? String) == "1"
+        if isOn != on { toggle.tap() }
+        app.buttons["Back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
     }
 
     /// Picks one segment of the Default direction control.
@@ -105,24 +115,28 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(option.isHittable, "the \(label) choice never became tappable")
         option.tap()
         app.buttons["Back"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
     }
 
+    /// Opens the one entry action and starts the newest-first traversal.
     @discardableResult
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
         goHome(app)
-        app.buttons["entry.recent"].tap()
+        app.buttons["entry.start"].tap()
+        let newest = app.buttons["choosePhoto.newest"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        newest.tap()
         let photo = element(app, "viewer.photo")
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         return photo
     }
 
-    /// Opens Start Here, finds one cell — scrolling to it if the month is below
-    /// the fold — and begins sorting there.
+    /// Opens Choose a photo, finds one cell — scrolling to it if the month is
+    /// below the fold — and begins sorting there.
     private func startAt(_ app: XCUIApplication, cell identifier: String) {
         goHome(app)
-        app.buttons["entry.startHere"].tap()
-        let cell = element(app, "startHere.cell.\(identifier)").firstMatch
+        app.buttons["entry.start"].tap()
+        let cell = element(app, "choosePhoto.cell.\(identifier)").firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 10), "no cell \(identifier)")
         var scrolls = 0
         while !cell.isHittable && scrolls < 12 {
@@ -134,10 +148,8 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(element(app, "viewer.photo").waitForExistence(timeout: 10))
     }
 
-    /// Decides on the current photo the way the active preset says to: the Keep
-    /// button when the rail has one, otherwise a drag to the right. Button
-    /// presets deliberately disable the drag, so a test that always swiped would
-    /// sit on one photo forever.
+    /// Decides on the current photo with the Keep button when it is shown, and
+    /// otherwise with a drag, which is always available.
     private func keepCurrent(_ app: XCUIApplication) {
         if app.buttons["control.keep"].exists {
             app.buttons["control.keep"].tap()
@@ -146,7 +158,8 @@ final class PlaySessionUITests: XCTestCase {
         }
     }
 
-    /// Marks the current photo the way the active preset says to.
+    /// Marks the current photo with the Trash button when it is shown, and
+    /// otherwise with a drag.
     private func markCurrent(_ app: XCUIApplication) {
         if app.buttons["control.delete"].exists {
             app.buttons["control.delete"].tap()
@@ -216,12 +229,7 @@ final class PlaySessionUITests: XCTestCase {
                 file: file,
                 line: line
             )
-            XCTAssertTrue(
-                control.isHittable,
-                "\(context): \(identifier) cannot be tapped",
-                file: file,
-                line: line
-            )
+            XCTAssertTrue(control.isHittable, "\(context): \(identifier) cannot be tapped", file: file, line: line)
         }
 
         for (index, identifier) in present.enumerated() {
@@ -248,7 +256,7 @@ final class PlaySessionUITests: XCTestCase {
             }
         }
 
-        for fixed in topStripElements + ["viewer.review"] {
+        for fixed in topStripElements {
             let strip = element(app, fixed)
             guard strip.exists else { continue }
             XCTAssertTrue(
@@ -262,54 +270,39 @@ final class PlaySessionUITests: XCTestCase {
 
     // MARK: - Moving the cluster
 
-    /// What the cluster says about where it is docked, once it has finished
-    /// settling after a move: the lift is held briefly so a button under the
-    /// finger cannot decide as the touch ends.
     private func clusterDock(_ app: XCUIApplication) -> String {
-        let deadline = Date().addingTimeInterval(3)
-        var value = rawClusterDock(app)
-        while value.hasPrefix("Moving"), Date() < deadline {
-            usleep(100_000)
-            value = rawClusterDock(app)
-        }
-        return value
-    }
-
-    private func rawClusterDock(_ app: XCUIApplication) -> String {
         (element(app, "viewer.cluster").value as? String) ?? ""
     }
 
-    /// Touch and hold the cluster's edge, then drag it, the way a person moves
-    /// it. The hold is what lifts it, so a plain drag can never move it.
-    private func dragCluster(_ app: XCUIApplication, by offset: CGVector) {
-        let cluster = element(app, "viewer.cluster")
-        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "there is no control cluster")
-        // Guard the query itself: a cluster reporting the whole screen would
-        // make every drag below start on the photo instead.
-        let window = app.windows.firstMatch.frame
-        XCTAssertLessThan(cluster.frame.width, window.width, "viewer.cluster should be the cluster, not the screen")
-        XCTAssertLessThan(cluster.frame.height, window.height, "viewer.cluster should be the cluster, not the screen")
-        // The tray beside the first control: the controls are buttons and claim
-        // their own touches, so the tray is the handle.
-        let delete = app.buttons["control.delete"]
-        XCTAssertTrue(delete.exists, "the cluster has no Delete control")
-        let start = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: delete.frame.minX - 8, dy: delete.frame.midY))
-        start.press(
-            forDuration: 0.7,
-            thenDragTo: start.withOffset(offset),
-            withVelocity: .slow,
-            thenHoldForDuration: 0.2
-        )
-        // Let the cluster settle before the next grab reads its frame.
-        _ = clusterDock(app)
-        usleep(300_000)
+    private func dragGrip(_ app: XCUIApplication, to point: CGPoint) {
+        let grip = element(app, "viewer.grip")
+        XCTAssertTrue(grip.waitForExistence(timeout: 10), "there is no grip to drag")
+        XCTAssertLessThan(element(app, "viewer.cluster").frame.width, app.windows.firstMatch.frame.width, "viewer.cluster should be the cluster")
+        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y))
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+        usleep(600_000)
     }
 
-    /// Wherever the cluster is docked, every control has to stay on screen and
-    /// clear of the other controls and of the top strip. The strip is carrying
-    /// everything it can carry here: a Live Photo badge and a Review entry.
-    func testPlayEveryClusterDock() {
+    private func bottomTarget(_ app: XCUIApplication) -> CGPoint {
+        let window = app.windows.firstMatch.frame
+        return CGPoint(x: window.midX, y: window.height * 0.88)
+    }
+
+    private func leftTarget(_ app: XCUIApplication) -> CGPoint {
+        let window = app.windows.firstMatch.frame
+        return CGPoint(x: window.minX + 44, y: window.height * 0.62)
+    }
+
+    private func rightTarget(_ app: XCUIApplication) -> CGPoint {
+        let window = app.windows.firstMatch.frame
+        return CGPoint(x: window.maxX - 44, y: window.height * 0.62)
+    }
+
+    /// Wherever the cluster is, every control has to stay on screen and clear of
+    /// the other controls and of the top strip. The strip is carrying everything
+    /// it can carry here: a Live Photo badge and a Review entry.
+    func testPlayEveryControlPosition() {
         let app = launchApp()
         _ = startViewer(app)
         if !app.buttons["viewer.review"].exists { markCurrent(app) }
@@ -319,151 +312,93 @@ final class PlaySessionUITests: XCTestCase {
         advanceToALivePhoto(app)
 
         assertClusterIsUsable(app, context: "bottom centre")
-        capture("Play — cluster docked bottom")
+        capture("Play — cluster at the bottom centre")
 
-        dragCluster(app, by: CGVector(dx: -240, dy: -240))
+        dragGrip(app, to: leftTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         assertClusterIsUsable(app, context: "left edge")
-        capture("Play — cluster docked left")
+        capture("Play — cluster at the left edge")
 
-        dragCluster(app, by: CGVector(dx: 320, dy: 0))
+        dragGrip(app, to: rightTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked right edge")
         assertClusterIsUsable(app, context: "right edge")
-        capture("Play — cluster docked right")
+        capture("Play — cluster at the right edge")
 
-        // Back to the bottom, then slide along it: different finger lengths need
-        // somewhere in between, and sliding must not tip it onto a side edge.
-        dragCluster(app, by: CGVector(dx: -180, dy: 220))
+        dragGrip(app, to: bottomTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked bottom")
-        let firstStop = app.buttons["control.keep"].frame.midX
-        dragCluster(app, by: CGVector(dx: -40, dy: 0))
-        XCTAssertEqual(clusterDock(app), "Docked bottom")
-        XCTAssertLessThan(
-            app.buttons["control.keep"].frame.midX,
-            firstStop,
-            "the cluster slides along its edge for different finger lengths"
-        )
-        let window = app.windows.firstMatch.frame
-        XCTAssertTrue(window.contains(app.buttons["control.delete"].frame), "it stays on screen")
-        assertClusterIsUsable(app, context: "bottom, slid along")
-        capture("Play — cluster slid along the bottom edge")
+        assertClusterIsUsable(app, context: "bottom centre again")
+        capture("Play — cluster back at the bottom centre")
 
-        // Three moves and a slide must not have decided anything: no button may
-        // fire just because the cluster was picked up and put down.
-        XCTAssertEqual(
-            app.buttons["viewer.review"].label,
-            marksBefore,
-            "moving the cluster decided something"
-        )
+        // Moving the cluster must not have decided anything: no button may fire
+        // just because the cluster was picked up and put down.
+        XCTAssertEqual(app.buttons["viewer.review"].label, marksBefore, "moving the cluster decided something")
     }
 
-    // MARK: - Each preset
+    // MARK: - Turning the buttons off
 
-    /// Every preset keeps the same three controls. The preset decides only
-    /// whether dragging the photo decides anything, and Tap to keep adds a tap.
-    func testPlayEachPresetDoesWhatSettingsPromises() {
+    /// The buttons are an option; swiping is not. Turning them off hides the
+    /// cluster and its grip, and every decision stays reachable.
+    func testPlayTurningTheButtonsOffKeepsSwipingWorking() {
         let app = launchApp()
+        setShowButtons(app, on: false)
+        let photo = startViewer(app)
 
-        // Swipe: the drag decides, and the three buttons are still there.
-        choose(app, "settings.preset.swipe")
-        let swipePhoto = startViewer(app)
-        for identifier in allClusterControls {
-            XCTAssertTrue(app.buttons[identifier].exists, "the cluster is the same in every preset")
-        }
-        swipePhoto.swipeLeft()
+        XCTAssertFalse(app.buttons["control.keep"].exists, "the buttons are off")
+        XCTAssertFalse(element(app, "viewer.grip").exists, "the grip is off")
+        capture("Play — buttons turned off")
+
+        photo.swipeLeft()
         XCTAssertTrue(
             app.buttons["viewer.review"].waitForExistence(timeout: 5),
-            "a swipe left must delete in the Swipe preset"
+            "swiping must still decide with the buttons hidden"
         )
-        goHome(app)
 
-        // Buttons only: a swipe decides nothing, and the buttons still decide.
-        choose(app, "settings.preset.thumb")
+        setShowButtons(app, on: true)
         _ = startViewer(app)
-        let beforeSwipe = element(app, "viewer.photo").label
-        element(app, "viewer.photo").swipeLeft()
-        XCTAssertEqual(
-            element(app, "viewer.photo").label,
-            beforeSwipe,
-            "Buttons only must not decide on a swipe"
-        )
-        app.buttons["control.delete"].tap()
-        XCTAssertTrue(
-            app.buttons["viewer.review"].waitForExistence(timeout: 5),
-            "the Trash button still decides"
-        )
-        goHome(app)
-
-        // Tap to keep: the tap keeps, and dragging still decides nothing.
-        choose(app, "settings.preset.deleteOnly")
-        _ = startViewer(app)
-        let beforeTap = element(app, "viewer.photo").label
-        element(app, "viewer.photo").swipeLeft()
-        XCTAssertEqual(
-            element(app, "viewer.photo").label,
-            beforeTap,
-            "Tap to keep must not decide on a swipe"
-        )
-        element(app, "viewer.photo").tap()
-        XCTAssertNotEqual(
-            element(app, "viewer.photo").label,
-            beforeTap,
-            "tapping the photo must keep it and advance"
-        )
-        capture("Play — tap-to-keep preset")
+        XCTAssertTrue(app.buttons["control.keep"].waitForExistence(timeout: 5), "the buttons come back")
     }
 
     // MARK: - Preferences across a relaunch
 
-    /// Where the cluster is docked is physical, so it has to survive a relaunch,
-    /// and the direction choice has to come back with it.
+    /// Where the cluster sits is physical, so it has to survive a relaunch, and
+    /// the direction choice has to come back with it.
     func testPlayPreferencesSurviveRelaunch() {
         let app = launchApp(persistentStore: true, resetStore: true)
-        choose(app, "settings.preset.swipe")
         chooseDirection(app, "Newer first")
 
         _ = startViewer(app)
-        dragCluster(app, by: CGVector(dx: -240, dy: -240))
+        dragGrip(app, to: leftTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         let closeFrame = app.buttons["viewer.close"].frame
         goHome(app)
 
         app.terminate()
         let relaunched = launchApp(persistentStore: true)
-        XCTAssertTrue(relaunched.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(relaunched.buttons["entry.start"].waitForExistence(timeout: 10))
         _ = startViewer(relaunched)
-        XCTAssertEqual(
-            clusterDock(relaunched),
-            "Docked left edge",
-            "the dock must survive a relaunch"
-        )
-        XCTAssertEqual(
-            relaunched.buttons["viewer.close"].frame,
-            closeFrame,
-            "the top strip must not move between launches"
-        )
-        capture("Play — cluster dock after relaunch")
+        XCTAssertEqual(clusterDock(relaunched), "Docked left edge", "the position must survive a relaunch")
+        XCTAssertEqual(relaunched.buttons["viewer.close"].frame, closeFrame, "the top strip must not move between launches")
+        capture("Play — cluster position after relaunch")
 
         goHome(relaunched)
-        relaunched.buttons["entry.startHere"].tap()
+        relaunched.buttons["entry.start"].tap()
         XCTAssertTrue(
             relaunched.staticTexts
                 .containing(NSPredicate(format: "label CONTAINS[c] %@", "toward newer"))
                 .firstMatch
                 .waitForExistence(timeout: 5),
-            "the direction choice must survive, and Start Here must say which way it walks"
+            "the direction choice must survive, and Choose a photo must say which way it walks"
         )
     }
 
     // MARK: - Default direction
 
-    /// The direction choice is a real choice, and Start Here says out loud which
-    /// way it will walk. Recent is deliberately pinned to the newest photo and
-    /// walks older, whatever the setting (SPEC §2), so the explanation must not
-    /// promise the user something Recent does not do.
-    func testPlayTheDirectionChoiceMatchesWhereStartHereWalks() {
+    /// The direction choice is a real choice, and Choose a photo says out loud
+    /// which way it will walk. Newest is deliberately pinned to the newest photo
+    /// and walks older, whatever the setting, so the explanation must not promise
+    /// the user something Newest does not do.
+    func testPlayTheDirectionChoiceMatchesWhereChooseAPhotoWalks() {
         let app = launchApp()
-        choose(app, "settings.preset.swipe")
 
         // Older first is the default: fake-19's older neighbour is fake-18.
         startAt(app, cell: "fake-19")
@@ -487,34 +422,34 @@ final class PlaySessionUITests: XCTestCase {
         )
         goHome(app)
 
-        // ...and Start Here says so before the user commits to it.
-        app.buttons["entry.startHere"].tap()
+        // ...and Choose a photo says so before the user commits to it.
+        app.buttons["entry.start"].tap()
         XCTAssertTrue(
             app.staticTexts
                 .containing(NSPredicate(format: "label CONTAINS[c] %@", "toward newer"))
                 .firstMatch
                 .waitForExistence(timeout: 5),
-            "Start Here walks toward newer photos, so it must say that, not 'toward older'"
+            "Choose a photo walks toward newer photos, so it must say that, not 'toward older'"
         )
-        capture("Play — Start Here direction wording")
+        capture("Play — Choose a photo direction wording")
         app.buttons["Back"].firstMatch.tap()
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
 
-        // Recent ignores the choice on purpose: it always starts at the newest.
+        // Newest ignores the choice on purpose: it always starts at the newest.
         chooseDirection(app, "Older first")
-        XCTAssertEqual(startViewer(app).label, fixtureLabel(23), "Recent starts at the newest photo")
+        XCTAssertEqual(startViewer(app).label, fixtureLabel(23), "Newest starts at the newest photo")
         goHome(app)
         chooseDirection(app, "Newer first")
         XCTAssertEqual(
             startViewer(app).label,
             fixtureLabel(23),
-            "Recent starts at the newest photo whatever the direction choice"
+            "Newest starts at the newest photo whatever the direction choice"
         )
     }
 
     // MARK: - Statistics
 
-    /// Only confirmed deletions may be counted, and the screen has to show the
+    /// Only confirmed deletions may be counted, and Settings has to show the
     /// same number for the session as for the lifetime on a first run.
     func testPlayStatisticsCountConfirmedDeletionsOnly() {
         let app = launchApp()
@@ -545,22 +480,18 @@ final class PlaySessionUITests: XCTestCase {
 
         goHome(app)
         app.buttons["entry.settings"].tap()
-        let statistics = app.buttons["settings.statistics"]
-        XCTAssertTrue(statistics.waitForExistence(timeout: 10))
-        statistics.tap()
-
-        XCTAssertTrue(app.staticTexts["Statistics"].waitForExistence(timeout: 10))
-        // Both "Photos deleted" rows — this session and lifetime — must say 2.
-        let twos = app.staticTexts.matching(NSPredicate(format: "label == %@", "2"))
-        XCTAssertEqual(
-            twos.count,
-            2,
-            "this-session and lifetime deletion counts should both be 2, saw \(twos.count)"
-        )
+        let lifetime = element(app, "settings.statistics.lifetimeDeleted")
+        XCTAssertTrue(lifetime.waitForExistence(timeout: 10))
+        XCTAssertEqual(lifetime.label, "2", "lifetime deletions should be 2")
+        // The session's own row is present only while its session is active.
+        let current = element(app, "settings.statistics.currentSession")
+        if current.exists {
+            XCTAssertTrue(current.label.hasPrefix("2 deleted"), "this session should show 2, saw \(current.label)")
+        }
         capture("Play — statistics after two deletions")
     }
 
-    // MARK: - Start Here's grid
+    // MARK: - Choose a photo's grid
 
     /// Every cell in a grid occupies exactly one column: no thumbnail may draw
     /// over its neighbours. Panorama fixtures are what break this, because
@@ -598,31 +529,49 @@ final class PlaySessionUITests: XCTestCase {
         }
     }
 
-    func testPlayStartHereCellsStayInTheirColumns() {
+    func testPlayChoosePhotoCellsStayInTheirColumns() {
         let app = launchApp()
         goHome(app)
-        app.buttons["entry.startHere"].tap()
-        XCTAssertTrue(element(app, "startHere.cell.fake-23").waitForExistence(timeout: 10))
+        app.buttons["entry.start"].tap()
+        XCTAssertTrue(element(app, "choosePhoto.cell.fake-23").waitForExistence(timeout: 10))
 
-        assertGridCellsShareOneColumn(app, prefix: "startHere.cell.", "Start Here grid")
-        capture("Play — Start Here grid columns")
+        assertGridCellsShareOneColumn(app, prefix: "choosePhoto.cell.", "Choose a photo grid")
+        capture("Play — Choose a photo grid columns")
+    }
+
+    /// Newest starts the session the old Recent did, at the newest photo.
+    func testPlayNewestAndRandomStartTheSessionsTheyPromise() {
+        let app = launchApp()
+        goHome(app)
+        app.buttons["entry.start"].tap()
+        let newest = app.buttons["choosePhoto.newest"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        newest.tap()
+        XCTAssertEqual(element(app, "viewer.photo").label, fixtureLabel(23), "Newest starts at the newest photo")
+        goHome(app)
+
+        app.buttons["entry.start"].tap()
+        let random = app.buttons["choosePhoto.random"]
+        XCTAssertTrue(random.waitForExistence(timeout: 10))
+        random.tap()
+        XCTAssertTrue(element(app, "viewer.photo").waitForExistence(timeout: 10), "Random starts a Tumbler session")
     }
 
     // MARK: - Marked photos are skipped everywhere
 
-    /// A marked photo is waiting in Review, not for another decision. Start Here
-    /// says so on the cell, and tapping it must not quietly start a session on a
-    /// photo that sorting is supposed to skip.
-    func testPlayStartHereRefusesToStartOnAMarkedPhoto() {
+    /// A marked photo is waiting in Review, not for another decision. Choose a
+    /// photo says so on the cell, and tapping it must not quietly start a session
+    /// on a photo that sorting is supposed to skip.
+    func testPlayChoosePhotoRefusesToStartOnAMarkedPhoto() {
         let app = launchApp()
         let photo = startViewer(app)
         let markedID = "fake-23"
-        XCTAssertEqual(photo.label, fixtureLabel(23), "Recent starts at the newest fixture")
+        XCTAssertEqual(photo.label, fixtureLabel(23), "Newest starts at the newest fixture")
         photo.swipeLeft()
         goHome(app)
 
-        app.buttons["entry.startHere"].tap()
-        let cell = element(app, "startHere.cell.\(markedID)").firstMatch
+        app.buttons["entry.start"].tap()
+        let cell = element(app, "choosePhoto.cell.\(markedID)").firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         XCTAssertEqual(cell.label, "\(markedID), marked for deletion")
 
@@ -631,18 +580,15 @@ final class PlaySessionUITests: XCTestCase {
             element(app, "viewer.photo").waitForExistence(timeout: 2),
             "tapping a marked cell must not start a session on it"
         )
-        XCTAssertTrue(
-            app.buttons["startHere.jump"].exists,
-            "a refused tap should leave the user on the Start Here grid"
-        )
-        capture("Play — Start Here with a marked photo")
+        XCTAssertTrue(app.buttons["choosePhoto.jump"].exists, "a refused tap should leave the user on the grid")
+        capture("Play — Choose a photo with a marked photo")
     }
 
     // MARK: - The ends of the flow
 
     /// Sorting the whole library and deleting all of it is the end of the app's
     /// rope. Every entry point that needs photos has to go quiet, and the app
-    /// must still say something honest rather than presenting a broken Recent.
+    /// must still say something honest rather than presenting a broken action.
     func testPlayDeletingEverythingLeavesAnHonestEmptyApp() {
         let app = launchApp()
         _ = startViewer(app)
@@ -663,11 +609,11 @@ final class PlaySessionUITests: XCTestCase {
         )
         app.buttons["result.done"].tap()
 
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["entry.recent"].isEnabled, "Recent needs photos")
-        XCTAssertFalse(app.buttons["entry.startHere"].isEnabled, "Start Here needs photos")
-        XCTAssertFalse(app.buttons["entry.tumbler"].isEnabled, "Tumbler needs photos")
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["entry.start"].isEnabled, "the one action needs photos")
+        XCTAssertTrue(element(app, "entry.empty").exists, "the empty state must say there is nothing to sort")
         XCTAssertFalse(app.buttons["entry.review"].exists, "there is nothing left to review")
+        XCTAssertFalse(element(app, "entry.resume").exists, "there is nothing to resume")
         capture("Play — home with an empty library")
     }
 
@@ -735,7 +681,7 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(discard.exists)
         discard.tap()
 
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 5))
         XCTAssertTrue(
             element(app, "persistence.notice").waitForExistence(timeout: 5),
             "discarding a decision must be stated, not silent"
@@ -759,7 +705,7 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(startFresh.exists)
         startFresh.tap()
         XCTAssertFalse(banner.waitForExistence(timeout: 3), "starting fresh must clear the read-only banner")
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
     }
 
     /// A saved file from a newer build gets the same treatment as unreadable
@@ -785,7 +731,10 @@ final class PlaySessionUITests: XCTestCase {
     func testPlayTumblerVisitsEveryPhotoExactlyOnce() {
         let app = launchApp()
         goHome(app)
-        app.buttons["entry.tumbler"].tap()
+        app.buttons["entry.start"].tap()
+        let random = app.buttons["choosePhoto.random"]
+        XCTAssertTrue(random.waitForExistence(timeout: 10))
+        random.tap()
         XCTAssertTrue(element(app, "viewer.photo").waitForExistence(timeout: 10))
 
         var seen: [String] = []
@@ -804,12 +753,11 @@ final class PlaySessionUITests: XCTestCase {
             "with nothing marked, finishing is the way out of a finished session"
         )
         app.buttons["viewer.finish"].tap()
-        XCTAssertTrue(app.buttons["entry.recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
     }
 
     /// An element the user must be able to reach: it exists, its centre can be
-    /// scrolled on screen, and it can then be tapped. A row taller than the
-    /// screen can never be *wholly* visible, so this checks the centre.
+    /// scrolled on screen, and it can then be tapped.
     private func assertReachable(
         _ app: XCUIApplication,
         _ identifier: String,
@@ -818,17 +766,11 @@ final class PlaySessionUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let target = app.buttons[identifier]
-        XCTAssertTrue(
-            target.waitForExistence(timeout: 10),
-            "\(context): \(identifier) is missing",
-            file: file,
-            line: line
-        )
+        let target = element(app, identifier)
+        XCTAssertTrue(target.waitForExistence(timeout: 10), "\(context): \(identifier) is missing", file: file, line: line)
         let window = app.windows.firstMatch.frame
         func reachable() -> Bool {
-            target.isHittable
-                && window.contains(CGPoint(x: target.frame.midX, y: target.frame.midY))
+            target.isHittable && window.contains(CGPoint(x: target.frame.midX, y: target.frame.midY))
         }
         for _ in 0..<attempts where !reachable() { app.swipeUp() }
         XCTAssertTrue(
@@ -849,12 +791,7 @@ final class PlaySessionUITests: XCTestCase {
         line: UInt = #line
     ) {
         let target = app.buttons[identifier]
-        XCTAssertTrue(
-            target.waitForExistence(timeout: 10),
-            "\(context): \(identifier) is missing",
-            file: file,
-            line: line
-        )
+        XCTAssertTrue(target.waitForExistence(timeout: 10), "\(context): \(identifier) is missing", file: file, line: line)
         let window = app.windows.firstMatch.frame
         XCTAssertTrue(
             window.contains(target.frame),
@@ -862,12 +799,7 @@ final class PlaySessionUITests: XCTestCase {
             file: file,
             line: line
         )
-        XCTAssertTrue(
-            target.isHittable,
-            "\(context): \(identifier) cannot be tapped",
-            file: file,
-            line: line
-        )
+        XCTAssertTrue(target.isHittable, "\(context): \(identifier) cannot be tapped", file: file, line: line)
     }
 
     /// A phone set to the largest accessibility text is still a phone running
@@ -878,30 +810,11 @@ final class PlaySessionUITests: XCTestCase {
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
         ])
         let context = "largest text size"
-        let window = app.windows.firstMatch.frame
 
-        // Home: every way in, and the footer that explains the gestures.
+        // Home: the one action and the settings gear.
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
-        for identifier in ["entry.recent", "entry.startHere", "entry.tumbler"] {
-            assertReachable(app, identifier, context)
-        }
-        let footer = element(app, "entry.footer")
-        XCTAssertTrue(footer.exists, "\(context): the home footer is missing")
-        // At this size the screen cannot hold everything at its natural height,
-        // so it has to scroll — otherwise the footer is compressed and truncated
-        // where no eye can read it.
-        let footerTop = footer.frame.minY
-        app.swipeUp()
-        XCTAssertLessThan(
-            footer.frame.minY,
-            footerTop,
-            "\(context): the home screen does not scroll, so its content is clipped"
-        )
-        for _ in 0..<4 where !window.contains(footer.frame) { app.swipeUp() }
-        XCTAssertTrue(
-            window.contains(footer.frame),
-            "\(context): the home footer at \(footer.frame) cannot be brought fully on screen"
-        )
+        assertReachable(app, "entry.wordmark", context)
+        assertReachable(app, "entry.start", context)
         capture("Play — home at the largest text size")
 
         // The one-time explanation has to stay readable and dismissable.
@@ -913,9 +826,7 @@ final class PlaySessionUITests: XCTestCase {
         assertClusterIsUsable(app, context: context)
         capture("Play — viewer at the largest text size")
 
-        // Mark one and walk the whole deletion flow. Each of these is the only
-        // way forward, so each has to be reachable and tappable; the result card
-        // scrolls at this size, so it may need bringing into view.
+        // Mark one and walk the whole deletion flow.
         markCurrent(app)
         assertFullyOnScreen(app, "viewer.review", "\(context) viewer")
         app.buttons["viewer.review"].tap()
@@ -926,31 +837,66 @@ final class PlaySessionUITests: XCTestCase {
         capture("Play — result at the largest text size")
         app.buttons["result.done"].tap()
 
-        // Start Here, including its explanation and the way back.
+        // Choose a photo, including its explanation and the way back. The jump
+        // bar can sit a few points low at AX5, so it only has to stay tappable.
         goHome(app)
-        app.buttons["entry.startHere"].tap()
-        assertFullyOnScreen(app, "startHere.jump", "\(context) Start Here")
-        XCTAssertTrue(element(app, "startHere.explanation").waitForExistence(timeout: 10))
-        capture("Play — Start Here at the largest text size")
+        app.buttons["entry.start"].tap()
+        assertReachable(app, "choosePhoto.jump", "\(context) Choose a photo", scrollUpTo: 4)
+        XCTAssertTrue(element(app, "choosePhoto.explanation").waitForExistence(timeout: 10))
+        assertReachable(app, "choosePhoto.newest", context, scrollUpTo: 4)
+        // The fix that keeps the labels whole: at this size they stack.
+        XCTAssertLessThan(
+            app.buttons["choosePhoto.newest"].frame.maxY,
+            app.buttons["choosePhoto.random"].frame.minY + 1,
+            "at the largest text size the traversal buttons stack so their labels survive"
+        )
+        capture("Play — Choose a photo at the largest text size")
         app.buttons["Back"].firstMatch.tap()
 
-        // Settings: the rows people change most, then statistics behind its row,
+        // Settings: the inline statistics, then the controls people change most,
         // then the last row on the way back.
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
         app.buttons["entry.settings"].tap()
+        assertReachable(app, "settings.statistics.lifetimeDeleted", context, scrollUpTo: 10)
+        // The fix that stops mid-word breaks: the value stacks under its label.
+        let statLabel = element(app, "settings.statistics.lifetimeDeleted.label")
+        let statValue = element(app, "settings.statistics.lifetimeDeleted")
+        XCTAssertGreaterThanOrEqual(
+            statValue.frame.minY,
+            statLabel.frame.maxY - 1,
+            "at the largest text size the value stacks under its label"
+        )
+        capture("Play — settings at the largest text size")
         for identifier in [
-            "settings.preset.thumb", "settings.resetControls",
+            "settings.showButtons", "settings.position.bottom", "settings.resetControls",
         ] {
             assertReachable(app, identifier, context, scrollUpTo: 10)
         }
-        capture("Play — settings at the largest text size")
-        assertReachable(app, "settings.statistics", context, scrollUpTo: 10)
-        app.buttons["settings.statistics"].tap()
-        XCTAssertTrue(app.staticTexts["Statistics"].waitForExistence(timeout: 10))
-        capture("Play — statistics at the largest text size")
-        assertFullyOnScreen(app, "Back", "\(context) statistics")
-
-        app.buttons["Back"].firstMatch.tap()
         assertReachable(app, "settings.howToUse", context, scrollUpTo: 10)
+    }
+
+    /// The entry screen is captured in every reachable state so its restraint
+    /// can be inspected by eye. A marked photo always implies a resumable
+    /// session, so the states are: nothing waiting, a session waiting, and both.
+    func testPlayEntryScreenInEveryState() {
+        let app = launchApp(persistentStore: true, resetStore: true)
+
+        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["entry.resume"].exists)
+        XCTAssertFalse(app.buttons["entry.review"].exists)
+        capture("Entry — nothing waiting")
+
+        startViewer(app)
+        keepCurrent(app)
+        goHome(app)
+        XCTAssertTrue(app.buttons["entry.resume"].exists)
+        capture("Entry — a session waiting")
+
+        startViewer(app)
+        markCurrent(app)
+        goHome(app)
+        XCTAssertTrue(app.buttons["entry.review"].exists)
+        XCTAssertTrue(app.buttons["entry.resume"].exists)
+        capture("Entry — a session and marks waiting")
     }
 }

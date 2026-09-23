@@ -29,9 +29,9 @@ In scope for this slice:
 
 * PhotoKit access (including limited library) with a clear privacy explanation.
 * Photos and Live Photos; ordinary videos excluded everywhere.
-* Entry: Continue, Recent, Start Here (lazy grid), Tumbler.
-* Full-screen viewer with the four control presets and left/center/right
-  placement.
+* Entry: **Start here** (opens Choose a photo), **Resume**, and the `Review · N`
+  chip. Choose a photo carries **Newest** and **Random**.
+* Full-screen viewer with three fixed control positions moved by the grip.
 * Undo, persisted session and deletion list, stale-asset reconciliation.
 * Deletion review with single restore and drag-select batch restore.
 * Result feedback plus current-session and lifetime statistics.
