@@ -34,7 +34,12 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   cached profile builds with no account involved. Managed profiles live in
   `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`. To prove the code
   compiles without touching signing, add `CODE_SIGNING_ALLOWED=NO`. Personal-team
-  profiles expire after 7 days.
+  profiles expire after 7 days. A free profile also caps how many apps can be
+  installed at once: after a bundle-id change the old app and its UI-test runner
+  still hold slots, and the new UI runner then fails to install with "This device
+  has reached the maximum number of installed apps using a free developer
+  profile". Clear the superseded ids with `xcrun devicectl device uninstall app`
+  before re-running the UI suite.
 - Raw-compiler fallbacks when `xcodebuild` is unavailable:
   `Scripts/run-kit-tests.sh` (macOS) and `Scripts/typecheck-ios.sh` (iOS check).
 - Inside a restricted (agent-harness) sandbox, two extra flags are required, or
