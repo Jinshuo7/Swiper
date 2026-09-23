@@ -12,11 +12,6 @@ public enum DeletionWording {
         "\(count) \(count == 1 ? "photo" : "photos") marked for deletion"
     }
 
-    /// e.g. `"Review & delete · 3"`.
-    public static func reviewAndDelete(_ count: Int) -> String {
-        "Review & delete · \(count)"
-    }
-
     /// e.g. `"Review · 3"`.
     public static func reviewCompact(_ count: Int) -> String {
         "Review · \(count)"

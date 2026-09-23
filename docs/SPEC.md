@@ -112,7 +112,7 @@ review entry live in the top strip instead.
   bottom row, the top of a column) or the trailing end, and the grip sits at the
   opposite end. Trash and Keep never move relative to each other
   ([ADR-0011](adr/0011-undo-at-the-outer-end.md)).
-* A three-dot **grip** sits in the tray's leading end, in a `44 x 44 pt` hit
+* A three-dot **grip** sits in the tray's end opposite Undo, in a `44 x 44 pt` hit
   region. Dragging it lifts a translucent **puck** that follows the finger
   one-to-one; the cluster itself stays put. The three positions appear as phantom
   **slots** once the drag passes about three points, with the nearest one
@@ -126,7 +126,7 @@ review entry live in the top strip instead.
 * The position is persisted immediately. **Reset control position** in Settings
   brings the cluster back to the bottom centre, and it can also be stepped
   through from the cluster's accessibility action.
-* The cluster **fades to 55%** after five seconds without a touch, and comes back
+* The cluster **fades to 70%** after five seconds without a touch, and comes back
   on the next one. It never hides while buttons are shown: the buttons are the
   non-gesture way to decide.
 * **Swipe gestures are always available** and the buttons are a display option

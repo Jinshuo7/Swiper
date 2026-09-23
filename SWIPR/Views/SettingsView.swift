@@ -220,7 +220,7 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 Image(systemName: model.preferences.undoSide == side ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(model.preferences.undoSide == side ? .blue : .white.opacity(0.4))
-                Text(side == .leading ? "Undo on the left" : "Undo on the right")
+                Text("Undo on the \(side.title.lowercased())")
                     .foregroundStyle(.white)
                 Spacer()
             }
@@ -316,7 +316,7 @@ struct SettingsView: View {
             Text(title.uppercased())
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.5))
-                .accessibilityIdentifier(titleIdentifier ?? "")
+                .accessibilityIdentifier(titleIdentifier ?? title)
             VStack(alignment: .leading, spacing: 10) {
                 content()
             }

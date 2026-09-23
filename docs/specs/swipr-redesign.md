@@ -87,14 +87,16 @@ row with a chevron.
   safe-area height, `20 pt` inside the left or right edge.
 - Nothing between the positions. The old continuous position, the rail, anchor
   and order settings all go.
-- The tray is `228 x 88 pt` for a row at the current control size, so a `375 pt`
-  wide phone leaves about `74 pt` clear at each bottom corner.
+- The tray is `286 x 88 pt` for a row at the current control size: the three
+  buttons, the grip's `44 pt` slot and the tray's padding. A `375 pt` wide phone
+  leaves about `45 pt` clear at each bottom corner. (The earlier `228 pt` figure
+  predated putting the grip inside the tray and could not hold it.)
 - The photo is fitted to the full safe area and is never resized or shifted by
   the controls. This reverses the earlier lane behaviour, recorded in an ADR.
 
 ### 4. Moving the cluster
 
-- A three-dot grip sits in the tray's leading end, in a `44 x 44 pt` hit region,
+- A three-dot grip sits in the tray's end opposite Undo, in a `44 x 44 pt` hit region,
   with the accessibility label "Move controls".
 - Dragging the grip lifts a translucent puck (a small circle holding the three
   dots) that tracks the finger one-to-one. The cluster itself does not move.

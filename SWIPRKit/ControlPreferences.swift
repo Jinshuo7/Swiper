@@ -53,8 +53,6 @@ public enum UndoSide: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Spoken name, phrased for the bottom row the setting is usually read in.
     public var title: String { self == .leading ? "Left" : "Right" }
-
-    public var opposite: UndoSide { self == .leading ? .trailing : .leading }
 }
 
 /// The user's persisted interaction preferences.
@@ -90,13 +88,9 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         case showButtons
         case undoSide
         case defaultDirection
-        // Written by older builds. Read so a stored choice is not thrown away;
-        // nothing writes them.
+        // Written by older builds that stored the three-way dock under `rail`.
+        // Read so a stored choice is not thrown away; nothing writes it.
         case rail
-        case preset
-        case anchor
-        case placement
-        case order
     }
 
     public init(from decoder: Decoder) throws {

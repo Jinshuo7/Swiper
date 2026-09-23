@@ -141,8 +141,8 @@ device).
 
 1. Tap **Start here**, then **Newest**. The first photo is shown complete, with
    both edges visible, and the one-time tutorial explains the flow. The three
-   buttons sit in a tray at the bottom centre, with the three-dot grip at their
-   leading end.
+   buttons sit in a tray at the bottom centre, with Undo at one end and the
+   three-dot grip at the other.
 2. Drag **right** past the threshold — a check well arms with a light haptic and
    the photo is kept. Drag right only a little: nothing happens.
 3. Drag **left** past the threshold — a trash well arms and the photo is

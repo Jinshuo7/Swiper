@@ -86,10 +86,13 @@ No other defects were found that were common-sense rather than taste.
    ([ADR-0011](adr/0011-undo-at-the-outer-end.md)): Trash and Keep now sit about
    6 pt from the screen centre at the bottom, where the old layout put them ~29 pt
    off, and Undo is out of the misclick path besides.
-2. **Soften the idle fade** (55% → about 70%, or fade later). Cost: trivial.
-   Worth it on bright photos where the controls are the fallback.
-3. **Say "0 bytes" rather than "≈ 0 bytes" when nothing has been deleted.** Cost:
-   trivial.
+2. ~~Soften the idle fade (55% → about 70%).~~ **Decided and done** (the owner
+   chose the recommendation). No automated test: opacity is not observable through
+   XCUI, so the screenshot is the check.
+3. ~~Say "0 bytes" rather than "≈ 0 bytes" when nothing has been deleted.~~
+   **Decided and done**, and asserted directly:
+   `testStatisticsIsInlineAtTheTopOfSettings` reads the value label and expects
+   `0 bytes`.
 4. **Cap the header title size at accessibility sizes.** The title is currently
    the single biggest element on several screens. Cost: small.
 5. **Consider moving `Resume` next to the chip** so the entry body holds exactly
@@ -103,18 +106,19 @@ These are decisions, not defects. Each says what the owner has to choose.
 1. ~~**Button centring at the bottom.**~~ **Decided and done.** Undo moved to
    the cluster's outer end with a two-way left/right setting; Trash and Keep are
    adjacent and effectively centred. See the follow-up section below.
-2. **Idle fade.** Keep 55%, or raise it? *Recommendation: raise to ~70%.*
+2. ~~**Idle fade.**~~ **Decided:** raised to 70%.
 3. **A fuller statistics screen.** The earlier research suggested keeping any
    fuller screen reachable; the current build removed the separate screen and
    inlines everything. Options: (a) inline only (current); (b) inline plus a
    "More" row into the old screen. *Recommendation: (a); the inline block already
    carries every number the old screen did.*
-4. **A marks-only entry state.** The spec lists four entry states including
-   "marks waiting". In the current product a mark always implies a resumable
-   session, so the states are: nothing, session, session+marks. If the owner
-   expects to see marks with no resumable session, that is a product rule change
-   (`PersistedSession.isResumable`), not a UI fix. *Recommendation: leave as is;
-   a mark without a session is not reachable by design.*
+4. **A marks-only entry state.** **Decided: leave as is.** The spec lists four
+   entry states including "marks waiting". In the current product a mark always
+   implies a resumable session, so the states are: nothing, session,
+   session+marks; a mark with no resumable session would need
+   `PersistedSession.isResumable` changed. Ticket 11's "screenshots in all four
+   states" is therefore met for the three reachable states, with this recorded as
+   the reason the fourth does not exist.
 
 ## Not covered, and why
 

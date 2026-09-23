@@ -10,14 +10,13 @@ final class DeletionWordingTests: XCTestCase {
 
     func testReviewWordingMatchesTheAgreedCopy() {
         XCTAssertEqual(DeletionWording.reviewCompact(1), "Review · 1")
-        XCTAssertEqual(DeletionWording.reviewAndDelete(3), "Review & delete · 3")
+        XCTAssertEqual(DeletionWording.reviewCompact(3), "Review · 3")
         XCTAssertEqual(DeletionWording.nothingDeletedYet, "Nothing deleted yet.")
     }
 
     func testWordingNeverCallsTheListAQueueInTheUserCopy() {
         let copy = [
             DeletionWording.markedForDeletion(2),
-            DeletionWording.reviewAndDelete(2),
             DeletionWording.reviewCompact(2),
             DeletionWording.nothingDeletedYet,
         ].joined(separator: " ").lowercased()

@@ -466,8 +466,7 @@ struct ViewerView: View {
         if model.preferences.showButtons && gripMove.isActive {
             ZStack {
                 ForEach(ControlPosition.allCases) { position in
-                    let cluster = ControlClusterLayout.clusterSize(for: position)
-                    let centre = ControlClusterLayout.centre(for: position, in: size)
+                    let rect = ControlClusterLayout.slotRect(for: position, in: size)
                     let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .fill(Color.white.opacity(highlightedSlot == position ? 0.12 : 0.04))
@@ -478,8 +477,8 @@ struct ViewerView: View {
                                     lineWidth: highlightedSlot == position ? 3 : 1
                                 )
                         )
-                        .frame(width: cluster.width, height: cluster.height)
-                        .position(centre)
+                        .frame(width: rect.width, height: rect.height)
+                        .position(x: rect.midX, y: rect.midY)
                 }
             }
             .allowsHitTesting(false)
@@ -572,10 +571,11 @@ struct ViewerView: View {
     }
 
     /// The landing is the only animated part of a move; the tracked puck is
-    /// always exactly under the finger. Reduce Motion tightens it.
+    /// always exactly under the finger. Reduce Motion tightens the spring rather
+    /// than swapping it for a different curve.
     private var landingAnimation: Animation {
         reduceMotion
-            ? .easeOut(duration: ControlClusterLayout.reduceMotionDuration)
+            ? .spring(duration: ControlClusterLayout.reduceMotionDuration, bounce: 0)
             : .spring(duration: ControlClusterLayout.landingDuration, bounce: ControlClusterLayout.landingBounce)
     }
 

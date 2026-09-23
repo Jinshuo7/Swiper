@@ -876,6 +876,11 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeDeleted"].exists)
         XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeReclaimed"].exists)
         XCTAssertTrue(app.staticTexts["settings.statistics.sessions"].exists)
+        XCTAssertEqual(
+            app.staticTexts["settings.statistics.lifetimeReclaimed"].label,
+            "0 bytes",
+            "nothing reclaimed reads as plain 0 bytes, not an approximate zero"
+        )
         capture("Settings — inline statistics")
     }
 

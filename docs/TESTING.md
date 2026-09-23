@@ -175,7 +175,8 @@ The viewer's controls were replaced again, following `docs/adr/0006`–`0009`:
 - Trash and Keep stay adjacent; Undo sits at an outer end chosen by the two-way
   `undoSide` setting, and the grip moves to the opposite end
   (`docs/adr/0011-undo-at-the-outer-end.md`).
-- It is moved by dragging a **three-dot grip** in the tray's leading end, in a
+- It is moved by dragging a **three-dot grip** in the tray's end opposite Undo,
+  in a
   44 x 44 pt hit region. The grip lifts a translucent **puck** that follows the
   finger one-to-one while the cluster stays put; the three positions appear as
   phantom **slots** with the nearest highlighted; a release over a slot lands

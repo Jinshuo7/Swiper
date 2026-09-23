@@ -10,11 +10,9 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.defaultDirection, .older)
     }
 
-    func testUndoSideNamesAndOpposite() {
+    func testUndoSideNames() {
         XCTAssertEqual(UndoSide.leading.title, "Left")
         XCTAssertEqual(UndoSide.trailing.title, "Right")
-        XCTAssertEqual(UndoSide.leading.opposite, .trailing)
-        XCTAssertEqual(UndoSide.trailing.opposite, .leading)
     }
 
     func testPositionNamesAndOrientation() {
@@ -126,7 +124,10 @@ final class ControlClusterLayoutTests: XCTestCase {
     func testClusterSizeShortAxisIsEightyEight() {
         let bottom = ControlClusterLayout.clusterSize(for: .bottom)
         XCTAssertEqual(bottom.height, 88)
-        XCTAssertGreaterThan(bottom.width, 0)
+        XCTAssertEqual(bottom.width, 286, "grip + three controls + the tray's padding")
+
+        // A 375 pt phone leaves room at each bottom corner for the side columns.
+        XCTAssertGreaterThanOrEqual((375 - bottom.width) / 2, 40)
 
         let column = ControlClusterLayout.clusterSize(for: .leading)
         XCTAssertEqual(column.width, 88)

@@ -554,7 +554,14 @@ final class PlaySessionUITests: XCTestCase {
         let random = app.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 10))
         random.tap()
-        XCTAssertTrue(element(app, "viewer.photo").waitForExistence(timeout: 10), "Random starts a Tumbler session")
+        let randomPhoto = element(app, "viewer.photo")
+        XCTAssertTrue(randomPhoto.waitForExistence(timeout: 10), "Random starts a Tumbler session")
+        // The Tumbler seed is random, so the opening photo is any fixture, never a
+        // specific one; that it is a library photo is what the entry promises.
+        XCTAssertTrue(
+            (0..<24).contains { fixtureLabel($0) == randomPhoto.label },
+            "Random must open on a library photo, got \(randomPhoto.label)"
+        )
     }
 
     // MARK: - Marked photos are skipped everywhere
