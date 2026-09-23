@@ -15,7 +15,7 @@ protocol SWIPRPhotoLibrary: PhotoLibraryProviding, AssetImageProviding {
 /// A deterministic, fully in-memory library used by previews and UI tests.
 ///
 /// It never touches the user's real photos, so UI tests can exercise deletion
-/// and favorite flows without any destructive real-library action. Demo assets
+/// and deletion flows without any destructive real-library action. Demo assets
 /// deliberately cover landscape, portrait, square and panorama proportions, and
 /// every generated image carries high-contrast edge markers so a cropped or
 /// offscreen photo is obvious both to a screenshot reviewer and to a pixel
@@ -41,33 +41,23 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
     /// Injectable failures so app and UI tests can exercise recovery paths
     /// without touching a real library.
     struct Faults: Equatable, Sendable {
-        /// `setFavorite` throws for these identifiers.
-        var failingFavoriteIDs: Set<String> = []
         /// `deleteAssets` submits these identifiers but leaves them in place,
         /// modelling a partial or cancelled system deletion.
         var failedDeleteIDs: Set<String> = []
         /// `deleteAssets` throws outright for these identifiers.
         var throwingDeleteIDs: Set<String> = []
-        /// `setFavorite` never completes while true, so tests can observe the
-        /// serialised-saving state.
-        var hangsFavoriteWrites = false
 
         static let none = Faults()
     }
 
     var changeHandler: (() -> Void)?
     var faults: Faults = .none
-    /// Every favorite write that reached the library, in order. App tests use it
-    /// to prove a retry never repeats an effect.
-    private(set) var favoriteWrites: [(id: String, isFavorite: Bool)] = []
 
     private var assets: [AssetDescriptor]
-    private var favoriteIDs: Set<String>
     private var deletedIDs: Set<String> = []
 
     init(assets: [AssetDescriptor]) {
         self.assets = assets
-        self.favoriteIDs = Set(assets.filter(\.isFavorite).map(\.id))
     }
 
     // MARK: - Demo fixtures
@@ -85,7 +75,6 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
                 creationDate: base.addingTimeInterval(Double(index) * 86_400 * 9),
                 pixelWidth: shape.pixelWidth,
                 pixelHeight: shape.pixelHeight,
-                isFavorite: false,
                 kind: index % 5 == 4 ? .livePhoto : .photo
             )
         }
@@ -112,7 +101,6 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
                     creationDate: descriptor.creationDate,
                     pixelWidth: descriptor.pixelWidth,
                     pixelHeight: descriptor.pixelHeight,
-                    isFavorite: favoriteIDs.contains(descriptor.id),
                     kind: descriptor.kind
                 )
             }
@@ -128,20 +116,6 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
 
     func existingAssetIDs(among ids: [String]) async -> Set<String> {
         Set(assets.map(\.id)).subtracting(deletedIDs).intersection(ids)
-    }
-
-    func setFavorite(_ isFavorite: Bool, forID id: String) async throws {
-        guard assets.contains(where: { $0.id == id }) && !deletedIDs.contains(id) else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        if faults.hangsFavoriteWrites {
-            try await Task.sleep(nanoseconds: 60 * 1_000_000_000)
-        }
-        if faults.failingFavoriteIDs.contains(id) {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        favoriteWrites.append((id: id, isFavorite: isFavorite))
-        if isFavorite { favoriteIDs.insert(id) } else { favoriteIDs.remove(id) }
     }
 
     func deleteAssets(ids: [String]) async throws -> [String] {

@@ -12,7 +12,7 @@ struct PermissionView: View {
             Text("Photo access")
                 .font(.title.weight(.semibold))
                 .foregroundStyle(.white)
-            Text("SWIPR needs access to your photo library to show each photo, mark favorites and delete the photos you explicitly confirm. Everything stays on this device — nothing is uploaded, and SWIPR never deletes anything until you confirm it in the deletion review.")
+            Text("SWIPR needs access to your photo library to show each photo and to delete the photos you explicitly confirm. Everything stays on this device — nothing is uploaded, and SWIPR never deletes anything until you confirm it in the deletion review.")
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white.opacity(0.7))

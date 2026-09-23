@@ -32,15 +32,6 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertFalse(engine.keptIDs.contains("e"))
     }
 
-    func testFavoriteEmitsSetFavoriteAndAdvances() {
-        var engine = freshEngine()
-        engine.start()
-        let effects = engine.apply(.favorite)
-        XCTAssertEqual(effects, [.setFavorite(id: "e", isFavorite: true), .advanced])
-        XCTAssertEqual(engine.current?.id, "d")
-        XCTAssertTrue(engine.keptIDs.contains("e"))
-    }
-
     func testUndoReversesKeepAndReturnsToAsset() {
         var engine = freshEngine()
         engine.start()
@@ -59,16 +50,6 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertEqual(effects, [.unqueuedDeletion(id: "e"), .undoApplied(assetID: "e")])
         XCTAssertTrue(engine.queue.isEmpty)
         XCTAssertEqual(engine.current?.id, "e")
-    }
-
-    func testUndoReversesFavoriteRestoringPreviousValue() {
-        let order = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0, favorite: false)])
-        var engine = SessionEngine(order: order)
-        engine.start()
-        let effects = engine.apply(.favorite)
-        XCTAssertEqual(effects, [.setFavorite(id: "a", isFavorite: true), .sessionFinished])
-        let undoEffects = engine.undo()
-        XCTAssertEqual(undoEffects, [.setFavorite(id: "a", isFavorite: false), .undoApplied(assetID: "a")])
     }
 
     func testApplyUndoAfterFinalDecisionReturnsToAsset() {

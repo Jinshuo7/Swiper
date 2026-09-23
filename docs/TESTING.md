@@ -71,18 +71,20 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
 - The device must be connected, unlocked and in Developer Mode, with its
   developer profile trusted under Settings → General → VPN & Device Management.
   Personal Team profiles expire after 7 days; rebuild to re-trust.
-- **Status 2026-09-22 02:30: RUN GREEN.** The full suite ran on the iPhone 11 Pro
-  (`00008030-000669DE3408802E`, iOS 26.2.1), `** TEST SUCCEEDED **`:
+- **Status 2026-09-23: RUN GREEN**, after the rename and the removal of
+  favouriting, on the iPhone 11 Pro (`00008030-000669DE3408802E`, iOS 26.2.1),
+  `** TEST SUCCEEDED **`:
 
   | Target | Tests | Result |
   | --- | --- | --- |
-  | `SWIPRKitTests` | 127 | 0 failures |
+  | `SWIPRKitTests` | 126 | 0 failures |
   | `SWIPRAppTests` | 31 | 0 failures |
-  | `SWIPRUITests` | 47 | 0 failures |
+  | `SWIPRUITests` | 46 | 0 failures |
 
-  205 tests, 0 failures. `SWIPRUITests` is 33 cases plus the 14
+  203 tests, 0 failures. `SWIPRUITests` is 32 cases plus the 14
   `PlaySessionUITests` cases described below; the control redesign replaced the
-  rail-order case and added six cluster cases.
+  rail-order case and added five cluster cases, and removing favouriting took the
+  heart case with it. The framework, app and UI suites all ran on the same build.
 - Previously, 2026-09-21 21:09: **188 tests, 0 failures** (126 + 31 + 31), result
   bundle `.derivedData/final4.xcresult`.
 - The interrupted-session case runs on the device too:
@@ -195,8 +197,8 @@ Three things about the move gesture are easy to get wrong again:
 `SWIPRUITests` covers this with `testTheClusterDocksToEitherSideAndBecomesAColumn`,
 `testAPlainDragNeverMovesTheCluster` (a plain drag must not shove the buttons, and
 a move must not decide), `testADockedSideClusterDoesNotCoverThePhoto`,
-`testSwitchingPresetDoesNotMoveTheCluster`, `testCloseIsSmallInTheTopLeftCorner`
-and `testTheHeartIsInTheTopStripAndStillFavorites`. The play suite adds
+`testSwitchingPresetDoesNotMoveTheCluster` and
+`testCloseIsSmallInTheTopLeftCorner`. The play suite adds
 `testPlayEveryClusterDock`, which drags the cluster to all three edges and slides
 it along the bottom, checking at each stop that every control stays on screen,
 tappable, and clear of the top strip.
@@ -204,7 +206,9 @@ tappable, and clear of the top strip.
 `SWIPRKitTests.ControlPreferencesTests` covers the storage: a legacy anchor or
 placement becomes a continuous position, an old `order` key is ignored rather
 than rejected, and a position is clamped to 0...1 (a non-finite one falls back to
-the centre).
+the centre). `SWIPRKitTests.SessionPersistenceTests` covers the version 3 state:
+a version 2 session holding a favourite undo entry still loads, with that entry
+treated as a keep.
 
 ## Screenshots
 
@@ -244,7 +248,6 @@ Attachments the suite produces, and what each one is for:
 | `Controls — docked to the right edge` | `testTheClusterDocksToEitherSideAndBecomesAColumn` | The cluster rotated to a column at the right edge, with the photo fitted beside its lane (`controls-02-right-edge-column.png`) |
 | `Controls — docked to the left edge` | same | The same column at the left edge (`controls-03-left-edge-column.png`) |
 | `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-04-close-top-left.png`) |
-| `Controls — heart in the top strip` | `testTheHeartIsInTheTopStripAndStillFavorites` | The heart on the right of the strip (`controls-05-heart-top-strip.png`) |
 | `Settings — statistics row` | `testStatisticsIsReachedFromSettings` | Statistics now inside Settings, reached from a row |
 | `Start Here — explanation, months, jump and sort` | `testStartHereExplainsItselfAndGroupsTheLibraryByMonth` | The explanation, month sections with sticky headers, the month menu and the order toggle |
 | `Start Here — oldest first` | same | The order toggle actually reversing the month sections |

@@ -98,7 +98,7 @@ struct EntryView: View {
     /// Always states whether anything has actually been deleted, so a leftover
     /// mark can never be mistaken for a completed deletion.
     private var footerText: String {
-        let base = "Swipe left to mark for deletion or right to keep.\nUse the heart to favorite. Videos are left alone."
+        let base = "Swipe left to mark for deletion or right to keep.\nVideos are left alone."
         guard model.queueCount > 0 else { return base }
         return "\(DeletionWording.markedForDeletion(model.queueCount)). \(DeletionWording.nothingDeletedYet)\n\(base)"
     }

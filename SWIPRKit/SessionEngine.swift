@@ -59,8 +59,6 @@ public struct SessionEngine: Equatable, Sendable {
         return order.asset(byID: cursorID)
     }
 
-    public var currentIsFavorite: Bool { current?.isFavorite ?? false }
-
     public var queueIDs: [String] { queue.ids }
 
     public var remainingCount: Int {
@@ -144,17 +142,6 @@ public struct SessionEngine: Equatable, Sendable {
                 displacedAssetID: mode == .tumbler ? cursorID : nil
             ))
             return [advanceEffect]
-        case .favorite:
-            let previous = asset.isFavorite
-            decidedIDs.insert(asset.id)
-            keptIDs.insert(asset.id)
-            let advanceEffect = advance()
-            undoStack.push(UndoEntry(
-                assetID: asset.id,
-                effect: .favorited(previousValue: previous),
-                displacedAssetID: mode == .tumbler ? cursorID : nil
-            ))
-            return [.setFavorite(id: asset.id, isFavorite: true), advanceEffect]
         case .undo:
             return [.noOp]
         }
@@ -169,8 +156,6 @@ public struct SessionEngine: Equatable, Sendable {
         case .queuedDeletion:
             queue.remove(entry.assetID)
             effects.append(.unqueuedDeletion(id: entry.assetID))
-        case .favorited(let previous):
-            effects.append(.setFavorite(id: entry.assetID, isFavorite: previous))
         case .kept:
             break
         }

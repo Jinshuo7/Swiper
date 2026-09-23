@@ -126,8 +126,8 @@ xcodebuild build-for-testing -project SWIPR.xcodeproj -scheme SWIPR \
 ### Granting photo access
 
 On first launch SWIPR explains why it needs access and asks for read-write
-library permission (read-write is required because favoriting and deletion both
-change the library). Choose **Allow Full Access**. You can also choose **Limit
+library permission (read-write is required because deletion changes the
+library). Choose **Allow Full Access**. You can also choose **Limit
 Access**; SWIPR will show only the selected photos and offer a control to
 select more. If you declined earlier, tap **Open Settings** and re-enable
 access.
@@ -137,7 +137,7 @@ access.
 Use a throwaway library (Simulator, or a handful of disposable photos on a test
 device).
 
-**Keep / mark / favorite**
+**Keep / mark**
 
 1. Enter with **Recent**. The first photo is shown complete, with both edges
    visible, and the one-time tutorial explains the flow.
@@ -145,9 +145,7 @@ device).
    the photo is kept. Drag right only a little: nothing happens.
 3. Drag **left** past the threshold — a trash well arms and the photo is
    **marked**, not deleted. The compact `Review · N` control appears.
-4. Tap the heart — the photo is favorited in the Photos app, kept, and the next
-   appears.
-5. Tap **Undo** — the last decision of this session is reversed and you return
+4. Tap **Undo** — the last decision of this session is reversed and you return
    to that photo.
 
 **Deletion review and safety**

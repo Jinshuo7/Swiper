@@ -56,8 +56,8 @@ struct AdaptiveButtonStyle: ButtonStyle {
 struct CircleControl: View {
     let systemImage: String
     let label: String
-    /// Defaults to `control.<label>`. Close and Favorite name their own, because
-    /// they live in the top strip rather than on the decision cluster.
+    /// Defaults to `control.<label>`. Close names its own, because it lives in
+    /// the top strip rather than on the decision cluster.
     var identifier: String?
     var tint: Color = .white
     /// The drawn circle, and the tap region around it. Close is drawn smaller

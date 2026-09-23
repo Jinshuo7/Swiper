@@ -22,7 +22,7 @@ on top of the tracer bullet:
 The smallest end-to-end path that proves the core idea:
 
 > permission → library snapshot → one real full-screen photo → decide
-> (keep / mark for deletion / favorite) → reversible deletion list →
+> (keep / mark for deletion) → reversible deletion list →
 > explicit deletion review → system-backed commit → result feedback
 
 In scope for this slice:

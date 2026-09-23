@@ -296,9 +296,9 @@ struct ViewerView: View {
 
     // MARK: - Chrome
 
-    /// Informational chrome only: what this asset is, the way out, the favorite
-    /// and the way into review. None of it moves when the rail moves, because it
-    /// is anchored independently at the top.
+    /// Informational chrome only: what this asset is, the way out, and the way
+    /// into review. None of it moves when the cluster moves, because it is
+    /// anchored independently at the top.
     private var topBar: some View {
         ZStack {
             // Centred, so it sits in the middle whatever the two ends are doing.
@@ -309,7 +309,6 @@ struct ViewerView: View {
             HStack(spacing: 10) {
                 closeControl
                 Spacer(minLength: 0)
-                favoriteControl
                 reviewControl
             }
         }
@@ -352,15 +351,6 @@ struct ViewerView: View {
             hitSize: 44
         ) {
             model.closeViewer()
-        }
-    }
-
-    /// The heart keeps a place in the top strip, where it costs the decision
-    /// controls nothing. It is not in the bottom cluster because it is used far
-    /// less often than delete, undo and keep.
-    private var favoriteControl: some View {
-        CircleControl(systemImage: "heart", label: "Favorite", identifier: "viewer.favorite") {
-            model.apply(.favorite)
         }
     }
 
@@ -566,7 +556,7 @@ struct ViewerView: View {
         activityToken += 1
         // Settle for a moment before the buttons can decide again. A control
         // under the finger can deliver its action as the touch ends, and moving
-        // the cluster must never keep, delete or favorite a photo.
+        // the cluster must never keep or delete a photo.
         isSettlingAfterMove = true
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 150_000_000)

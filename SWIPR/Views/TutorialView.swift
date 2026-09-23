@@ -118,12 +118,6 @@ struct TutorialView: View {
                     detail: "Trash, Undo and Checkmark are always on the photo. Hold the bar behind them to drag the cluster to another edge.",
                     tint: .orange
                 ),
-                Instruction(
-                    symbol: "heart",
-                    title: "Favorite keeps the photo",
-                    detail: "The heart at the top right marks it as an Apple Photos favorite.",
-                    tint: .pink
-                ),
             ]
         case .thumb:
             return [
@@ -145,12 +139,6 @@ struct TutorialView: View {
                     detail: "Undo never deletes anything.",
                     tint: .white
                 ),
-                Instruction(
-                    symbol: "heart",
-                    title: "Favorite keeps the photo",
-                    detail: "The heart at the top right favorites it in Apple Photos as well.",
-                    tint: .pink
-                ),
             ]
         case .deleteOnly:
             return [
@@ -165,12 +153,6 @@ struct TutorialView: View {
                     title: "Tap the photo to keep it",
                     detail: "Tapping anywhere on the photo advances without deleting.",
                     tint: .green
-                ),
-                Instruction(
-                    symbol: "heart",
-                    title: "Favorite keeps the photo",
-                    detail: "The heart at the top right favorites it in Apple Photos as well.",
-                    tint: .pink
                 ),
             ]
         }

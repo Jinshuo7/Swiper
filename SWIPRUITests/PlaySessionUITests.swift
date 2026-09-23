@@ -16,9 +16,9 @@ final class PlaySessionUITests: XCTestCase {
 
     /// Everything fixed in the top strip. The cluster must never cover any of
     /// it, because the strip is where the way out, the way into Review, the
-    /// favorite and the Live Photo badge live.
+    /// review entry and the Live Photo badge live.
     private let topStripElements = [
-        "viewer.close", "viewer.liveBadge", "viewer.favorite", "viewer.review",
+        "viewer.close", "viewer.liveBadge", "viewer.review",
     ]
 
     /// The demo fixtures are `index * 9` days after this instant; see
@@ -370,7 +370,6 @@ final class PlaySessionUITests: XCTestCase {
         for identifier in allClusterControls {
             XCTAssertTrue(app.buttons[identifier].exists, "the cluster is the same in every preset")
         }
-        XCTAssertTrue(app.buttons["viewer.favorite"].exists, "the heart is always in the top strip")
         swipePhoto.swipeLeft()
         XCTAssertTrue(
             app.buttons["viewer.review"].waitForExistence(timeout: 5),

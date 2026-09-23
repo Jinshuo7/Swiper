@@ -17,9 +17,6 @@ public protocol PhotoLibraryProviding: AnyObject {
     /// Which of `ids` still exist, used to confirm a deletion actually happened.
     func existingAssetIDs(among ids: [String]) async -> Set<String>
 
-    /// Sets the Apple Photos favorite flag. Throws if the library rejects it.
-    func setFavorite(_ isFavorite: Bool, forID id: String) async throws
-
     /// Performs the only destructive operation in SWIPR. The system presents
     /// its own confirmation before anything is removed.
     /// Returns the identifiers actually submitted to the library for deletion.

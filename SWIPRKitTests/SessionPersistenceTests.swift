@@ -14,7 +14,7 @@ final class SessionPersistenceTests: XCTestCase {
         engine.start()
         engine.apply(.keep)
         engine.apply(.queueDeletion)
-        engine.apply(.favorite)
+        engine.apply(.keep)
 
         let persisted = engine.persisted()
         let restored = SessionEngine.restored(
@@ -301,6 +301,29 @@ final class SessionPersistenceTests: XCTestCase {
         }
         XCTAssertEqual(state.schemaVersion, PersistedState.currentSchemaVersion)
         XCTAssertEqual(state.marks, ["a"])
+    }
+
+    /// Version 2 could record a favourite decision and version 3 removed
+    /// favouriting, so a stored session may hold a favourite undo entry. It has
+    /// to load, with that entry treated as a keep so undoing it only returns to
+    /// the photo.
+    func testVersionTwoSessionWithAFavouriteUndoEntryStillLoads() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let versionTwo = #"""
+        {"schemaVersion":2,"marks":[],"updatedAt":0,"session":{"currentAssetID":"b","direction":"older","mode":"sequential","decidedIDs":["a"],"keptIDs":["a"],"undoEntries":[{"assetID":"a","effect":{"favorited":{"previousValue":false}},"displacedAssetID":null}],"updatedAt":0,"isFinished":false}}
+        """#
+        try Data(versionTwo.utf8).write(to: directory.appendingPathComponent("session.json"))
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let state) = store.loadState() else {
+            return XCTFail("schema 2 should be migrated, got \(store.loadState())")
+        }
+        XCTAssertEqual(state.schemaVersion, PersistedState.currentSchemaVersion)
+        XCTAssertEqual(state.session?.undoEntries.first?.effect, .kept)
+        XCTAssertEqual(state.session?.currentAssetID, "b")
+        XCTAssertEqual(state.session?.decidedIDs, ["a"])
     }
 
     // MARK: - In-memory store

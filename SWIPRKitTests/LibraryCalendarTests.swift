@@ -20,7 +20,6 @@ final class LibraryCalendarTests: XCTestCase {
             creationDate: date,
             pixelWidth: 4_032,
             pixelHeight: 3_024,
-            isFavorite: false,
             kind: .photo
         )
     }

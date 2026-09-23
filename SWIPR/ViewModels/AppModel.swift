@@ -377,13 +377,12 @@ final class AppModel: ObservableObject {
 
     func undo() { apply(.undo) }
 
-    /// Applies the decision to a copy of the session, performs every library
-    /// effect it needs, saves, and only then acknowledges it.
+    /// Applies the decision to a copy of the session, saves it, and only then
+    /// acknowledges it.
     ///
-    /// Library effects always happen *before* the save. That ordering is what
-    /// makes a retry safe: by the time a decision can be parked, its PhotoKit
-    /// side effect is already done, so retrying only re-attempts the write and
-    /// can never repeat a favorite change.
+    /// A decision performs no library work of its own: marking a photo for
+    /// deletion changes only the session and the deletion list. Deleting happens
+    /// later, in ``confirmDeletion()``, and only after the user confirms it.
     private func stage(_ action: SessionAction) async {
         guard pendingDecision == nil, let engine else { return }
 
@@ -391,19 +390,7 @@ final class AppModel: ObservableObject {
         defer { isDecisionInFlight = false }
 
         var staged = engine
-        var libraryEffects: [SessionEffect] = []
-
-        if action == .favorite {
-            guard let assetID = staged.current?.id else { return }
-            libraryEffects.append(.setFavorite(id: assetID, isFavorite: true))
-        }
-
-        for effect in staged.apply(action) {
-            guard case .setFavorite = effect, action != .favorite else { continue }
-            libraryEffects.append(effect)
-        }
-
-        guard await performLibraryEffects(libraryEffects) else { return }
+        staged.apply(action)
         await acknowledge(staged)
     }
 
@@ -427,7 +414,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Retries the parked decision. Only persistence is re-attempted, so a
-    /// retry can never repeat a favorite change or a queued-deletion effect.
+    /// retry cannot repeat a queued-deletion effect.
     func retryPendingDecision() async {
         await serialized {
             guard let pending = self.pendingDecision else { return }
@@ -618,25 +605,6 @@ final class AppModel: ObservableObject {
 
     func dismissResult() {
         continueAfterResult()
-    }
-
-    // MARK: - Effect handling
-
-    /// Performs the PhotoKit half of a decision, in order, before anything is
-    /// recorded. Returns `false` when the library refused, in which case the
-    /// decision is abandoned and the session is left as it was.
-    @discardableResult
-    private func performLibraryEffects(_ effects: [SessionEffect]) async -> Bool {
-        for effect in effects {
-            guard case .setFavorite(let id, let isFavorite) = effect else { continue }
-            do {
-                try await library.setFavorite(isFavorite, forID: id)
-            } catch {
-                errorMessage = "Couldn't update the favorite: \(error.localizedDescription)"
-                return false
-            }
-        }
-        return true
     }
 
     // MARK: - Persistence helpers

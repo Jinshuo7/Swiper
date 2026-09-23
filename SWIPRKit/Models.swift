@@ -21,7 +21,6 @@ public struct AssetDescriptor: Codable, Equatable, Hashable, Identifiable, Senda
     public let creationDate: Date?
     public let pixelWidth: Int
     public let pixelHeight: Int
-    public let isFavorite: Bool
     public let kind: MediaKind
 
     public init(
@@ -29,14 +28,12 @@ public struct AssetDescriptor: Codable, Equatable, Hashable, Identifiable, Senda
         creationDate: Date?,
         pixelWidth: Int,
         pixelHeight: Int,
-        isFavorite: Bool,
         kind: MediaKind
     ) {
         self.id = id
         self.creationDate = creationDate
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
-        self.isFavorite = isFavorite
         self.kind = kind
     }
 
@@ -82,8 +79,6 @@ public enum SessionAction: String, Codable, CaseIterable, Sendable {
     case queueDeletion
     /// Keep the photo and advance.
     case keep
-    /// Mark the photo as an Apple Photos favorite, keep it, and advance.
-    case favorite
     /// Reverse the most recent decision.
     case undo
 
@@ -91,7 +86,6 @@ public enum SessionAction: String, Codable, CaseIterable, Sendable {
         switch self {
         case .queueDeletion: return "Delete"
         case .keep: return "Keep"
-        case .favorite: return "Favorite"
         case .undo: return "Undo"
         }
     }
@@ -101,7 +95,6 @@ public enum SessionAction: String, Codable, CaseIterable, Sendable {
 /// photo library. The engine itself never touches PhotoKit, which keeps it
 /// pure and unit-testable.
 public enum SessionEffect: Equatable, Sendable {
-    case setFavorite(id: String, isFavorite: Bool)
     case queuedDeletion(id: String)
     case unqueuedDeletion(id: String)
     case advanced

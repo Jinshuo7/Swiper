@@ -8,7 +8,6 @@ enum TestLibrary {
         dayOffset: Int,
         width: Int = 4_032,
         height: Int = 3_024,
-        favorite: Bool = false,
         kind: MediaKind = .photo
     ) -> AssetDescriptor {
         let base = Date(timeIntervalSince1970: 1_600_000_000)
@@ -17,7 +16,6 @@ enum TestLibrary {
             creationDate: base.addingTimeInterval(Double(dayOffset) * 86_400),
             pixelWidth: width,
             pixelHeight: height,
-            isFavorite: favorite,
             kind: kind
         )
     }

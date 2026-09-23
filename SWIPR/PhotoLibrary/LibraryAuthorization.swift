@@ -1,7 +1,7 @@
 import Photos
 
 /// A UI-friendly mirror of `PHAuthorizationStatus` for the access level SWIPR
-/// actually needs (read-write, because favorites and deletion both mutate the
+/// actually needs (read-write, because deletion mutates the
 /// library).
 enum LibraryAuthorization: Equatable {
     case notDetermined

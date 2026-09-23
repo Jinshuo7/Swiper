@@ -71,9 +71,8 @@ settings. Statistics are not otherwise visible.
 8. Reduce Motion removes the spring-back animation and the well's scale change;
    the meaning is still carried by symbol, wording and stroke, never by colour or
    motion alone.
-9. A heart control in the top strip marks the asset as an Apple Photos favorite,
-   keeps it and advances. It is always available, so nobody has to perform a
-   gesture, and it costs the decision controls no space.
+9. A decision is keep or mark for deletion. SWIPR does not favorite; that
+   belongs to the Photos app. See [ADR-0010](adr/0010-favourite-is-out-of-scope.md).
 10. Undo reverses the most recent decision of this session, including removing a
    just-marked photo from the deletion list, and returns to that photo. Undo
    never deletes.
@@ -86,13 +85,13 @@ settings. Statistics are not otherwise visible.
 
 Every decision control lives on **one cluster of three**: Trash, Undo and
 Checkmark, in that order. Nothing about the current photo, the number of marks or
-the active preset moves it. The way out, the favorite and the review entry live in
+the active preset moves it. The way out and the review entry live in
 the top strip instead.
 
 * **Close** is always the top left corner, drawn smaller than the decision
-  controls, the way a Back button is on every other screen. **Favorite** and the
-  compact `Review · N` entry share the top right, and a Live Photo's **LIVE** chip
-  is centred between them.
+  controls, the way a Back button is on every other screen. The compact
+  `Review · N` entry sits at the top right, and a Live Photo's **LIVE** chip is
+  centred so the two never collide.
 * The cluster **docks to the lower part of one of three edges**: the bottom as a
   row, or the left or right edge as a column. It never reaches into the top strip.
 * The user moves it by **touching and holding the bar behind the controls**, then

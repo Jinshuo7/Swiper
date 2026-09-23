@@ -61,7 +61,11 @@ public struct PersistedState: Codable, Equatable, Sendable {
     /// The version this build writes. Bump it whenever the stored shape
     /// changes, and teach ``FileSessionStore`` how to migrate from every older
     /// version.
-    public static let currentSchemaVersion = 2
+    ///
+    /// Version 3 removed favouriting. A version 2 session can therefore contain a
+    /// favourite undo entry, which ``UndoEntry/Effect`` still decodes, mapping it
+    /// to `.kept` so undoing it only returns to the photo.
+    public static let currentSchemaVersion = 3
 
     public var schemaVersion: Int
     /// The ordered list of assets marked for deletion, oldest mark first.

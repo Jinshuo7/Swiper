@@ -99,27 +99,36 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(model.currentAsset?.id, marked, "a saved decision advances the session")
     }
 
-    func testRetryDoesNotRepeatTheFavoriteEffect() async {
+    /// A decision performs no library work of its own: it changes the session and
+    /// the deletion list, and the photo stays until a deletion is confirmed. So
+    /// retrying a parked save re-attempts the write and nothing else.
+    func testRetrySavesTheParkedDecisionAgainAndTouchesNoPhotos() async {
         let (model, library, store) = await bootstrapped()
         model.startRecent()
         await model.settle()
-        let favorited = model.currentAsset?.id
+        let marked = model.currentAsset?.id
+        let savesBefore = store.saveAttempts
 
         store.failsWrites = true
-        model.apply(.favorite)
+        model.apply(.queueDeletion)
         await model.settle()
 
-        XCTAssertEqual(library.favoriteWrites.count, 1, "the favorite is written once while staging")
         XCTAssertNotNil(model.pendingDecision)
+        XCTAssertEqual(model.currentAsset?.id, marked, "an unsaved decision must not advance the session")
+        XCTAssertEqual(store.saveAttempts, savesBefore + 1, "the failed save is attempted once")
+        XCTAssertEqual(store.state?.marks, [], "a failed save leaves the stored state alone")
+        let ids = [marked].compactMap { $0 }
+        let stillThere = await library.existingAssetIDs(among: ids)
+        XCTAssertEqual(stillThere, Set(ids), "marking a photo removes nothing from the library")
 
         store.failsWrites = false
         await model.retryPendingDecision()
         await model.settle()
 
-        XCTAssertEqual(library.favoriteWrites.count, 1, "retrying must not repeat the library effect")
-        XCTAssertEqual(library.favoriteWrites.first?.id, favorited)
-        XCTAssertTrue(library.favoriteWrites.first?.isFavorite ?? false)
         XCTAssertNil(model.pendingDecision)
+        XCTAssertNotEqual(model.currentAsset?.id, marked, "the retried decision advances the session")
+        XCTAssertEqual(store.state?.marks, ids)
+        XCTAssertEqual(store.saveAttempts, savesBefore + 2, "retrying re-attempts the write and nothing else")
     }
 
     func testASuccessfulDecisionIsSavedBeforeTheSessionAdvances() async {
@@ -155,26 +164,24 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.route, .entry)
     }
 
-    func testFavoriteAndItsUndoAreAppliedInOrderExactlyOnceEach() async {
-        let made = await bootstrapped()
-        made.model.startRecent()
-        await made.model.settle()
-        let favorited = made.model.currentAsset?.id
+    /// Two gestures in the same run-loop turn must serialise, and neither marking
+    /// nor undoing may touch the library: nothing is deleted until review.
+    func testMarkingThenUndoingInOneTurnLeavesTheLibraryAlone() async {
+        let (model, library, _) = await bootstrapped()
+        model.startRecent()
+        await model.settle()
+        let marked = model.currentAsset?.id
 
-        // Two gestures in the same run-loop turn: the second must wait for the
-        // first, and neither library effect may be repeated or reordered.
-        made.model.apply(.favorite)
-        made.model.apply(.undo)
-        await made.model.settle()
+        model.apply(.queueDeletion)
+        model.apply(.undo)
+        await model.settle()
 
-        XCTAssertEqual(made.model.currentAsset?.id, favorited, "undo returns to the favorited photo")
-        XCTAssertEqual(
-            made.library.favoriteWrites.map { "\($0.id):\($0.isFavorite)" },
-            ["\(favorited ?? ""):true", "\(favorited ?? ""):false"],
-            "the favorite write and its undo must land in order, once each"
-        )
-        XCTAssertFalse(made.model.engine?.decidedIDs.contains(favorited ?? "") ?? true)
-        XCTAssertNil(made.model.pendingDecision)
+        XCTAssertEqual(model.currentAsset?.id, marked, "undo returns to the marked photo")
+        XCTAssertTrue(model.markedIDs.isEmpty, "undo removes the mark")
+        let ids = [marked].compactMap { $0 }
+        let stillThere = await library.existingAssetIDs(among: ids)
+        XCTAssertEqual(stillThere, Set(ids), "marking and undoing touch nothing")
+        XCTAssertNil(model.pendingDecision)
     }
 
     // MARK: - Restart

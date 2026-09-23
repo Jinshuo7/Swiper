@@ -27,8 +27,7 @@ Open SWIPR, grant access, and decide: **Continue sorting** if an unfinished
 session exists, **Review & delete · N** if photos are already marked, **Recent**
 to start at the newest photo, **Start Here** to pick a starting point from a
 scrollable grid, or **Tumbler** for a repeat-free random walk. Decide each photo
-with swipe left (mark for deletion), swipe right (keep), or a heart (favorite,
-keep, advance), or switch to a button preset. Traversal remembers the preferred
+by swiping left (mark for deletion) or right (keep), or with the three controls. Traversal remembers the preferred
 direction and defaults toward older photos, and skips photos already marked.
 
 Marking is not deleting, and it is not session state: one deletion list carries

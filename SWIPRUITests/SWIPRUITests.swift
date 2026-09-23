@@ -495,24 +495,6 @@ final class SWIPRUITests: XCTestCase {
         capture("Controls — close in the top left")
     }
 
-    /// The heart moved to the top strip, where it costs the decision controls
-    /// nothing. It still favorites the photo and moves on.
-    func testTheHeartIsInTheTopStripAndStillFavorites() {
-        let app = launchApp()
-        _ = startViewer(app)
-
-        let window = app.windows.firstMatch.frame
-        let favorite = app.buttons["viewer.favorite"]
-        XCTAssertTrue(favorite.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(favorite.frame.midX, window.midX, "the heart sits on the right with Review")
-        XCTAssertLessThan(favorite.frame.midY, window.height * 0.2, "the heart belongs in the top strip")
-
-        let before = photoElement(app).label
-        favorite.tap()
-        XCTAssertNotEqual(photoElement(app).label, before, "favoriting also advances")
-        capture("Controls — heart in the top strip")
-    }
-
     /// Marking a photo makes the Review bar appear. That must not shove the
     /// decision controls somewhere else mid-session.
     func testControlRailDoesNotMoveWhenAMarkAppears() {
@@ -633,7 +615,6 @@ final class SWIPRUITests: XCTestCase {
 
         for (identifier, label) in [
             ("viewer.close", "Close"),
-            ("viewer.favorite", "Favorite"),
             ("control.undo", "Undo"),
         ] {
             let control = app.buttons[identifier]
@@ -691,7 +672,7 @@ final class SWIPRUITests: XCTestCase {
     }
 
     private func assertControlsInsideScreen(_ app: XCUIApplication, window: CGRect) {
-        for identifier in ["viewer.close", "viewer.favorite", "control.undo"] {
+        for identifier in ["viewer.close", "control.undo"] {
             let control = app.buttons[identifier]
             XCTAssertTrue(control.exists, "\(identifier) is missing from the viewer")
             XCTAssertTrue(

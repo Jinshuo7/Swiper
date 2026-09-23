@@ -77,16 +77,6 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
         return existing
     }
 
-    func setFavorite(_ isFavorite: Bool, forID id: String) async throws {
-        guard let asset = asset(withID: id) else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        try await PHPhotoLibrary.shared().performChanges {
-            let request = PHAssetChangeRequest(for: asset)
-            request.isFavorite = isFavorite
-        }
-    }
-
     func deleteAssets(ids: [String]) async throws -> [String] {
         let assets = self.assets(withIDs: ids)
         guard !assets.isEmpty else { return [] }
@@ -223,7 +213,6 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
             creationDate: asset.creationDate,
             pixelWidth: asset.pixelWidth,
             pixelHeight: asset.pixelHeight,
-            isFavorite: asset.isFavorite,
             kind: kind
         )
     }
