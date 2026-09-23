@@ -384,7 +384,7 @@ struct ViewerView: View {
             }
         }
         .frame(width: cluster.width, height: cluster.height)
-        .opacity(isClusterIdle && !gripMove.isActive ? 0.55 : 1)
+        .opacity(isClusterIdle && !gripMove.isActive ? 0.7 : 1)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
         // The accessibility element has to be the cluster itself. Applying these
         // after `.position` would report the whole screen instead, because

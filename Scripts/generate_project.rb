@@ -79,7 +79,7 @@ settings(app, {
   "GENERATE_INFOPLIST_FILE" => "YES",
   "INFOPLIST_KEY_CFBundleDisplayName" => "SWIPR",
   "INFOPLIST_KEY_NSPhotoLibraryUsageDescription" =>
-    "SWIPR shows your photos one at a time so you can keep, favorite or queue them for deletion. Favorites and confirmed deletions change your library. Everything stays on this device.",
+    "SWIPR shows your photos one at a time so you can keep them or mark them for deletion. Confirmed deletions change your library, and everything stays on this device.",
   "INFOPLIST_KEY_UILaunchScreen_Generation" => "YES",
   "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" => "YES",
   "INFOPLIST_KEY_UISupportedInterfaceOrientations" => "UIInterfaceOrientationPortrait",

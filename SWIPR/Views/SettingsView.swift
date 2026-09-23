@@ -100,7 +100,7 @@ struct SettingsView: View {
             )
             statisticsRow(
                 title: "Storage reclaimed",
-                value: "≈ \(ByteFormatter.string(fromBytes: model.statistics.lifetimeReclaimedBytes))",
+                value: storageText(model.statistics.lifetimeReclaimedBytes),
                 identifier: "settings.statistics.lifetimeReclaimed"
             )
             statisticsRow(
@@ -111,7 +111,7 @@ struct SettingsView: View {
             if model.resumableSession != nil {
                 statisticsRow(
                     title: "This session",
-                    value: "\(model.statistics.currentSessionDeletedCount) deleted · ≈ \(ByteFormatter.string(fromBytes: model.statistics.currentSessionReclaimedBytes))",
+                    value: "\(model.statistics.currentSessionDeletedCount) deleted · \(storageText(model.statistics.currentSessionReclaimedBytes))",
                     identifier: "settings.statistics.currentSession"
                 )
             }
@@ -121,6 +121,12 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 4)
         }
+    }
+
+    /// Storage is an estimate, so it is prefixed with "≈" — except at zero,
+    /// where "≈ 0 bytes" reads worse than the plain truth.
+    private func storageText(_ bytes: Int64) -> String {
+        bytes == 0 ? ByteFormatter.string(fromBytes: 0) : "≈ \(ByteFormatter.string(fromBytes: bytes))"
     }
 
     private func statisticsRow(title: String, value: String, identifier: String) -> some View {
