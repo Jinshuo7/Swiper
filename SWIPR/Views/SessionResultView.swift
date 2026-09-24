@@ -31,27 +31,27 @@ struct SessionResultView: View {
         VStack(spacing: 18) {
             Image(systemName: hasDeletions ? "checkmark.circle.fill" : "info.circle")
                 .font(.system(size: 52, weight: .light))
-                .foregroundStyle(hasDeletions ? .green : .white)
+                .foregroundStyle(hasDeletions ? Color.swiprKeep : Color.swiprForeground)
 
             if hasDeletions {
                 Text("\(outcome.deletedCount) \(outcome.deletedCount == 1 ? "photo" : "photos") deleted")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("You reclaimed approximately \(ByteFormatter.string(fromBytes: outcome.deletedBytes)).")
                     .font(.callout)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Nothing was deleted")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("No marked photo was confirmed deleted. Unconfirmed items are never counted as deletions.")
                     .font(.callout)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -59,7 +59,7 @@ struct SessionResultView: View {
                 Text("\(outcome.failedCount) could not be confirmed as deleted and stayed marked. Nothing about them was counted.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.swiprWarning)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("result.remaining")
             }
@@ -75,10 +75,10 @@ struct SessionResultView: View {
         }
         .padding(28)
         .frame(maxWidth: 420)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.swiprSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(Color.swiprBorder, lineWidth: 1)
         )
     }
 }

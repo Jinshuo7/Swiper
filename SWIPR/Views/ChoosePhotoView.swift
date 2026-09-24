@@ -43,23 +43,21 @@ struct ChoosePhotoView: View {
                     // the labels into ellipses and the jump bar off the bottom.
                     ScrollView {
                         VStack(spacing: 0) {
-                            explanation
                             traversalRow
                             jumpBar(proxy)
-                            Divider().overlay(Color.white.opacity(0.12))
+                            Divider().overlay(Color.swiprBorder)
                             gridBody
                         }
                     }
                 } else {
-                    explanation
                     traversalRow
                     jumpBar(proxy)
-                    Divider().overlay(Color.white.opacity(0.12))
+                    Divider().overlay(Color.swiprBorder)
 
                     if model.order.isEmpty {
                         Spacer()
                         Text("No photos or Live Photos are visible.")
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(Color.swiprSecondary)
                         Spacer()
                     } else {
                         grid
@@ -93,29 +91,9 @@ struct ChoosePhotoView: View {
             Spacer()
             Color.clear.frame(width: 44, height: 44)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.swiprForeground)
         .padding(.horizontal, 12)
         .padding(.top, 6)
-    }
-
-    /// Says what the screen is for. Without this the grid is just a photo library
-    /// with no explanation of what tapping a photo does. The direction is named
-    /// from the preference, because a session started here really does walk
-    /// whichever way the user chose.
-    private var explanation: some View {
-        Text("Pick the photo you want to start from. SWIPR begins there and walks toward \(walkDirectionWord) photos, skipping anything you have already decided or marked for deletion.")
-            .font(.footnote)
-            .multilineTextAlignment(.leading)
-            .foregroundStyle(.white.opacity(0.65))
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 10)
-            .accessibilityIdentifier("choosePhoto.explanation")
-    }
-
-    private var walkDirectionWord: String {
-        model.preferences.defaultDirection == .older ? "older" : "newer"
     }
 
     /// The two named traversals. At accessibility sizes they stack, because a
@@ -167,11 +145,11 @@ struct ChoosePhotoView: View {
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .foregroundStyle(.white)
+            .background(Color.swiprSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .foregroundStyle(Color.swiprForeground)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    .stroke(Color.swiprBorder, lineWidth: 1)
             )
         }
         .accessibilityIdentifier(identifier)
@@ -216,9 +194,9 @@ struct ChoosePhotoView: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
-            .foregroundStyle(.white)
-            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            .background(Color.swiprSurface, in: Capsule())
+            .foregroundStyle(Color.swiprForeground)
+            .overlay(Capsule().stroke(Color.swiprBorder, lineWidth: 1))
         }
         .disabled(months.count < 2)
         .accessibilityIdentifier("choosePhoto.jump")
@@ -237,9 +215,9 @@ struct ChoosePhotoView: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
-            .foregroundStyle(.white)
-            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            .background(Color.swiprSurface, in: Capsule())
+            .foregroundStyle(Color.swiprForeground)
+            .overlay(Capsule().stroke(Color.swiprBorder, lineWidth: 1))
         }
         .accessibilityIdentifier("choosePhoto.sort")
     }
@@ -278,16 +256,16 @@ struct ChoosePhotoView: View {
         HStack(spacing: 8) {
             Text(monthTitles[month.id] ?? month.id)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.swiprForeground)
             Text("\(month.count)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.swiprSecondary)
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
+        .background(Color.swiprBackground.opacity(0.96))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("choosePhoto.month.\(month.id)")
     }
@@ -306,7 +284,7 @@ private struct ChoosePhotoCell: View {
         // size itself, a 4:1 panorama in a 92pt-tall cell asks for 368pt of width
         // and draws straight across its neighbours' columns, so the grid stops
         // looking like a grid.
-        Color.white.opacity(0.05)
+        Color.swiprElevated
             .frame(maxWidth: .infinity)
             .frame(height: 92)
             .overlay {
@@ -338,8 +316,8 @@ private struct ChoosePhotoCell: View {
             .font(.system(size: 9, weight: .bold))
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(.black.opacity(background), in: Capsule())
-            .foregroundStyle(.white)
+            .background(Color.swiprBackground.opacity(background), in: Capsule())
+            .foregroundStyle(Color.swiprForeground)
             .padding(4)
             .accessibilityHidden(true)
     }

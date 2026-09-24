@@ -8,6 +8,8 @@ import SwiftUI
 /// deletion-review chip only appears while photos are marked.
 struct EntryView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var logoSettled = false
 
     var body: some View {
         // Exactly one screen tall at normal sizes. When the largest
@@ -25,12 +27,29 @@ struct EntryView: View {
         VStack(spacing: 0) {
             header
             Spacer(minLength: 16)
-            VStack(spacing: 26) {
-                Text("SWIPR")
-                    .font(.system(size: 44, weight: .bold))
-                    .foregroundStyle(.white)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("entry.wordmark")
+            VStack(spacing: 22) {
+                VStack(spacing: 14) {
+                    Image(systemName: "photo.stack.fill")
+                        .font(.system(size: 27, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 72, height: 72)
+                        .background(Color.swiprAccent.gradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .rotationEffect(.degrees(logoSettled ? 0 : -7))
+                        .scaleEffect(logoSettled ? 1 : 0.92)
+                        .accessibilityHidden(true)
+
+                    Text("SWIPR")
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .tracking(2.5)
+                        .foregroundStyle(Color.swiprForeground)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("entry.wordmark")
+
+                    Text("A calmer camera roll.")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.swiprSecondary)
+                }
+                .offset(y: logoSettled ? 0 : 7)
 
                 startAction
 
@@ -40,7 +59,7 @@ struct EntryView: View {
                     } label: {
                         Text("Resume")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.swiprForeground)
                             .frame(minWidth: 44, minHeight: 44)
                     }
                     .accessibilityIdentifier("entry.resume")
@@ -49,7 +68,7 @@ struct EntryView: View {
                 if !model.hasPhotos {
                     Text("No photos to sort.")
                         .font(.body)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color.swiprSecondary)
                         .accessibilityIdentifier("entry.empty")
                 }
 
@@ -59,13 +78,22 @@ struct EntryView: View {
                     } label: {
                         Text("Select more photos")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Color.swiprSecondary)
                             .frame(minWidth: 44, minHeight: 44)
                     }
                     .accessibilityIdentifier("entry.selectMorePhotos")
                 }
             }
             Spacer(minLength: 16)
+        }
+        .onAppear {
+            guard !reduceMotion else {
+                logoSettled = true
+                return
+            }
+            withAnimation(.spring(duration: 0.55, bounce: 0.16)) {
+                logoSettled = true
+            }
         }
     }
 
@@ -88,7 +116,7 @@ struct EntryView: View {
 
             reviewChip
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.swiprForeground)
         .padding(.horizontal, 12)
         .padding(.top, 8)
     }
@@ -106,9 +134,9 @@ struct EntryView: View {
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
-                .foregroundStyle(.white)
-                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .background(Color.swiprSurface, in: Capsule())
+                .foregroundStyle(Color.swiprForeground)
+                .overlay(Capsule().stroke(Color.swiprBorder, lineWidth: 1))
             }
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)
@@ -130,9 +158,9 @@ struct EntryView: View {
                 Image(systemName: "photo.stack")
                     .font(.system(size: 27, weight: .semibold))
                     .frame(width: 68, height: 68)
-                    .background(enabled ? Color.white : Color.white.opacity(0.12), in: Circle())
-                    .foregroundStyle(enabled ? Color.black : Color.white.opacity(0.4))
-                    .overlay(Circle().stroke(Color.white.opacity(enabled ? 0 : 0.15), lineWidth: 1))
+                    .background(enabled ? Color.swiprAccent : Color.swiprElevated, in: Circle())
+                    .foregroundStyle(enabled ? Color.white : Color.swiprTertiary)
+                    .overlay(Circle().stroke(Color.swiprBorder.opacity(enabled ? 0 : 1), lineWidth: 1))
                     .contentShape(Circle())
             }
             .disabled(!enabled)
@@ -141,7 +169,7 @@ struct EntryView: View {
 
             Text("Start here")
                 .font(.body)
-                .foregroundStyle(enabled ? .white : .white.opacity(0.4))
+                .foregroundStyle(enabled ? Color.swiprForeground : Color.swiprTertiary)
                 .accessibilityHidden(true)
         }
     }

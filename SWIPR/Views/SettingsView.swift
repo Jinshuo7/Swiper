@@ -33,7 +33,7 @@ struct SettingsView: View {
                         }
                         Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at the end of the buttons, away from Trash and Keep, and you can put it on either side. Drag the three dots to move the whole cluster to the bottom, left or right edge — the photo never moves.")
                             .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color.swiprSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
                     }
@@ -58,7 +58,7 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings.direction")
                         Text("Choose a photo walks in this direction, and SWIPR remembers it. Newest always begins at the newest photo.")
                             .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color.swiprSecondary)
                     }
                 }
                 .padding(20)
@@ -82,7 +82,7 @@ struct SettingsView: View {
             Spacer()
             Color.clear.frame(width: 44, height: 44)
         }
-        .foregroundStyle(.white)
+         .foregroundStyle(Color.swiprForeground)
         .padding(.horizontal, 12)
         .padding(.top, 6)
     }
@@ -118,7 +118,7 @@ struct SettingsView: View {
             }
             Text("Only deletions confirmed by the system are counted. Storage figures are estimates.")
                 .font(.footnote)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Color.swiprSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 4)
         }
@@ -132,11 +132,11 @@ struct SettingsView: View {
 
     private func statisticsRow(title: String, value: String, identifier: String) -> some View {
         let label = Text(title)
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(Color.swiprSecondary)
             .accessibilityIdentifier("\(identifier).label")
         let valueText = Text(value)
             .fontWeight(.semibold)
-            .foregroundStyle(.white)
+             .foregroundStyle(Color.swiprForeground)
             .accessibilityIdentifier(identifier)
         // At accessibility sizes the value is wide enough to squeeze the label
         // into mid-word breaks, so the two stack instead of sitting side by side.
@@ -182,14 +182,14 @@ struct SettingsView: View {
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: model.preferences.position == position ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(model.preferences.position == position ? .blue : .white.opacity(0.4))
+                    .foregroundStyle(model.preferences.position == position ? Color.swiprAccent : Color.swiprTertiary)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Buttons at the \(position.title)")
                         .fontWeight(.semibold)
-                        .foregroundStyle(.white)
+                         .foregroundStyle(Color.swiprForeground)
                     Text(subtitle)
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.swiprSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
@@ -204,7 +204,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Undo side")
                 .fontWeight(.semibold)
-                .foregroundStyle(.white)
+                 .foregroundStyle(Color.swiprForeground)
             ForEach(UndoSide.allCases) { side in
                 undoSideRow(side)
             }
@@ -219,9 +219,9 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: model.preferences.undoSide == side ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(model.preferences.undoSide == side ? .blue : .white.opacity(0.4))
+                    .foregroundStyle(model.preferences.undoSide == side ? Color.swiprAccent : Color.swiprTertiary)
                 Text("Undo on the \(side.title.lowercased())")
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                 Spacer()
             }
             .padding(.vertical, 4)
@@ -253,20 +253,20 @@ struct SettingsView: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.white)
+                         .foregroundStyle(Color.swiprForeground)
                     Text(subtitle)
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.swiprSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.swiprTertiary)
             }
             .padding(.vertical, 6)
         }
@@ -284,14 +284,14 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                 Text(subtitle)
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .tint(.green)
+         .tint(Color.swiprKeep)
         .padding(.vertical, 6)
         .accessibilityIdentifier(identifier)
     }
@@ -315,14 +315,15 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Color.swiprSecondary)
                 .accessibilityIdentifier(titleIdentifier ?? title)
             VStack(alignment: .leading, spacing: 10) {
                 content()
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.swiprSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.swiprBorder, lineWidth: 1))
         }
     }
 }

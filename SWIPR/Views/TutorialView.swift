@@ -13,7 +13,7 @@ struct TutorialView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.78)
+            Color.swiprBackground.opacity(0.78)
                 .ignoresSafeArea()
                 .onTapGesture { onDismiss() }
 
@@ -35,10 +35,10 @@ struct TutorialView: View {
             }
             .padding(22)
             .frame(maxWidth: 420)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    .stroke(Color.swiprBorder, lineWidth: 1)
             )
             .padding(24)
         }
@@ -50,7 +50,7 @@ struct TutorialView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("How sorting works")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.swiprForeground)
 
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(instructions, id: \.title) { instruction in
@@ -63,26 +63,26 @@ struct TutorialView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(instruction.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.swiprForeground)
                             Text(instruction.detail)
                                 .font(.footnote)
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(Color.swiprSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
             }
 
-            Divider().overlay(Color.white.opacity(0.2))
+            Divider().overlay(Color.swiprBorder)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Nothing is deleted until you review and confirm.")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
+                     .foregroundStyle(Color.swiprForeground)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Every decision is saved as you make it, so closing the app or an interruption does not erase work you already accepted.")
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -101,25 +101,25 @@ struct TutorialView: View {
                 symbol: "hand.draw",
                 title: "Drag left to delete",
                 detail: "The photo follows your finger. Past the threshold it arms, and releasing marks it. Nothing is deleted yet.",
-                tint: .red
+                tint: .swiprDelete
             ),
             Instruction(
                 symbol: "hand.draw",
                 title: "Drag right to keep",
                 detail: "A short or vertical drag makes no decision, so hesitating is safe.",
-                tint: .green
+                tint: .swiprKeep
             ),
             Instruction(
                 symbol: "trash",
                 title: "Or use the buttons",
                 detail: "Trash, Undo and Checkmark are on the photo unless you turn them off in Settings.",
-                tint: .orange
+                tint: .swiprAccent
             ),
             Instruction(
                 symbol: "ellipsis",
                 title: "Move the buttons",
                 detail: "Drag the three dots to put the buttons at the bottom, left or right edge. The photo stays exactly where it is.",
-                tint: .blue
+                tint: .swiprAccent
             ),
         ]
     }

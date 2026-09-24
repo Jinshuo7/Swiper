@@ -48,6 +48,10 @@ struct ViewerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // Keep the image stage black in both appearances: letterboxing
+                // must never look like part of the app's light-mode canvas.
+                // The image stage stays black in both appearances so full-photo
+                // letterboxing never blends into the surrounding app canvas.
                 Color.black.ignoresSafeArea()
 
                 if let asset = model.engine?.current {
@@ -234,7 +238,7 @@ struct ViewerView: View {
     }
 
     private func outcomeTint(_ direction: SessionAction) -> Color {
-        direction == .queueDeletion ? .red : .green
+        direction == .queueDeletion ? .swiprDelete : .swiprKeep
     }
 
     private func outcomeWell(
@@ -252,7 +256,7 @@ struct ViewerView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .foregroundStyle(.white)
+         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(WellBackground(tint: tint, armed: armed))
@@ -294,9 +298,9 @@ struct ViewerView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .foregroundStyle(.white)
-        .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+        .background(.regularMaterial, in: Capsule())
+        .foregroundStyle(Color.swiprForeground)
+        .overlay(Capsule().stroke(Color.white.opacity(0.24), lineWidth: 1))
         // One element, not a container plus inherited children, so a UI test
         // query for the identifier matches exactly once.
         .accessibilityElement(children: .ignore)
@@ -335,9 +339,9 @@ struct ViewerView: View {
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.regularMaterial, in: Capsule())
                 .foregroundStyle(.white)
-                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .overlay(Capsule().stroke(Color.white.opacity(0.24), lineWidth: 1))
             }
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)
@@ -367,10 +371,10 @@ struct ViewerView: View {
 
         return ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        .stroke(Color.swiprBorder.opacity(0.8), lineWidth: 1)
                 )
             if position.isVertical {
                 VStack(spacing: ControlClusterLayout.controlSpacing) {
@@ -406,7 +410,7 @@ struct ViewerView: View {
     private func grip(in size: CGSize) -> some View {
         Image(systemName: "ellipsis")
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(Color.swiprForeground)
             .frame(width: ControlClusterLayout.gripHitSize, height: ControlClusterLayout.gripHitSize)
             .contentShape(Rectangle())
             .gesture(moveGesture(in: size))
@@ -425,19 +429,19 @@ struct ViewerView: View {
     }
 
     private var trashControl: some View {
-        CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
+        CircleControl(systemImage: "trash", label: "Delete", tint: .swiprDelete, visualSize: 64, hitSize: 64) {
             clusterAction { model.apply(.queueDeletion) }
         }
     }
 
     private var keepControl: some View {
-        CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
+        CircleControl(systemImage: "checkmark", label: "Keep", tint: .swiprKeep, visualSize: 64, hitSize: 64) {
             clusterAction { model.apply(.keep) }
         }
     }
 
     private var undoControl: some View {
-        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
+        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo", visualSize: 46, hitSize: 56) {
             clusterAction { model.apply(.undo) }
         }
     }
@@ -465,17 +469,14 @@ struct ViewerView: View {
     private func controlSlots(in size: CGSize) -> some View {
         if model.preferences.showButtons && gripMove.isActive {
             ZStack {
-                ForEach(ControlPosition.allCases) { position in
+                if let position = highlightedSlot {
                     let rect = ControlClusterLayout.slotRect(for: position, in: size)
                     let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(Color.white.opacity(highlightedSlot == position ? 0.12 : 0.04))
+                        .fill(Color.swiprForeground.opacity(0.12))
                         .overlay(
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .stroke(
-                                    Color.white.opacity(highlightedSlot == position ? 0.95 : 0.28),
-                                    lineWidth: highlightedSlot == position ? 3 : 1
-                                )
+                                .stroke(Color.swiprForeground.opacity(0.95), lineWidth: 3)
                         )
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
@@ -502,11 +503,11 @@ struct ViewerView: View {
             )
             ZStack {
                 Circle()
-                    .fill(.ultraThinMaterial)
+                    .fill(.regularMaterial)
                     .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1))
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(Color.swiprForeground)
             }
             .frame(width: ControlClusterLayout.controlSize, height: ControlClusterLayout.controlSize)
             .position(centre)
@@ -590,10 +591,10 @@ struct ViewerView: View {
         VStack(spacing: 18) {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 48, weight: .light))
-                .foregroundStyle(.white)
+                 .foregroundStyle(Color.swiprForeground)
             Text("You've reviewed everything")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
+                 .foregroundStyle(Color.swiprForeground)
 
             if model.queueCount > 0 {
                 Button {
@@ -624,9 +625,9 @@ struct ViewerView: View {
         VStack(spacing: 14) {
             Image(systemName: "photo")
                 .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.swiprSecondary)
             Text("No photo to show")
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.swiprSecondary)
             Button("Back") { model.route = .entry }
                 .buttonStyle(SecondaryButtonStyle())
                 .padding(.horizontal, 60)
@@ -679,7 +680,7 @@ private struct AssetCanvas: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                ProgressView().tint(.white)
+                ProgressView().tint(.swiprAccent)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

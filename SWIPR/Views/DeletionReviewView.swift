@@ -54,7 +54,7 @@ struct DeletionReviewView: View {
                 Text(DeletionWording.markedForDeletion(markedIDs.count))
                     .font(.caption)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("review.markedCount")
             }
@@ -71,7 +71,7 @@ struct DeletionReviewView: View {
                 .accessibilityIdentifier("review.selectToggle")
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.swiprForeground)
         .padding(.horizontal, 12)
         .padding(.top, 6)
     }
@@ -215,23 +215,23 @@ struct DeletionReviewView: View {
                 Text("Your iPhone asks you to confirm before anything is removed. Photos you restored stay put.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.swiprSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("review.deleteExplanation")
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(.black.opacity(0.001))
+        .background(Color.swiprBackground.opacity(0.96))
     }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.swiprSecondary)
             Text("Nothing is marked for deletion")
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Color.swiprSecondary)
             Button("Done") { model.leaveReview() }
                 .buttonStyle(SecondaryButtonStyle())
                 .padding(.horizontal, 60)
@@ -251,7 +251,7 @@ private struct ReviewCell: View {
     var body: some View {
         // The cell owns its column; the thumbnail is an overlay on it. Sized by
         // its own content, a 4:1 panorama draws across the neighbouring cells.
-        Color.white.opacity(0.05)
+        Color.swiprElevated
             .overlay {
                 if let image {
                     Image(uiImage: image)
@@ -264,8 +264,8 @@ private struct ReviewCell: View {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(isSelected ? Color.blue : Color.white)
-                        .background(Circle().fill(.black.opacity(0.35)))
+                        .foregroundStyle(isSelected ? Color.swiprAccent : Color.swiprForeground)
+                        .background(Circle().fill(Color.swiprBackground.opacity(0.8)))
                         .padding(6)
                 }
             }
@@ -285,13 +285,13 @@ private struct InspectionView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.swiprBackground.ignoresSafeArea()
                 if let image {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                 } else {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(.swiprAccent)
                 }
             }
             .overlay(alignment: .topLeading) {

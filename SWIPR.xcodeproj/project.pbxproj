@@ -23,6 +23,7 @@
 		351C2D34E6930E0E21C8ADAA /* DeletionWording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F2E217F2E09FC68920CA13 /* DeletionWording.swift */; };
 		392874851C4189104CDA12CA /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05D9F03508F1DB899DCCF36 /* RootView.swift */; };
 		3ABB1A64670B1AE9A9193DF6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5B0A1BA96E3716A9E4B846 /* AppModel.swift */; };
+		3D89D52ABE72E8A2D1F27E56 /* SWIPRTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36CE6B02C68D3AC4311719DB /* SWIPRTheme.swift */; };
 		49AC10854F4B6830A7842BB3 /* AssetReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D94CCD89AD0848067B6A28B4 /* AssetReconciler.swift */; };
 		4AA05309C306B915E578BF71 /* ControlPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA1E72C6A89167CF3298051 /* ControlPreferencesTests.swift */; };
 		4B3EFE14DD483DCC3A5530AE /* FakePhotoLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73B46CD3707F371A3CF2E16 /* FakePhotoLibrary.swift */; };
@@ -145,6 +146,7 @@
 		2EA32012A2A79BA0CD9230D9 /* SWIPR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SWIPR.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		31BFCBC28A97A45FE48647C6 /* PhotoKitLibrary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhotoKitLibrary.swift; path = SWIPR/PhotoLibrary/PhotoKitLibrary.swift; sourceTree = "<group>"; };
 		3691A1022B3D844A0092CA17 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		36CE6B02C68D3AC4311719DB /* SWIPRTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SWIPRTheme.swift; path = SWIPR/Theme/SWIPRTheme.swift; sourceTree = "<group>"; };
 		44109F3B2FA5F9D1533CA093 /* LibraryAuthorization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LibraryAuthorization.swift; path = SWIPR/PhotoLibrary/LibraryAuthorization.swift; sourceTree = "<group>"; };
 		45C21B841DE25EBE2AD5BF05 /* LibraryOrder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LibraryOrder.swift; path = SWIPRKit/LibraryOrder.swift; sourceTree = "<group>"; };
 		4EEB8DBA7377DEDA112F7DF1 /* SessionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SessionEngine.swift; path = SWIPRKit/SessionEngine.swift; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 				17B895B3E583A6B2258A64DA /* AppModelTests.swift */,
 				C2B2ADF41C0939EBE64A9B5B /* PlaySessionUITests.swift */,
 				0C5B0DBB7A06819E40C94DF3 /* SWIPRUITests.swift */,
+				36CE6B02C68D3AC4311719DB /* SWIPRTheme.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -546,6 +549,7 @@
 				5297E73352032EB081945D82 /* SettingsView.swift in Sources */,
 				76941C514381F9EDBBF0CA62 /* TutorialView.swift in Sources */,
 				DB950352B9C86203C8A51CC9 /* ViewerView.swift in Sources */,
+				3D89D52ABE72E8A2D1F27E56 /* SWIPRTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

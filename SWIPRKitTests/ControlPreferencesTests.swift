@@ -124,7 +124,7 @@ final class ControlClusterLayoutTests: XCTestCase {
     func testClusterSizeShortAxisIsEightyEight() {
         let bottom = ControlClusterLayout.clusterSize(for: .bottom)
         XCTAssertEqual(bottom.height, 88)
-        XCTAssertEqual(bottom.width, 286, "grip + three controls + the tray's padding")
+        XCTAssertEqual(bottom.width, 290, "grip + three 64 pt controls + the tray's padding")
 
         // A 375 pt phone leaves room at each bottom corner for the side columns.
         XCTAssertGreaterThanOrEqual((375 - bottom.width) / 2, 40)

@@ -35,7 +35,6 @@ struct SWIPRApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(model)
-                .preferredColorScheme(.dark)
         }
     }
 

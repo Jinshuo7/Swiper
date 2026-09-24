@@ -128,9 +128,9 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
 /// Kept in the framework rather than only inside the SwiftUI view so the
 /// geometry the spec pins down is directly testable on macOS.
 public enum ControlClusterLayout {
-    public static let controlSize: CGFloat = 56
-    public static let controlSpacing: CGFloat = 14
-    public static let trayInset: CGFloat = 16
+    public static let controlSize: CGFloat = 64
+    public static let controlSpacing: CGFloat = 10
+    public static let trayInset: CGFloat = 12
     /// The grip's hit region. The drawn three dots are much smaller; this is the
     /// area that can be grabbed.
     public static let gripHitSize: CGFloat = 44

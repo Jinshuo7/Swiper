@@ -7,7 +7,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.swiprBackground.ignoresSafeArea()
             content
             persistenceLayer
             if model.isShowingTutorial {
@@ -41,7 +41,7 @@ struct RootView: View {
     private var content: some View {
         switch model.route {
         case .loading:
-            ProgressView().tint(.white)
+            ProgressView().tint(.swiprAccent)
         case .permission:
             PermissionView()
         case .entry:

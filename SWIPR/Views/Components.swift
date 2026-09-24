@@ -13,8 +13,8 @@ struct PrimaryButtonStyle: ButtonStyle {
             .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
-            .background(configuration.isPressed ? Color.white.opacity(0.85) : Color.white)
-            .foregroundStyle(.black)
+            .background(configuration.isPressed ? Color.swiprAccent.opacity(0.85) : Color.swiprAccent)
+            .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
@@ -29,12 +29,12 @@ struct SecondaryButtonStyle: ButtonStyle {
             .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
-            .background(Color.white.opacity(configuration.isPressed ? 0.18 : 0.1))
-            .foregroundStyle(.white)
+            .background(Color.swiprSurface.opacity(configuration.isPressed ? 0.72 : 1))
+            .foregroundStyle(Color.swiprForeground)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    .stroke(Color.swiprBorder, lineWidth: 1)
             )
     }
 }
@@ -71,9 +71,9 @@ struct CircleControl: View {
             Image(systemName: systemImage)
                 .font(.system(size: visualSize * 0.39, weight: .semibold))
                 .frame(width: visualSize, height: visualSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(.regularMaterial, in: Circle())
                 .foregroundStyle(tint)
-                .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .overlay(Circle().stroke(Color.white.opacity(0.24), lineWidth: 1))
                 .frame(width: max(visualSize, hitSize), height: max(visualSize, hitSize))
                 .contentShape(Rectangle())
         }
@@ -92,8 +92,8 @@ struct TopBarButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: Circle())
-                .foregroundStyle(.white)
+                .background(.regularMaterial, in: Circle())
+                .foregroundStyle(Color.swiprForeground)
         }
         .accessibilityLabel(label)
         .accessibilityIdentifier("topbar.\(label.lowercased())")
@@ -116,9 +116,9 @@ struct WellBackground: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(armed ? 0.9 : 0.25), lineWidth: armed ? 3 : 1)
+                    .stroke(tint.opacity(armed ? 1 : 0.8), lineWidth: armed ? 3 : 1)
             )
-            .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+            .shadow(color: Color.swiprBackground.opacity(0.35), radius: 12, y: 4)
     }
 }
 
@@ -139,14 +139,14 @@ struct PersistenceBanner: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.swiprWarning)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.swiprForeground)
                     Text(message)
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Color.swiprSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -156,25 +156,25 @@ struct PersistenceBanner: View {
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Color.white)
-                    .foregroundStyle(.black)
+                    .background(Color.swiprAccent)
+                    .foregroundStyle(.white)
                     .clipShape(Capsule())
                 if let secondaryTitle, let secondaryAction {
                     Button(secondaryTitle, action: secondaryAction)
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.12))
-                        .foregroundStyle(.white)
+                        .background(Color.swiprElevated)
+                        .foregroundStyle(Color.swiprForeground)
                         .clipShape(Capsule())
                 }
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                .stroke(Color.swiprBorder, lineWidth: 1)
         )
         .frame(maxWidth: 460)
     }
