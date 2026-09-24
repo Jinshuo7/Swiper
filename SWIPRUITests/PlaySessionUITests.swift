@@ -68,6 +68,38 @@ final class PlaySessionUITests: XCTestCase {
         add(attachment)
     }
 
+    /// A thread-safe slot for a screenshot taken while a drag is held.
+    private final class ScreenshotBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: XCUIScreenshot?
+
+        var screenshot: XCUIScreenshot? {
+            get { lock.withLock { stored } }
+            set { lock.withLock { stored = newValue } }
+        }
+    }
+
+    /// Holds a drag in place, captures what is on screen while it is held, then
+    /// releases. The phantom slots only exist mid-drag, so a post-release
+    /// screenshot could never show them.
+    private func holdDrag(_ start: XCUICoordinate, to end: XCUICoordinate, captureNamed name: String) {
+        let box = ScreenshotBox()
+        let captured = expectation(description: "captured \(name)")
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
+            box.screenshot = XCUIScreen.main.screenshot()
+            captured.fulfill()
+        }
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1.5)
+        wait(for: [captured], timeout: 20)
+        guard let screenshot = box.screenshot else {
+            return XCTFail("Could not capture \(name) while the drag was held")
+        }
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// Returns to the entry screen from wherever the app currently is.
     private func goHome(_ app: XCUIApplication) {
         if app.buttons["viewer.close"].exists {
@@ -297,6 +329,19 @@ final class PlaySessionUITests: XCTestCase {
     private func rightTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         return CGPoint(x: window.maxX - 44, y: window.height * 0.62)
+    }
+
+    /// Captures the phantom slots while the grip is held, because they only
+    /// exist mid-move and that is the state the owner flagged as visually busy:
+    /// the bottom row and the side columns overlap in the lower corners.
+    func testPhantomSlotsWhileDraggingTheGrip() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let grip = element(app, "viewer.grip")
+        XCTAssertTrue(grip.waitForExistence(timeout: 10))
+        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        // Toward the left column, where the lower slots overlap most.
+        holdDrag(start, to: start.withOffset(CGVector(dx: -120, dy: -180)), captureNamed: "Design — phantom slots mid-move")
     }
 
     /// Wherever the cluster is, every control has to stay on screen and clear of
