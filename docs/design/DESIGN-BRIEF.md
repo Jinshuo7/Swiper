@@ -13,7 +13,9 @@ swiping; marked photos go to a review screen and are only removed after an
 explicit system confirmation. Its whole reason to exist is speed and a quiet
 screen, not browsing.
 
-- Target: iOS 17+, SwiftUI, portrait iPhone, **dark UI only** (`.preferredColorScheme(.dark)`).
+- Target: iOS 17+, SwiftUI, portrait iPhone. The app currently ships **dark only**
+  (`.preferredColorScheme(.dark)`, black backgrounds, hardcoded white text); the
+  owner wants **light and dark**, plus one accent colour.
 - Framework module `SWIPRKit` holds the logic; `SWIPR/Views/` holds the UI.
 - English only, deliberately (no localisation yet, `docs/LOCALIZATION.md`).
 - **No new dependencies.** Pure SwiftUI + SF Symbols + a few UIKit bridges.
@@ -82,7 +84,8 @@ Everything is in the repo; no live link needed.
 ### How to see the UI, and what is missing
 
 - **Static screens** are covered by the committed screenshots and the contact
-  sheets — that is enough to review layout, type and colour.
+  sheets — that is enough to review layout, type and colour. Note they are the
+  current **dark-only** state; there is no light mode in the app yet.
 - **Motion states** do not photograph well. The two that matter are captured as
   stills: the drag wells (`drag-02-left-past-threshold-armed.png`) and the
   phantom slots (`design-slots-mid-drag.png`). If the designer needs more, we can
@@ -94,7 +97,11 @@ Everything is in the repo; no live link needed.
 
 ## Constraints the design must live inside
 
-- **Dark only**, black background; contrast at least 4.5:1.
+- **Light and dark.** The app hardcodes dark colours today, so the design needs a
+  semantic palette for both appearances (and one accent). Contrast at least 4.5:1
+  in each. This is a real engineering change, not a retint: every `.white`,
+  `Color.black` and `.ultraThinMaterial` in `SWIPR/Views/` has to move behind a
+  semantic colour layer, and `.preferredColorScheme(.dark)` comes off.
 - **Safe areas**: the bottom row sits 20 pt above the bottom safe edge; side
   columns centre at 75% of the safe-area height. The photo is fitted to the full
   safe area and **never resizes or shifts** for chrome (ADR-0006). Controls float
@@ -111,15 +118,14 @@ Everything is in the repo; no live link needed.
 Answer these and we will prepare the rest:
 
 1. **What do you need from us?** Specifically: which screenshots/sizes, the
-   SwiftUI source, a written style guide, or a set of redlines? Do you want a
-   light-mode exploration even though the app ships dark?
+   SwiftUI source, a written style guide, or a set of redlines?
 2. **Do you produce code, or a spec we implement?** If you hand back SwiftUI,
    great; if you hand back mockups, say which format resolves best.
-3. **Brand direction.** Is there a logo mark concept, a typeface preference
-   (system font vs a custom wordmark), and one accent colour? Today the only
-   colour is the red/green semantic pair and system blue.
-4. **The landing line.** Confirm or replace the working slogan ("Delete fast.")
-   and say whether it also wants a sub-line ("Swipe to keep. Tap to delete.").
+3. **Brand direction.** A logo mark concept and one accent colour; the app keeps
+   the **system font** (decided, no custom typeface). Define light and dark
+   palettes around the existing red/green semantic pair.
+4. **The landing line (optional).** A slogan was floated ("Delete fast.") but is
+   not required now. If the designer has a better one-line promise, propose it.
 5. **The logo motion.** What is it, how long, and what is the static end state?
    Give us the Reduce Motion fallback.
 6. **The slot overlap fix.** Your preferred model for showing the three
@@ -130,7 +136,7 @@ Answer these and we will prepare the rest:
 
 ## Decisions the owner still has to make
 
-- The slogan wording and whether it appears on the entry screen only.
-- Whether to introduce a custom typeface at all (system font is the safe default).
-- Whether the accent colour should change from system white/blue.
+- The accent hue itself, once the designer proposes options.
 - How much motion is acceptable on first launch.
+- Whether a slogan is used at all (optional).
+- Light/dark: the owner wants both; the designer defines the palettes.
