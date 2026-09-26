@@ -5,6 +5,14 @@ import SwiftUI
 struct SWIPRApp: App {
     @StateObject private var model: AppModel
 
+    static var viewerPrototypeEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-viewerDockPrototype")
+        #else
+        false
+        #endif
+    }
+
     init() {
         let arguments = ProcessInfo.processInfo.arguments
         // A unit-test bundle runs *inside* this app process. XCTest sets this
@@ -12,7 +20,7 @@ struct SWIPRApp: App {
         // real PhotoKit library or the real on-disk store, even when no launch
         // argument says so.
         let isHostedByTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        let useFakeLibrary = isHostedByTests || arguments.contains("-uiTestingFakeLibrary")
+        let useFakeLibrary = Self.viewerPrototypeEnabled || isHostedByTests || arguments.contains("-uiTestingFakeLibrary")
         let library: SWIPRPhotoLibrary
         let store: SessionStoring
         if useFakeLibrary {
@@ -23,7 +31,7 @@ struct SWIPRApp: App {
                 fakeLibrary.faults.failedDeleteIDs = Set(FakePhotoLibrary.demoDescriptors().map(\.id))
             }
             library = fakeLibrary
-            store = SWIPRApp.makeUITestingStore(arguments: arguments)
+            store = Self.viewerPrototypeEnabled ? InMemorySessionStore() : SWIPRApp.makeUITestingStore(arguments: arguments)
         } else {
             library = PhotoKitLibrary()
             store = FileSessionStore()
@@ -33,9 +41,15 @@ struct SWIPRApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(model)
-                .preferredColorScheme(.dark)
+            if Self.viewerPrototypeEnabled {
+                #if DEBUG
+                ViewerDockPrototype()
+                #endif
+            } else {
+                RootView()
+                    .environmentObject(model)
+                    .preferredColorScheme(.dark)
+            }
         }
     }
 
