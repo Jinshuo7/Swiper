@@ -45,6 +45,19 @@ class TicketControllerTests(unittest.TestCase):
             ],
         }
 
+    def bare_controller(self, manifest=None):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        command("git", "init", cwd=root)
+        (root / "editable.txt").write_text("editable")
+        (root / "context.txt").write_text("context")
+        value = manifest or self.manifest()
+        value["run_root"] = str(root / "runs")
+        path = root / "manifest.json"
+        path.write_text(json.dumps(value))
+        return controller.TicketController(path, source_root=root)
+
     def test_routine_and_planned_classification(self) -> None:
         manifest = self.manifest()
         self.assertEqual(controller.classify_ticket(manifest), (False, []))
@@ -117,6 +130,36 @@ class TicketControllerTests(unittest.TestCase):
             }))
             with self.assertRaisesRegex(controller.ControllerError, "attestation"):
                 controller.apply_accepted(ledger)
+
+    def test_verifier_blocking_findings_block(self) -> None:
+        manifest = self.manifest()
+        manifest["models"]["verifier"] = {"role": "verifier", "provider": "x", "model": "x"}
+        instance = self.bare_controller(manifest)
+        instance._bounded_response = lambda *args, **kwargs: (
+            {"disposition": "VERIFY", "blocking_findings": ["unsafe"]}, None
+        )
+        with self.assertRaisesRegex(controller.ControllerError, "blocking findings"):
+            instance._run_independent_verifier("diff", [])
+
+    def test_verifier_missing_blocking_findings_blocks(self) -> None:
+        manifest = self.manifest()
+        manifest["models"]["verifier"] = {"role": "verifier", "provider": "x", "model": "x"}
+        instance = self.bare_controller(manifest)
+        instance._bounded_response = lambda *args, **kwargs: (
+            {"disposition": "VERIFY"}, None
+        )
+        with self.assertRaisesRegex(controller.ControllerError, "omitted"):
+            instance._run_independent_verifier("diff", [])
+
+    def test_clean_verifier_receipt_is_in_acceptance_prompt(self) -> None:
+        manifest = self.manifest()
+        manifest["models"]["verifier"] = {"role": "verifier", "provider": "x", "model": "x"}
+        instance = self.bare_controller(manifest)
+        instance._bounded_response = lambda *args, **kwargs: (
+            {"disposition": "VERIFY", "blocking_findings": []}, None
+        )
+        instance._run_independent_verifier("diff", [])
+        self.assertIn('"blocking_findings": []', instance._acceptance_prompt("diff", []))
 
     def test_context_request_cannot_expand_edit_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

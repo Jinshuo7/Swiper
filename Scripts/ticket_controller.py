@@ -1067,6 +1067,25 @@ class TicketController:
             f"Diff:\n{diff}\nEvidence:\n{json.dumps(evidence, indent=2)}"
         )
 
+    def _run_independent_verifier(
+        self, diff: str, evidence: list[dict[str, Any]]
+    ) -> None:
+        if "verifier" not in self.manifest["models"]:
+            self.block("high-risk ticket requires a configured independent verifier")
+        receipt, _ = self._bounded_response(
+            "verifier",
+            self._verifier_prompt(diff, evidence),
+            allowed={"VERIFY", "BLOCK"},
+        )
+        if receipt["disposition"] == "BLOCK":
+            self.block(str(receipt.get("reason", "independent verification blocked")))
+        findings = receipt.get("blocking_findings")
+        if not isinstance(findings, list):
+            self.block("independent verifier omitted blocking_findings list")
+        if findings:
+            self.block("independent verifier reported blocking findings")
+        self.independent_receipt = receipt
+
     def _sync_worker_changes(self) -> None:
         assert self.broker
         unexpected = []
@@ -1286,6 +1305,8 @@ class TicketController:
         self._transition(State.VERIFIED, "deterministic verification passed")
         diff = self._diff()
         independent, _ = should_independently_verify(self.manifest)
+        if independent:
+            self._run_independent_verifier(diff, evidence)
         review, _ = self._bounded_response(
             "codex",
             self._acceptance_prompt(diff, evidence),
@@ -1315,6 +1336,8 @@ class TicketController:
             evidence = self.verify()
             self._transition(State.VERIFIED, "post-correction verification passed")
             diff = self._diff()
+            if independent:
+                self._run_independent_verifier(diff, evidence)
             review, _ = self._bounded_response(
                 "codex",
                 self._acceptance_prompt(diff, evidence),
@@ -1323,16 +1346,6 @@ class TicketController:
             self._transition(State.REVIEWED, f"final Codex review returned {review['disposition']}")
             if review["disposition"] != "ACCEPT":
                 self.block(str(review.get("reason", "final acceptance blocked")))
-        if independent:
-            if "verifier" not in self.manifest["models"]:
-                self.block("high-risk ticket requires a configured independent verifier")
-            self.independent_receipt, _ = self._bounded_response(
-                "verifier",
-                self._verifier_prompt(diff, evidence),
-                allowed={"VERIFY", "BLOCK"},
-            )
-            if self.independent_receipt["disposition"] == "BLOCK":
-                self.block(str(self.independent_receipt.get("reason", "independent verification blocked")))
         self._transition(State.ACCEPTED, "ticket accepted; no automatic progression")
         self._diff()
         if self.changed_paths:
