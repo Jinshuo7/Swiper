@@ -1,21 +1,3 @@
-> **Exploratory prototype — not production UI.** This document and the
-> `-viewerDockPrototype` build are a throwaway interaction study. They are **not**
-> the production-v1 target in [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
-> / [`docs/SPEC.md`](../../SPEC.md). Known differences from the target:
-> * Default prototype controls are **tinted** red/green and the sockets/links are
->   **cyan**; the target is neutral adaptive glass with only extremely faint
->   desaturated edge colour and no cyan.
-> * The prototype draws **no Photo/Live/Video badge** beneath Review; the target
->   requires one.
-> * Neutral variants exist behind launch flags, but they have **not** been
->   validated for the complete accessibility contract or the iOS 17 material
->   fallback, and generated screenshots are **not proof of visual approval**.
-> * Grip/puck/slot vocabulary below is superseded by direct whole-dock movement.
->
-> The dated observations in this file are **historical as-built facts** about the
-> prototype, not requirements. The original copy is archived at
-> [`docs/history/production-v1-reconciliation/docs/design/orange-porcelain/PROTOTYPE.md`](../../history/production-v1-reconciliation/docs/design/orange-porcelain/PROTOTYPE.md).
-
 # Native viewer interaction prototype
 
 Branch: `codex/viewer-dock-prototype`. Throwaway debug-only viewer selected by

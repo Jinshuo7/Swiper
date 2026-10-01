@@ -9,4 +9,4 @@ xcodebuild -quiet -project SWIPR.xcodeproj -scheme SWIPR -configuration Debug \
 xcrun devicectl device install app --device "$device_id" \
   .derivedData-prototype/Build/Products/Debug-iphoneos/SWIPR.app
 xcrun devicectl device process launch --device "$device_id" --terminate-existing \
-  com.zhangjinshuo.swipr -viewerDockPrototype
+  com.zhangjinshuo.swipr -- -viewerDockPrototype

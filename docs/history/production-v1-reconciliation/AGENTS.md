@@ -101,13 +101,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## Documentation
 
-Production v1 is specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24);
-the in-repo target contract is `docs/SPEC.md`, and `docs/IMPLEMENTATION-STATUS.md`
-separates required v1 from as-built legacy. Keep `docs/VISION.md`, `docs/SPEC.md`,
-`docs/ROADMAP.md`, `docs/TESTING.md`, `docs/LOCALIZATION.md` and `docs/adr/` in
-sync with behaviour; the glossary is `CONTEXT.md`; the visual baseline index is
-`docs/design/orange-porcelain/README.md`. English-only is the current as-built
-state while bilingual EN/zh-Hans is a v1 requirement.
+Keep these in sync with behaviour: `docs/VISION.md`, `docs/SPEC.md`,
+`docs/ROADMAP.md`, and `docs/adr/`. The glossary is `CONTEXT.md`.
 
 ## Agent skills
 

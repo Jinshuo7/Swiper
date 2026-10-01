@@ -1,10 +1,17 @@
 # Localisation survey and plan
 
+> **Production-v1 requirement.** [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+> requires **English and Simplified Chinese to ship complete** (ticket
+> [#33](https://github.com/Jinshuo7/Swiper/issues/33)), with each layer using its
+> own resource bundle and a fluent human reviewing the Simplified Chinese before
+> release. This document is the inventory, blocker list and single-pass plan for
+> that requirement. It records the as-built start point; it is a target, not a
+> claim that localisation is done.
+
 Status: **surveyed, not migrated.** English is the only shipped language. Nothing
 in the app is half-localised: no catalog exists and no call site has been
-converted. This document is the preparation for doing it in one pass, because a
-partial migration is worse than none — the app would show a mixture of English
-and Chinese.
+converted. The migration is deliberately one pass, because a partial migration
+is worse than none — the app would show a mixture of English and Chinese.
 
 ## What exists today
 
@@ -91,6 +98,7 @@ names, and the `XCTestConfigurationFilePath` environment key.
 ## What is deliberately not done yet
 
 The migration itself. Doing step 2 or 3 alone would leave the app shipping a
-mixture, and step 4 needs a decision that is not mine to make: whether I should
-produce a first-pass `zh-Hans` translation for review, or whether translations
-will be supplied. The English copy is unchanged and complete.
+mixture. Step 4 may be drafted by an agent as a first pass, but **approval by a
+fluent human reviewer is the release gate**; the Simplified Chinese must not ship
+unreviewed. The English copy is complete. Production v1 cannot ship until this
+migration is finished and human-reviewed.

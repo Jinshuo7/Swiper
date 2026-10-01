@@ -3,37 +3,6 @@
 This document records the exact commands used to verify SWIPR and what a future
 agent needs to re-run them. Keep it in sync when the test setup changes.
 
-## Current production-v1 testing contract (issue #24)
-
-Production v1 is specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
-and [`docs/SPEC.md`](SPEC.md). Testing follows its Testing Decisions: assert
-externally observable behaviour and durable invariants; use the application-model
-integration seam against fakes; extend fixtures to mixed photo/video, unavailable
-previews, Skip and playback transitions; cover dock gesture arbitration, EN/zh-Hans
-catalogues, and Dynamic Type through the largest accessibility category.
-
-* **Known baseline failure:** the largest-accessibility-text ("AX5") reachability
-  case `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize`
-  cannot scroll `choosePhoto.newest` at AX5. It is **release-blocking**. Do not
-  claim an all-green suite until it is fixed and re-run on a named commit.
-* **Legacy photo-only build.** Everything below records the as-built build from
-  issues #10–#16. Its **grip/single-entry narrative is historical, not
-  normative**: production v1 replaces the grip with direct whole-dock movement
-  and replaces the single "Choose a photo" entry with Home + editable filters
-  (see [`docs/SPEC.md`](SPEC.md) §§2–5). The exact commands remain useful.
-* Automated tests never touch a real library; UI tests launch with
-  `-uiTestingFakeLibrary`.
-
-### Focused simulator prototype check
-
-```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
-  -project SWIPR.xcodeproj -scheme SWIPR \
-  -destination 'platform=iOS Simulator,id=71EAC83D-54D4-451A-AB32-74A8878C7869' \
-  -derivedDataPath ./.derivedData-simulator \
-  -only-testing:SWIPRUITests/ViewerDockPrototypeTests
-```
-
 There are three test targets:
 
 | Target | What it covers | Where it runs |
@@ -218,11 +187,7 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
     is an overlay on it.
 
 
-### The control redesign (2026-09-23, third round) — historical as-built
-
-> **Historical, not normative.** This describes the legacy photo-only build's
-grip/puck/slot controls. Production v1 uses direct whole-dock movement; see
-[`docs/SPEC.md`](SPEC.md) §5 and [ADR-0007](adr/0007-three-fixed-control-positions.md).
+### The control redesign (2026-09-23, third round)
 
 The viewer's controls were replaced again, following `docs/adr/0006`–`0009`:
 

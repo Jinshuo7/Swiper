@@ -1,5 +1,17 @@
 # Three fixed control positions, moved with a puck
 
+**Status: AMENDED** by production-v1 (issue #24, 2026-10-01). The three fixed
+destinations are unchanged and still definitive. The **mechanism is replaced**:
+the three-dot grip, the lifted puck and the phantom slots are gone, and the
+**whole dock is dragged directly** from its buttons or gaps, morphing into a
+compact neutral **token** with destination markers and magnetic landing. There is
+no permanent grip and no long press. See [`docs/SPEC.md`](../SPEC.md) §5. The
+original decision below is retained as history for the destinations and the
+rejected continuous-placement alternative; its grip/puck/slot mechanism is no
+longer normative.
+
+## Original decision (historical)
+
 The three controls live at exactly three positions: a row centred on the screen
 width near the bottom edge, and columns centred in the middle of the lower half at
 the left and right edges. They move by dragging a three-dot grip. The grip lifts

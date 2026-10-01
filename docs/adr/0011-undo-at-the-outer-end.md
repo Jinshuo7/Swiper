@@ -1,5 +1,14 @@
 # Undo sits at the outer end of the cluster
 
+**Status: AMENDED** by production-v1 (issue #24, 2026-10-01). Delete and Keep stay
+adjacent with Undo at an outer end, and the two-value setting is retained — but it
+is now read as **Before actions** (default) / **After actions** rather than
+left/right, and the dock is moved by direct whole-dock dragging with no grip. See
+[`docs/SPEC.md`](../SPEC.md) §5.6. The reasoning below about keeping the pair
+adjacent and avoiding misclicks remains normative.
+
+## Original decision
+
 Undo leaves the middle of the control cluster and sits at one outer end; Trash
 and Keep stay adjacent as the pair. The end is a user setting with two values,
 which the user reads as left and right (leading and trailing in the code, so a

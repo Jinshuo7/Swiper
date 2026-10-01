@@ -1,4 +1,32 @@
-# Implementation status checkpoint
+# Implementation status
+
+> ## Read this first: two different things share this file
+>
+> **1. Required production v1** — specified by
+> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) and the in-repo
+> target contract [`SPEC.md`](SPEC.md), delivered by tickets
+> [#25–#36](ROADMAP.md). #24 is authoritative. **Almost none of the v1 target
+> behaviour below is implemented yet**: ordinary video, Home media choices,
+> editable filters, the fixed non-wrapping pool, playback, the neutral whole-dock
+> 3-position interaction, Before/After Undo, complete EN/zh-Hans and the App
+> Store release work are requirements, not as-built facts. Do not read the
+> legacy checkpoint as evidence that any of them exist.
+>
+> **2. As-built legacy state** — the finished checkpoint below, covering the
+> photo-only build from issues #11–#16 (spec #10) and later audit rounds. It is
+> real, tested work on the committed history. Its durable safety and persistence
+> substance is preserved by v1; its mutable product surface (single-entry flow,
+> grip cluster, photo-only scope) is superseded.
+>
+> **Known status for the v1 baseline:** the existing test baseline is not yet
+> all-green — the largest-accessibility-text ("AX5") reachability failure is
+> outstanding and is release-blocking (no known crash, data-loss,
+> deletion-safety or accessibility block may ship). Do not claim a green suite
+> until that is fixed and re-run on a named commit.
+
+---
+
+## Legacy checkpoint (issues #11–#16, photo-only — as-built history)
 
 Final checkpoint for the autonomous implementation of GitHub issues #11–#16
 (parent spec #10). Read with `docs/IMPLEMENTATION-PROMPT.md`,

@@ -1,5 +1,14 @@
 # Design handoff: give SWIPR a visual identity
 
+> **Historical brief — not the current contract.** Engineering and behaviour are
+> now specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) /
+> [`docs/SPEC.md`](../SPEC.md): photos, Live Photos and ordinary videos, a neutral
+> media-led viewer, a handle-free dock, light/dark/Xcode-iOS-17 fallback and full
+> English + Simplified Chinese. This brief describes the earlier **dark-only,
+> photo-only, grip-based** state and its open questions are settled or
+> superseded. Keep as history; see the visual baseline index at
+> [`docs/design/orange-porcelain/README.md`](orange-porcelain/README.md).
+
 Generated: 2026-09-23. This brief is for the designer (human or model) taking on
 the UI pass. The engineering, behaviour and tests are settled; this is about how
 the app looks and feels. Read `docs/SPEC.md` for behaviour and `CONTEXT.md` for

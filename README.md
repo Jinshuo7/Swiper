@@ -1,5 +1,14 @@
 # SWIPR
 
+> **Production-v1 status.** The current target is **photos, Live Photos and
+> ordinary videos** with Home + editable filters, a neutral whole-dock viewer,
+> fixed non-wrapping sessions, complete English + Simplified Chinese, and an App
+> Store release. [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24) is
+> authoritative; read [`docs/SPEC.md`](docs/SPEC.md) and
+> [`docs/IMPLEMENTATION-STATUS.md`](docs/IMPLEMENTATION-STATUS.md) (as-built vs.
+> required). The body of this README describes the **legacy photo-only build**
+> and is kept as as-built history.
+
 A minimal iOS photo-cleaning app. One complete photo fills the screen; a swipe or
 a nearby button decides its fate. Nothing is deleted while you swipe — marked
 photos go to a review screen and are only removed after an explicit final

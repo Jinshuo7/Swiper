@@ -1,5 +1,15 @@
 # Choose a photo owns every entry into sorting
 
+**Status: SUPERSEDED** by production-v1 (issue #24, 2026-10-01). Home now offers
+the **Everything**, **Photos** and **Videos** media choices, each opening an
+editable filter step, and only then a starting-point grid. "Choose a photo" is no
+longer the single door into sorting; the entry screen is Home. See
+[`docs/SPEC.md`](../SPEC.md) §§2–3. The decision below is retained as history for
+its reasoning about not duplicating start choices, which still holds within the
+starting-point grid.
+
+## Original decision (historical, no longer normative)
+
 Every sorting session begins on Choose a photo. The entry screen offers one action
 that opens it, plus resuming the session already in progress. The two traversal
 choices that used to have their own front-page buttons live inside Choose a photo:

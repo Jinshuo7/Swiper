@@ -18,6 +18,7 @@ xcuserdata/
 # Local scratch (agent builds, macro plugin temp)
 .derivedData/
 .derivedData-prototype/
+.derivedData-simulator/
 .tmp/
 
 # Local design handoff bundles (drafts and responses)
