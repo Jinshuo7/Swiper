@@ -182,6 +182,47 @@ class TicketControllerTests(unittest.TestCase):
                     }
                 )
 
+    def test_context_request_rejects_non_numeric_maximum_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "context.txt").write_text("context")
+            model = root / "model"
+            model.mkdir()
+            broker = controller.ContextBroker(
+                root, model, ["context.txt"], [], [], 4, 1000, [], []
+            )
+            with self.assertRaisesRegex(controller.ControllerError, "positive integer"):
+                broker.handle_request({
+                    "requested": ["context.txt"],
+                    "reason": "needed",
+                    "access": "read-only",
+                    "maximum_scope": "one",
+                })
+
+    def test_every_run_failure_writes_blocked_receipt(self) -> None:
+        failures = [
+            controller.ControllerError("parse error"),
+            controller.ControllerError("model timeout exceeded"),
+            controller.ControllerError("token budget exceeded"),
+            RuntimeError("unexpected stub failure"),
+        ]
+        for failure in failures:
+            with self.subTest(failure=str(failure)):
+                instance = self.bare_controller()
+
+                def fail(error=failure):
+                    raise error
+
+                instance._run_impl = fail
+                with self.assertRaises(type(failure)):
+                    instance.run()
+                ledger = json.loads(instance.ledger_path.read_text())
+                receipt = json.loads((instance.run_root / "receipt.json").read_text())
+                self.assertEqual(ledger["state"], "BLOCKED")
+                self.assertEqual(receipt["state"], "BLOCKED")
+                self.assertEqual(receipt["exception_type"], type(failure).__name__)
+                self.assertEqual(receipt["exception_message"], str(failure))
+
     def test_required_missing_visual_blocks_before_models(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

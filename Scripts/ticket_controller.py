@@ -43,6 +43,7 @@ class State(str, Enum):
     ACCEPTED = "ACCEPTED"
     PATCH_READY = "PATCH_READY"
     APPLIED = "APPLIED"
+    DRY_RUN = "DRY_RUN"
     BLOCKED = "BLOCKED"
 
 
@@ -51,7 +52,7 @@ ALLOWED_TRANSITIONS = {
     State.BASELINED: {State.ISOLATED, State.BLOCKED},
     State.ISOLATED: {State.CLASSIFIED, State.BLOCKED},
     State.CLASSIFIED: {State.READY, State.PLANNED, State.IMPLEMENTED, State.BLOCKED},
-    State.READY: {State.PLANNED, State.IMPLEMENTED, State.BLOCKED},
+    State.READY: {State.PLANNED, State.IMPLEMENTED, State.DRY_RUN, State.BLOCKED},
     State.PLANNED: {State.IMPLEMENTED, State.BLOCKED},
     State.IMPLEMENTED: {State.VERIFIED, State.BLOCKED},
     State.VERIFIED: {State.REVIEWED, State.BLOCKED},
@@ -60,6 +61,7 @@ ALLOWED_TRANSITIONS = {
     State.ACCEPTED: {State.PATCH_READY, State.BLOCKED},
     State.PATCH_READY: {State.APPLIED, State.BLOCKED},
     State.APPLIED: set(),
+    State.DRY_RUN: set(),
     State.BLOCKED: set(),
 }
 
@@ -328,7 +330,9 @@ class ContextBroker:
         if not isinstance(requested, list) or not requested:
             raise ControllerError("REQUEST_CONTEXT requires exact requested paths")
         paths = ensure_paths(str(path) for path in requested)
-        maximum = int(response.get("maximum_scope", len(paths)))
+        maximum = response.get("maximum_scope", len(paths))
+        if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+            raise ControllerError("REQUEST_CONTEXT maximum_scope must be a positive integer")
         if len(paths) > maximum:
             raise ControllerError("context request exceeds its declared maximum scope")
         permitted = self.context_paths | self.edit_paths | self.create_paths | self.request_allowlist
@@ -533,13 +537,15 @@ class TicketController:
         self._write_receipt(reason)
         raise ControllerError(reason)
 
-    def _write_receipt(self, summary: str) -> None:
+    def _write_receipt(self, summary: str, error: BaseException | None = None) -> None:
         json_dump(
             self.run_root / "receipt.json",
             {
                 "ticket": self.manifest["ticket"]["id"],
                 "state": self.state,
                 "summary": summary,
+                "exception_type": type(error).__name__ if error else None,
+                "exception_message": str(error) if error else None,
                 "patch": str(self.run_root / "candidate.patch")
                 if self.changed_paths and (self.run_root / "candidate.patch").exists()
                 else None,
@@ -1291,9 +1297,32 @@ class TicketController:
         self.attestation_path = str(path)
 
     def run(self) -> None:
+        try:
+            self._run_impl()
+        except BaseException as error:
+            if self.state != State.BLOCKED:
+                self.state = State.BLOCKED
+                self.history.append(
+                    {
+                        "at": datetime.now(timezone.utc).isoformat(),
+                        "state": self.state,
+                        "note": f"{type(error).__name__}: {error}",
+                    }
+                )
+                self._write_ledger()
+            self._write_receipt(str(error), error)
+            raise
+        if self.state not in {State.ACCEPTED, State.PATCH_READY, State.DRY_RUN, State.BLOCKED}:
+            error = ControllerError(f"controller exited in non-terminal state {self.state}")
+            self.state = State.BLOCKED
+            self._record(str(error))
+            self._write_receipt(str(error), error)
+            raise error
+
+    def _run_impl(self) -> None:
         needs_plan, _ = self.prepare()
         if not self.execute_models:
-            self._record("dry run complete; no model invoked")
+            self._transition(State.DRY_RUN, "dry run complete; no model invoked")
             self._write_receipt("dry run complete; no model invoked")
             return
         plan = None
@@ -1464,11 +1493,11 @@ def main(argv: list[str] | None = None) -> int:
             print(controller.ledger_path)
         else:
             apply_accepted(args.ledger.resolve())
-    except (ControllerError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
+    except BaseException as error:
         print(f"BLOCK: {error}", file=sys.stderr)
         if controller is not None:
             print(controller.ledger_path)
-        return 2
+        return 130 if isinstance(error, KeyboardInterrupt) else 2
     return 0
 
 
