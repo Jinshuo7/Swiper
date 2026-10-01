@@ -1,0 +1,164 @@
+{
+  "ticket": {
+    "id": "25",
+    "title": "V1-01: Make the production-v1 contract durable",
+    "authoritative_issue": 24,
+    "acceptance_criteria": [
+      "Retain the five approved Orange & Porcelain setup/filter, review, bottom-dock, left-dock, and right-dock references as the named production baseline.",
+      "Mark colored viewer, grip-based, expanded-slot, and other superseded concepts as historical.",
+      "Reconcile product documents, glossary, testing guidance, and ADRs with the approved production-v1 contract.",
+      "Name issue #24 as authoritative and remove unresolved interview language.",
+      "Pass relevant documentation and prototype checks and name the authoritative read order."
+    ]
+  },
+  "product_decisions": [
+    "Production v1 includes ordinary video and Home media choices with editable filters.",
+    "A session uses a fixed, non-wrapping pool.",
+    "The neutral viewer moves the whole dock directly among bottom, left, and right.",
+    "English and Simplified Chinese and App Store release are v1 requirements."
+  ],
+  "constraints": [
+    "Preserve all pre-existing UI prototype and user work.",
+    "Do not invent, regenerate, relabel, or substitute an approved visual reference.",
+    "Issue #24 is the authoritative production-v1 specification.",
+    "Automated tests must never access a real photo library."
+  ],
+  "visual_references": [
+    {"path": "docs/design/orange-porcelain/01-setup.png", "required": true, "role": "setup/filter"},
+    {"path": "docs/design/orange-porcelain/03-review.png", "required": true, "role": "review"},
+    {"path": "docs/design/orange-porcelain/04-viewer-bottom-neutral.png", "required": true, "role": "bottom dock"},
+    {"path": "docs/design/orange-porcelain/05-viewer-left-neutral.png", "required": true, "role": "left dock"},
+    {"path": "docs/design/orange-porcelain/06-viewer-right-neutral.png", "required": true, "role": "right dock"}
+  ],
+  "scope": {
+    "allow_edit": [
+      "AGENTS.md",
+      "CONTEXT.md",
+      "README.md",
+      "docs/IMPLEMENTATION-PROMPT.md",
+      "docs/IMPLEMENTATION-STATUS.md",
+      "docs/LOCALIZATION.md",
+      "docs/ROADMAP.md",
+      "docs/SPEC.md",
+      "docs/TESTING.md",
+      "docs/VISION.md",
+      "docs/adr/0003-exclude-ordinary-videos-in-v1.md",
+      "docs/adr/0007-three-fixed-control-positions.md",
+      "docs/adr/0008-choose-a-photo-owns-every-entry.md",
+      "docs/adr/0011-undo-at-the-outer-end.md",
+      "docs/design/2026-09-cleanup-flow.md",
+      "docs/design/DESIGN-BRIEF.md",
+      "docs/design/orange-porcelain/PROTOTYPE.md",
+      "docs/design/orange-porcelain/README.md",
+      "docs/tickets/production-v1-25.md"
+    ],
+    "allow_create": [],
+    "context": [
+      "docs/adr/0001-never-delete-while-swiping.md",
+      "docs/adr/0002-public-api-storage-estimates.md",
+      "docs/adr/0004-schema-versioned-session-persistence.md",
+      "docs/adr/0005-deletion-list-outlives-sessions.md",
+      "docs/adr/0006-photo-never-moves-for-chrome.md",
+      "docs/adr/0009-swipe-always-buttons-optional.md",
+      "docs/adr/0010-favourite-is-out-of-scope.md"
+    ],
+    "seed_untracked": [
+      "docs/design/2026-09-cleanup-flow.md",
+      "docs/design/orange-porcelain/01-setup.png",
+      "docs/design/orange-porcelain/03-review.png",
+      "docs/design/orange-porcelain/README.md",
+      "docs/tickets/production-v1-25.md"
+    ],
+    "allow_binary_context": [
+      "docs/design/orange-porcelain/01-setup.png",
+      "docs/design/orange-porcelain/03-review.png",
+      "docs/design/orange-porcelain/04-viewer-bottom-neutral.png",
+      "docs/design/orange-porcelain/05-viewer-left-neutral.png",
+      "docs/design/orange-porcelain/06-viewer-right-neutral.png"
+    ],
+    "allow_context_requests": [
+      "docs/design/orange-porcelain/PROMPTS.md",
+      "docs/design/orange-porcelain/VIEWER-V2-PROMPTS.md",
+      "docs/design/orange-porcelain/VIEWER-V3-PROMPTS.md"
+    ]
+  },
+  "risk": {
+    "ambiguous": false,
+    "architectural": true,
+    "cross_cutting": true,
+    "dependency_heavy": false,
+    "safety_sensitive": false,
+    "hard_to_decompose": false,
+    "deletion_or_data_loss": false,
+    "persistence_or_migration": false,
+    "privacy_or_security": false,
+    "release_candidate": false,
+    "large_or_cross_cutting_diff": true
+  },
+  "models": {
+    "codex": {
+      "role": "codex",
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "thinking": "medium"
+    },
+    "deepseek": {
+      "role": "deepseek",
+      "provider": "command-code",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "thinking": "high"
+    },
+    "verifier": {
+      "role": "verifier",
+      "provider": "command-code",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "thinking": "high"
+    }
+  },
+  "budgets": {
+    "max_codex_calls": 3,
+    "max_worker_calls": 5,
+    "max_attempts": 2,
+    "max_context_requests": 3,
+    "max_context_files": 40,
+    "soft_context_tokens": 25000,
+    "max_context_bytes": 12000000,
+    "max_model_prompt_bytes": 400000,
+    "max_codex_tokens": 200000,
+    "max_deepseek_tokens": 2000000,
+    "max_deepseek_model_turns": 100,
+    "max_deepseek_cost": 1.0,
+    "model_timeout_seconds": 900,
+    "progress_timeout_seconds": 180,
+    "max_event_log_bytes": 5000000
+  },
+  "tool_version_commands": [
+    ["xcodebuild", "-version"],
+    ["swift", "--version"]
+  ],
+  "verification": [
+    {
+      "name": "patch hygiene",
+      "command": ["git", "diff", "--check"],
+      "inputs": ["AGENTS.md", "CONTEXT.md", "README.md", "docs/SPEC.md", "docs/VISION.md", "docs/ROADMAP.md"],
+      "timeout_seconds": 60,
+      "reuse": true
+    },
+    {
+      "name": "framework tests",
+      "command": ["Scripts/run-kit-tests.sh"],
+      "environment": {"DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer"},
+      "inputs": ["Scripts/run-kit-tests.sh", "SWIPRKit"],
+      "timeout_seconds": 900,
+      "reuse": true
+    },
+    {
+      "name": "iOS typecheck",
+      "command": ["Scripts/typecheck-ios.sh"],
+      "environment": {"DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer"},
+      "inputs": ["Scripts/typecheck-ios.sh", "SWIPR", "SWIPRKit"],
+      "timeout_seconds": 900,
+      "reuse": true
+    }
+  ]
+}
