@@ -64,6 +64,50 @@ class TicketControllerTests(unittest.TestCase):
         manifest["risk"]["architectural"] = True
         self.assertEqual(controller.classify_ticket(manifest), (True, ["architectural"]))
 
+    def test_strict_json_rejects_trailing_prose_and_two_objects(self) -> None:
+        for value in ('{"disposition":"ACCEPT"} trailing', '{} {}'):
+            with self.subTest(value=value):
+                with self.assertRaises(controller.ControllerError):
+                    controller.parse_json_response(value)
+
+    def test_final_assistant_message_wins(self) -> None:
+        messages = [
+            {"role": "assistant", "content": [{"type": "text", "text": '{"disposition":"ACCEPT"}'}]},
+            {"role": "assistant", "content": [{"type": "text", "text": '{"disposition":"CORRECT","corrections":["fix"]}'}]},
+        ]
+        parsed = controller.parse_json_response(controller.final_assistant_text(messages))
+        self.assertEqual(parsed["disposition"], "CORRECT")
+
+    def test_accept_requires_every_criterion(self) -> None:
+        with self.assertRaisesRegex(controller.ControllerError, "every acceptance criterion"):
+            controller.validate_acceptance(
+                {
+                    "disposition": "ACCEPT",
+                    "blocking_findings": [],
+                    "criteria": [{"index": 0, "met": True, "evidence": "proof"}],
+                },
+                ["one", "two"],
+            )
+
+    def test_well_formed_accept_and_correct_schemas(self) -> None:
+        accepted = {
+            "disposition": "ACCEPT",
+            "blocking_findings": [],
+            "criteria": [
+                {"index": 0, "met": True, "evidence": "test A"},
+                {"criterion": "two", "met": True, "evidence": "test B"},
+            ],
+        }
+        self.assertEqual(controller.validate_acceptance(accepted, ["one", "two"]), "ACCEPT")
+        self.assertEqual(
+            controller.validate_acceptance(
+                {"disposition": "CORRECT", "corrections": ["fix it"]}, ["one"]
+            ),
+            "CORRECT",
+        )
+        with self.assertRaisesRegex(controller.ControllerError, "corrections"):
+            controller.validate_acceptance({"disposition": "CORRECT", "corrections": []}, ["one"])
+
     def test_model_workspace_is_outside_repository_and_run_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

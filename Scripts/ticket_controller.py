@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import selectors
 import shutil
 import signal
@@ -184,25 +185,65 @@ def should_independently_verify(manifest: dict[str, Any]) -> tuple[bool, list[st
 
 def parse_json_response(text: str) -> dict[str, Any]:
     text = text.strip()
-    candidates = [text]
-    if "```" in text:
-        pieces = text.split("```")
-        candidates.extend(piece.removeprefix("json").strip() for piece in pieces[1::2])
-    decoder = json.JSONDecoder()
-    for candidate in candidates:
-        try:
-            value, _ = decoder.raw_decode(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            return value
-    raise ControllerError("model did not return a JSON object")
+    fenced = re.fullmatch(r"```json\s*\n?(.*?)\n?```", text, flags=re.DOTALL)
+    candidate = fenced.group(1).strip() if fenced else text
+    try:
+        value = json.loads(candidate)
+    except json.JSONDecodeError as error:
+        raise ControllerError("final assistant message is not exactly one JSON object") from error
+    if not isinstance(value, dict):
+        raise ControllerError("final assistant message is not a JSON object")
+    return value
+
+
+def final_assistant_text(messages: list[dict[str, Any]]) -> str:
+    for message in reversed(messages):
+        if message.get("role") == "assistant":
+            return "".join(
+                str(content.get("text", ""))
+                for content in message.get("content", [])
+                if content.get("type") == "text"
+            )
+    return ""
 
 
 def validate_disposition(value: dict[str, Any], allowed: set[str]) -> str:
     disposition = value.get("disposition")
     if disposition not in allowed:
         raise ControllerError(f"invalid disposition {disposition!r}; expected {sorted(allowed)}")
+    return disposition
+
+
+def validate_acceptance(value: dict[str, Any], criteria: list[str]) -> str:
+    disposition = validate_disposition(value, {"ACCEPT", "CORRECT", "BLOCK"})
+    if disposition == "CORRECT":
+        corrections = value.get("corrections")
+        if not isinstance(corrections, list) or not corrections:
+            raise ControllerError("CORRECT requires a non-empty corrections list")
+    if disposition != "ACCEPT":
+        return disposition
+    if value.get("blocking_findings") != []:
+        raise ControllerError("ACCEPT requires blocking_findings: []")
+    results = value.get("criteria")
+    if not isinstance(results, list) or len(results) != len(criteria):
+        raise ControllerError("ACCEPT must account for every acceptance criterion exactly once")
+    matched: set[int] = set()
+    for result in results:
+        if not isinstance(result, dict) or result.get("met") is not True:
+            raise ControllerError("ACCEPT criterion must have met: true")
+        evidence = result.get("evidence")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ControllerError("ACCEPT criterion requires non-empty evidence")
+        index = result.get("index")
+        text = result.get("criterion")
+        if isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(criteria):
+            matched.add(index)
+        elif isinstance(text, str) and text in criteria:
+            matched.add(criteria.index(text))
+        else:
+            raise ControllerError("ACCEPT criterion does not match ticket criteria")
+    if matched != set(range(len(criteria))):
+        raise ControllerError("ACCEPT criteria contain duplicates or omissions")
     return disposition
 
 
@@ -886,7 +927,7 @@ class TicketController:
         progress_seconds = int(budgets.get("progress_timeout_seconds", 180))
         maximum_bytes = int(budgets.get("max_event_log_bytes", 5_000_000))
         total_bytes = 0
-        assistant_texts: list[str] = []
+        assistant_messages: list[dict[str, Any]] = []
         usage = Usage()
         files_read: set[str] = set()
         files_written: set[str] = set()
@@ -929,6 +970,7 @@ class TicketController:
                         if event.get("type") == "message_end":
                             message = event.get("message", {})
                             if message.get("role") == "assistant":
+                                assistant_messages.append(message)
                                 delta = Usage()
                                 delta.add(message.get("usage", {}))
                                 usage.merge(delta)
@@ -960,7 +1002,6 @@ class TicketController:
                                 for content in message.get("content", []):
                                     if content.get("type") == "text":
                                         text = content.get("text", "")
-                                        assistant_texts.append(text)
                                         if "REQUEST_CONTEXT" in text or "CHECKPOINT" in text:
                                             meaningful += 1
                                             last_progress = now
@@ -1006,7 +1047,13 @@ class TicketController:
         self.files_read.update(files_read)
         self.files_written.update(files_written)
         self._write_ledger()
-        return PiResult("\n".join(assistant_texts), usage, files_read, files_written, meaningful)
+        return PiResult(
+            final_assistant_text(assistant_messages),
+            usage,
+            files_read,
+            files_written,
+            meaningful,
+        )
 
     def _bounded_response(
         self,
@@ -1360,6 +1407,7 @@ class TicketController:
             self._acceptance_prompt(diff, evidence),
             allowed={"ACCEPT", "CORRECT", "BLOCK"},
         )
+        validate_acceptance(review, self.manifest["ticket"]["acceptance_criteria"])
         self._transition(State.REVIEWED, f"Codex returned {review['disposition']}")
         if review["disposition"] == "BLOCK":
             self.block(str(review.get("reason", "acceptance blocked")))
@@ -1391,6 +1439,7 @@ class TicketController:
                 self._acceptance_prompt(diff, evidence),
                 allowed={"ACCEPT", "BLOCK"},
             )
+            validate_acceptance(review, self.manifest["ticket"]["acceptance_criteria"])
             self._transition(State.REVIEWED, f"final Codex review returned {review['disposition']}")
             if review["disposition"] != "ACCEPT":
                 self.block(str(review.get("reason", "final acceptance blocked")))
