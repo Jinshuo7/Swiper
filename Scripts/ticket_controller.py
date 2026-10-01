@@ -338,6 +338,8 @@ class ContextBroker:
             raise ControllerError("context-file budget exceeded")
         if access == "edit" and path not in self.edit_paths | self.create_paths:
             raise ControllerError(f"edit scope expansion requires owner approval: {path}")
+        if path in self.granted:
+            return
         source = self.source_root / path
         if not source.is_file() and path not in self.create_paths:
             raise ControllerError(f"requested context does not exist: {path}")
@@ -643,6 +645,7 @@ class TicketController:
         relevant = set(self.manifest["scope"]["allow_edit"])
         relevant.update(self.manifest["scope"]["allow_create"])
         relevant.update(self.manifest["scope"]["context"])
+        relevant.update(self.manifest["scope"].get("allow_context_requests", []))
         for check in self.manifest["verification"]:
             relevant.update(check["inputs"])
         relevant.update(
@@ -1086,7 +1089,7 @@ class TicketController:
                 + "\n\nThe controller granted only these requested files: "
                 + ", ".join(granted)
                 + ". Continue and return one allowed JSON disposition.\n"
-                + self.broker.text_payload(granted)
+                + self.broker.text_payload(sorted(self.broker.granted))
             )
 
     def _planning_prompt(self) -> str:
@@ -1147,7 +1150,10 @@ class TicketController:
             isolated = self.isolated_root / path
             before = self.baseline_hashes.get(path)
             after = file_hash(model)
-            if path not in self.manifest["scope"]["allow_edit"] and after != before:
+            if path not in (
+                self.manifest["scope"]["allow_edit"]
+                + self.manifest["scope"].get("allow_create", [])
+            ) and after != before:
                 unexpected.append(path)
             if path in (
                 self.manifest["scope"]["allow_edit"]
@@ -1383,7 +1389,7 @@ class TicketController:
             if plan["disposition"] == "BLOCK":
                 self.block(str(plan.get("reason", "planner blocked")))
         self.attempts = 1
-        worker_session = self.run_root / "deepseek-session.jsonl"
+        worker_session = self.model_root / ".deepseek-session.jsonl"
         response, _ = self._bounded_response(
             "deepseek",
             self._worker_prompt(plan),

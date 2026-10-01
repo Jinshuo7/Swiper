@@ -243,6 +243,75 @@ class TicketControllerTests(unittest.TestCase):
                     "maximum_scope": "one",
                 })
 
+    def test_request_allowlisted_read_only_file_syncs_cleanly(self) -> None:
+        instance = self.bare_controller()
+        root = instance.source_root
+        (root / "requested.txt").write_text("requested")
+        instance.manifest["scope"]["allow_context_requests"] = ["requested.txt"]
+        instance.baseline_hashes = {"requested.txt": controller.file_hash(root / "requested.txt")}
+        instance.isolated_root.mkdir()
+        (instance.isolated_root / "requested.txt").write_text("requested")
+        instance.broker = controller.ContextBroker(
+            instance.isolated_root,
+            instance.model_root,
+            [],
+            ["editable.txt"],
+            [],
+            5,
+            1000,
+            [],
+            ["requested.txt"],
+        )
+        instance.broker.grant("requested.txt", access="read-only")
+        instance._sync_worker_changes()
+
+    def test_re_request_preserves_edited_file_and_write_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "editable.txt").write_text("before")
+            model = root / "model"
+            model.mkdir()
+            broker = controller.ContextBroker(
+                root, model, [], ["editable.txt"], [], 5, 1000, [], []
+            )
+            broker.grant("editable.txt", access="edit")
+            target = model / "editable.txt"
+            target.write_text("worker edit")
+            broker.grant("editable.txt", access="read-only")
+            self.assertEqual(target.read_text(), "worker edit")
+            self.assertTrue(target.stat().st_mode & 0o200)
+
+    def test_context_continuation_contains_all_prior_grants(self) -> None:
+        instance = self.bare_controller()
+        for name in ("first.txt", "second.txt"):
+            (instance.source_root / name).write_text(name)
+        instance.broker = controller.ContextBroker(
+            instance.source_root,
+            instance.model_root,
+            [],
+            [],
+            [],
+            5,
+            1000,
+            [],
+            ["first.txt", "second.txt"],
+        )
+        replies = iter([
+            '{"disposition":"REQUEST_CONTEXT","requested":["first.txt"],"reason":"one","access":"read-only","maximum_scope":1}',
+            '{"disposition":"REQUEST_CONTEXT","requested":["second.txt"],"reason":"two","access":"read-only","maximum_scope":1}',
+            '{"disposition":"PLAN"}',
+        ])
+        prompts = []
+
+        def fake_run(model_name, prompt, **kwargs):
+            prompts.append(prompt)
+            return controller.PiResult(next(replies), controller.Usage())
+
+        instance._run_pi = fake_run
+        instance._bounded_response("codex", "base", allowed={"PLAN"})
+        self.assertIn("first.txt\nfirst.txt", prompts[2])
+        self.assertIn("second.txt\nsecond.txt", prompts[2])
+
     def test_every_run_failure_writes_blocked_receipt(self) -> None:
         failures = [
             controller.ControllerError("parse error"),
