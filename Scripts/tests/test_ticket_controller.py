@@ -51,6 +51,73 @@ class TicketControllerTests(unittest.TestCase):
         manifest["risk"]["architectural"] = True
         self.assertEqual(controller.classify_ticket(manifest), (True, ["architectural"]))
 
+    def test_model_workspace_is_outside_repository_and_run_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command("git", "init", cwd=root)
+            command("git", "config", "user.email", "test@example.com", cwd=root)
+            command("git", "config", "user.name", "Test", cwd=root)
+            (root / "editable.txt").write_text("editable\n")
+            (root / "context.txt").write_text("context\n")
+            command("git", "add", ".", cwd=root)
+            command("git", "commit", "-m", "baseline", cwd=root)
+            manifest = self.manifest()
+            manifest["run_root"] = str(root / "runs")
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest))
+            instance = controller.TicketController(manifest_path, source_root=root)
+            self.assertNotIn(root.resolve(), instance.model_root.resolve().parents)
+            self.assertNotIn(instance.run_root.resolve(), instance.model_root.resolve().parents)
+
+    def test_tool_event_without_path_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(self.manifest()))
+            (root / "editable.txt").write_text("editable")
+            (root / "context.txt").write_text("context")
+            command("git", "init", cwd=root)
+            instance = controller.TicketController(manifest_path, source_root=root)
+            with self.assertRaisesRegex(controller.ControllerError, "identifiable string path"):
+                instance._tool_event_path({"toolName": "write", "args": {"content": "x"}})
+
+    def test_post_call_integrity_detects_source_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command("git", "init", cwd=root)
+            (root / "editable.txt").write_text("before")
+            (root / "context.txt").write_text("context")
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(self.manifest()))
+            instance = controller.TicketController(manifest_path, source_root=root)
+            instance.baseline_hashes = {"editable.txt": controller.file_hash(root / "editable.txt")}
+            expected = instance._integrity_snapshot()
+            (root / "editable.txt").write_text("after")
+            with self.assertRaisesRegex(controller.ControllerError, "integrity drift"):
+                instance._assert_integrity(expected)
+
+    def test_forged_patch_ready_ledger_without_attestation_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command("git", "init", cwd=root)
+            command("git", "config", "user.email", "test@example.com", cwd=root)
+            command("git", "config", "user.name", "Test", cwd=root)
+            (root / "editable.txt").write_text("base")
+            command("git", "add", "editable.txt", cwd=root)
+            command("git", "commit", "-m", "base", cwd=root)
+            (root / "candidate.patch").write_text("")
+            (root / "head.txt").write_text(command("git", "rev-parse", "HEAD", cwd=root))
+            ledger = root / "ledger.json"
+            ledger.write_text(json.dumps({
+                "state": "PATCH_READY",
+                "source_root": str(root),
+                "candidate_patch_hash": controller.file_hash(root / "candidate.patch"),
+                "changed_paths": ["editable.txt"],
+                "baseline_hashes": {"editable.txt": None},
+            }))
+            with self.assertRaisesRegex(controller.ControllerError, "attestation"):
+                controller.apply_accepted(ledger)
+
     def test_context_request_cannot_expand_edit_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

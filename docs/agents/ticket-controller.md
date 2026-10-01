@@ -62,6 +62,14 @@ Runs and test evidence live under ignored `.tmp/`. Temporary worktrees are kept
 for audit and manual inspection. Remove one only after its receipt is no longer
 needed, using the owning repository's normal `git worktree remove` command.
 
+Model workspaces and acceptance attestations live in separate system temporary
+directories, outside both the repository and the run-artifact directory. On
+macOS, model processes default to `sandbox-exec`: writes are limited to the
+model workspace plus explicitly listed Pi state/cache directories. Missing
+sandbox support blocks execution unless a manifest deliberately sets
+`sandbox_models` to `false`. Tool events with an ambiguous path fail closed,
+and source/run integrity is rechecked after every model call.
+
 ## Manifest rules
 
 Paths are repository-relative and exact. `allow_edit` covers existing writable

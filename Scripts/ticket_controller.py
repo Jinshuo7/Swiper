@@ -414,8 +414,8 @@ class TicketController:
         worktree_parent = Path(tempfile.gettempdir()) / "swipr-agent-worktrees"
         worktree_parent.mkdir(parents=True, exist_ok=True)
         self.isolated_root = worktree_parent / self.run_root.name
-        self.model_root = self.run_root / "model-workspace"
-        self.model_root.mkdir()
+        self.model_root = Path(tempfile.mkdtemp(prefix="swipr-agent-model-"))
+        self.attestation_root = Path(tempfile.mkdtemp(prefix="swipr-agent-attestation-"))
         self.ledger_path = self.run_root / "ledger.json"
         self.state = State.CREATED
         self.history: list[dict[str, Any]] = []
@@ -430,6 +430,7 @@ class TicketController:
         self.review_paths: list[str] = []
         self.candidate_patch_hash: str | None = None
         self.review_patch_hash: str | None = None
+        self.attestation_path: str | None = None
         self.worker_receipt: dict[str, Any] = {}
         self.independent_receipt: dict[str, Any] | None = None
         self.call_limits = {"codex": 0, "deepseek": 2, "verifier": 1}
@@ -503,6 +504,7 @@ class TicketController:
                 "review_paths": self.review_paths,
                 "candidate_patch_hash": self.candidate_patch_hash,
                 "review_patch_hash": self.review_patch_hash,
+                "attestation_path": self.attestation_path,
                 "worker_receipt": self.worker_receipt,
                 "independent_receipt": self.independent_receipt,
                 "usage_baseline": self.usage_baseline,
@@ -763,7 +765,24 @@ class TicketController:
             command += ["--no-tools"]
         command += ["--session", str(session_path)] if session_path else ["--no-session"]
         command += ["--print", f"@{prompt_path}"]
-        return command
+        if not self.manifest.get("sandbox_models", True):
+            return command
+        sandbox = shutil.which("sandbox-exec")
+        if not sandbox:
+            raise ControllerError("sandbox_models is enabled but sandbox-exec is unavailable")
+        write_paths = [
+            self.model_root,
+            Path.home() / ".pi",
+            Path.home() / ".config",
+            Path.home() / "Library" / "Caches",
+        ] + [Path(path).expanduser().resolve() for path in self.manifest.get("sandbox_write_paths", [])]
+        quote = lambda path: str(path).replace("\\", "\\\\").replace('"', '\\"')
+        rules = " ".join(f'(subpath "{quote(path)}")' for path in write_paths)
+        profile = self.model_root / ".sandbox.sb"
+        profile.write_text(
+            f"(version 1) (allow default) (deny file-write*) (allow file-write* {rules})\n"
+        )
+        return [sandbox, "-f", str(profile), *command]
 
     def _safe_tool_path(self, raw: str) -> str:
         path = Path(raw)
@@ -772,6 +791,39 @@ class TicketController:
             return resolved.relative_to(self.model_root.resolve()).as_posix()
         except ValueError as error:
             raise ControllerError(f"model attempted access outside packet workspace: {raw}") from error
+
+    def _tool_event_path(self, event: dict[str, Any]) -> str:
+        tool = event.get("toolName")
+        args = event.get("args")
+        raw_path = args.get("path") if isinstance(args, dict) else None
+        if not isinstance(raw_path, str) or not raw_path:
+            raise ControllerError(f"{tool} tool event has no identifiable string path")
+        return self._safe_tool_path(raw_path)
+
+    def _integrity_snapshot(self) -> dict[str, str | None]:
+        protected = {
+            f"source:{path}": file_hash(self.source_root / path)
+            for path in self.baseline_hashes
+        }
+        for path in [
+            self.ledger_path,
+            self.run_root / "head.txt",
+            self.run_root / "baseline-hashes.json",
+            *sorted(self.run_root.glob("*.patch")),
+        ]:
+            if path.exists():
+                protected[f"run:{path.name}"] = file_hash(path)
+        return protected
+
+    def _assert_integrity(self, expected: dict[str, str | None]) -> None:
+        drifted = []
+        for label, digest in expected.items():
+            kind, value = label.split(":", 1)
+            path = self.source_root / value if kind == "source" else self.run_root / value
+            if file_hash(path) != digest:
+                drifted.append(label)
+        if drifted:
+            raise ControllerError("post-model integrity drift: " + ", ".join(sorted(drifted)))
 
     def _run_pi(
         self,
@@ -810,6 +862,7 @@ class TicketController:
         prompt_path.write_text(prompt)
         log_path = self.run_root / f"{model_name}-{int(time.time())}.jsonl"
         stderr_path = self.run_root / f"{model_name}-{int(time.time())}.stderr"
+        protected = self._integrity_snapshot()
         process = subprocess.Popen(
             self._model_command(model, prompt_path, session_path=session_path, tools=tools),
             cwd=self.model_root,
@@ -877,7 +930,6 @@ class TicketController:
                                     self.codex_usage if role == "codex" else self.deepseek_usage
                                 )
                                 aggregate.merge(delta)
-                                self._write_ledger()
                                 token_limit_name = (
                                     "max_codex_tokens"
                                     if role == "codex"
@@ -908,10 +960,8 @@ class TicketController:
                                             last_progress = now
                         if event.get("type") == "tool_execution_start":
                             tool = event.get("toolName")
-                            args = event.get("args", {})
-                            raw_path = args.get("path")
-                            if tool in {"read", "write", "edit"} and raw_path:
-                                relative = self._safe_tool_path(str(raw_path))
+                            if tool in {"read", "write", "edit"}:
+                                relative = self._tool_event_path(event)
                                 if tool == "read":
                                     files_read.add(relative)
                                 else:
@@ -934,19 +984,22 @@ class TicketController:
                                     meaningful += 1
                                     last_progress = now
                                 active_write = None
-            except Exception:
+            except BaseException:
                 process.send_signal(signal.SIGINT)
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     process.kill()
                 raise
+            finally:
+                self._assert_integrity(protected)
         returncode = process.wait(timeout=10)
         stderr_path.write_text("".join(stderr_chunks))
         if returncode:
             raise ControllerError(f"model process failed with exit {returncode}")
         self.files_read.update(files_read)
         self.files_written.update(files_written)
+        self._write_ledger()
         return PiResult("\n".join(assistant_texts), usage, files_read, files_written, meaningful)
 
     def _bounded_response(
@@ -1185,6 +1238,20 @@ class TicketController:
             f"Diff:\n{diff}\nEvidence:\n{json.dumps(evidence, indent=2)}"
         )
 
+    def _write_attestation(self) -> None:
+        payload = {
+            "run_root": str(self.run_root.resolve()),
+            "head": (self.run_root / "head.txt").read_text().strip(),
+            "candidate_patch_hash": self.candidate_patch_hash,
+            "review_patch_hash": self.review_patch_hash,
+            "baseline_hashes": self.baseline_hashes,
+            "changed_paths": self.changed_paths,
+        }
+        payload["digest"] = sha256_bytes(json.dumps(payload, sort_keys=True).encode())
+        path = self.attestation_root / "accepted.json"
+        json_dump(path, payload)
+        self.attestation_path = str(path)
+
     def run(self) -> None:
         needs_plan, _ = self.prepare()
         if not self.execute_models:
@@ -1271,6 +1338,7 @@ class TicketController:
         if self.changed_paths:
             shutil.copy2(self.run_root / "worker.patch", self.run_root / "candidate.patch")
             self.candidate_patch_hash = file_hash(self.run_root / "candidate.patch")
+            self._write_attestation()
             self._transition(State.PATCH_READY, "accepted patch ready for explicit apply")
             self._write_receipt("accepted patch ready; stopped before explicit apply")
         else:
@@ -1290,6 +1358,26 @@ def apply_accepted(ledger_path: Path) -> None:
         raise ControllerError("candidate patch is missing")
     if file_hash(patch) != ledger.get("candidate_patch_hash"):
         raise ControllerError("candidate patch hash does not match the accepted ledger")
+    attestation_value = ledger.get("attestation_path")
+    if not isinstance(attestation_value, str):
+        raise ControllerError("external acceptance attestation is missing")
+    attestation_path = Path(attestation_value).resolve()
+    if not attestation_path.is_file() or ledger_path.parent.resolve() in attestation_path.parents:
+        raise ControllerError("external acceptance attestation is invalid")
+    attestation = json.loads(attestation_path.read_text())
+    digest = attestation.pop("digest", None)
+    if digest != sha256_bytes(json.dumps(attestation, sort_keys=True).encode()):
+        raise ControllerError("external acceptance attestation digest mismatch")
+    expected_attestation = {
+        "run_root": str(ledger_path.parent.resolve()),
+        "head": expected_head,
+        "candidate_patch_hash": file_hash(patch),
+        "review_patch_hash": file_hash(ledger_path.parent / "review.patch"),
+        "baseline_hashes": ledger.get("baseline_hashes"),
+        "changed_paths": ledger.get("changed_paths"),
+    }
+    if attestation != expected_attestation:
+        raise ControllerError("accepted evidence does not match external attestation")
     changed = ledger.get("changed_paths", [])
     if not changed:
         raise ControllerError("accepted run has no audited changed paths")
