@@ -1123,24 +1123,43 @@ class TicketController:
             "command": check["command"],
             "environment": check.get("environment", {}),
             "inputs": inputs,
+            "candidate_tree": self._write_tree(self.isolated_root, "verification.index"),
             "versions": versions,
         }
         return sha256_bytes(json.dumps(material, sort_keys=True).encode())
+
+    def _cache_root(self) -> Path:
+        return Path(tempfile.gettempdir()) / "swipr-agent-test-cache"
+
+    @staticmethod
+    def _cached_pass(cache: Path, key: str, command: list[str]) -> dict[str, Any] | None:
+        try:
+            value = json.loads(cache.read_text())
+        except (OSError, json.JSONDecodeError, TypeError):
+            return None
+        if (
+            not isinstance(value, dict)
+            or value.get("returncode") != 0
+            or value.get("key") != key
+            or value.get("command") != command
+        ):
+            return None
+        return value
 
     def verify(self) -> list[dict[str, Any]]:
         status_before = set(
             paths_from_nul(git(self.isolated_root, "status", "--porcelain=v1", "-z"))
         )
         versions = self._tool_versions()
-        cache_root = self.source_root / ".tmp" / "agent-test-cache"
+        cache_root = self._cache_root()
         cache_root.mkdir(parents=True, exist_ok=True)
         evidence = []
         for check in self.manifest["verification"]:
             key = self._test_key(check, versions)
             cache = cache_root / f"{key}.json"
             if check.get("reuse", True) and cache.exists():
-                result = json.loads(cache.read_text())
-                if result.get("returncode") == 0:
+                result = self._cached_pass(cache, key, check["command"])
+                if result:
                     result = {**result, "reused": True}
                     evidence.append(result)
                     continue

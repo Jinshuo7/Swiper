@@ -231,6 +231,49 @@ class TicketControllerTests(unittest.TestCase):
             self.assertNotEqual(first, second)
             command("git", "worktree", "remove", "--force", str(instance.isolated_root), cwd=root)
 
+    def test_verification_key_changes_with_undeclared_allowed_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command("git", "init", cwd=root)
+            command("git", "config", "user.email", "test@example.com", cwd=root)
+            command("git", "config", "user.name", "Test", cwd=root)
+            (root / "editable.txt").write_text("one\n")
+            (root / "other.txt").write_text("before\n")
+            (root / "context.txt").write_text("context\n")
+            command("git", "add", ".", cwd=root)
+            command("git", "commit", "-m", "baseline", cwd=root)
+            manifest = self.manifest()
+            manifest["scope"]["allow_edit"].append("other.txt")
+            manifest["run_root"] = str(root / "runs")
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest))
+            instance = controller.TicketController(manifest_path, source_root=root)
+            instance.prepare()
+            check = instance.manifest["verification"][0]
+            first = instance._test_key(check, {})
+            (instance.isolated_root / "other.txt").write_text("after\n")
+            second = instance._test_key(check, {})
+            self.assertNotEqual(first, second)
+            self.assertNotIn(root.resolve(), instance._cache_root().resolve().parents)
+            command("git", "worktree", "remove", "--force", str(instance.isolated_root), cwd=root)
+
+    def test_corrupt_or_mismatched_cache_is_not_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary) / "cache.json"
+            cache.write_text("not json")
+            self.assertIsNone(controller.TicketController._cached_pass(cache, "key", ["true"]))
+            cache.write_text(json.dumps({"key": "wrong", "command": ["true"], "returncode": 0}))
+            self.assertIsNone(controller.TicketController._cached_pass(cache, "key", ["true"]))
+
+    def test_unchanged_cache_entry_is_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary) / "cache.json"
+            expected = {"key": "key", "command": ["true"], "returncode": 0}
+            cache.write_text(json.dumps(expected))
+            self.assertEqual(
+                controller.TicketController._cached_pass(cache, "key", ["true"]), expected
+            )
+
     def test_review_diff_includes_prior_work_but_candidate_patch_does_not(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
