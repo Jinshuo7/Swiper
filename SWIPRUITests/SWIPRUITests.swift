@@ -8,8 +8,20 @@ final class SWIPRUITests: XCTestCase {
     /// repeated here.
     private let mixedMediaLaunchArgument = "-uiTestingMixedMediaLibrary"
 
+    /// The demo fixtures are `index * 9` days after this instant; see
+    /// `FakePhotoLibrary.demoDescriptors`.
+    private let fixtureBase = Date(timeIntervalSince1970: 1_700_000_000)
+
     override func setUp() {
         continueAfterFailure = false
+    }
+
+    /// What the viewer speaks for a demo fixture, so a test can tell exactly
+    /// which asset is on screen. Mirrors `ViewerView.accessibilityDescription`.
+    private func fixtureLabel(_ index: Int) -> String {
+        let date = fixtureBase.addingTimeInterval(Double(index) * 86_400 * 9)
+        let kind = index % 5 == 4 ? "Live Photo" : "Photo"
+        return "\(kind), \(date.formatted(date: .abbreviated, time: .shortened))"
     }
 
     private func launchApp(
@@ -345,26 +357,100 @@ final class SWIPRUITests: XCTestCase {
             app.descendants(matching: .any)["choosePhoto.explanation"].waitForExistence(timeout: 10),
             "Choose a photo must say what it is for"
         )
-        XCTAssertTrue(app.buttons["choosePhoto.newest"].exists, "Newest lives inside Choose a photo")
+        XCTAssertTrue(app.buttons["choosePhoto.newest"].exists, "Newest first lives inside Choose a photo")
+        XCTAssertTrue(app.buttons["choosePhoto.oldest"].exists, "Oldest first lives inside Choose a photo")
         XCTAssertTrue(app.buttons["choosePhoto.random"].exists, "Random lives inside Choose a photo")
         let headers = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "choosePhoto.month."))
         XCTAssertGreaterThanOrEqual(headers.count, 2, "the library should be grouped into months")
         XCTAssertTrue(app.descendants(matching: .any)["choosePhoto.jump"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["choosePhoto.sort"].exists)
-        capture("Choose a photo — explanation, Newest/Random, months")
+        capture("Choose a photo — explanation, Newest first/Oldest first/Random, months")
 
         // Newest first by default: toggling must actually reorder the sections.
         let firstNewest = headers.element(boundBy: 0).identifier
-        let toggle = app.descendants(matching: .any)["choosePhoto.sort"]
+        let toggle = app.buttons["choosePhoto.sort"]
+        XCTAssertTrue(toggle.label.contains("Newest first"), "the grid order toggle starts newest first")
         toggle.tap()
-        XCTAssertTrue(app.staticTexts["Oldest first"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            toggle.label.contains("Oldest first"),
+            "tapping the grid order toggle must flip it to Oldest first, saw \(toggle.label)"
+        )
         XCTAssertNotEqual(
             headers.element(boundBy: 0).identifier,
             firstNewest,
             "switching to oldest first should change which month is at the top"
         )
         capture("Choose a photo — oldest first")
+    }
+
+    /// Both named traversals start at the end they name, whatever the saved
+    /// default direction is. "Newest first" walks toward older items; "Oldest
+    /// first" walks toward newer ones.
+    func testBothNamedTraversalsStartAtTheirNamedEnd() {
+        let app = launchApp()
+        _ = openChoosePhoto(app)
+
+        let oldest = app.buttons["choosePhoto.oldest"]
+        XCTAssertTrue(oldest.waitForExistence(timeout: 10))
+        oldest.tap()
+        let oldestPhoto = photoElement(app)
+        XCTAssertTrue(oldestPhoto.waitForExistence(timeout: 10))
+        XCTAssertEqual(oldestPhoto.label, fixtureLabel(0), "Oldest first starts at the oldest photo")
+        oldestPhoto.swipeRight()
+        XCTAssertEqual(
+            photoElement(app).label,
+            fixtureLabel(1),
+            "Oldest first must walk toward newer photos"
+        )
+
+        app.buttons["viewer.close"].tap()
+        _ = openChoosePhoto(app)
+        let newest = app.buttons["choosePhoto.newest"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        newest.tap()
+        let newestPhoto = photoElement(app)
+        XCTAssertTrue(newestPhoto.waitForExistence(timeout: 10))
+        XCTAssertEqual(newestPhoto.label, fixtureLabel(23), "Newest first starts at the newest photo")
+        newestPhoto.swipeRight()
+        XCTAssertEqual(
+            photoElement(app).label,
+            fixtureLabel(22),
+            "Newest first must walk toward older photos"
+        )
+        capture("Choose a photo — both named traversals")
+    }
+
+    /// A named traversal walks its whole pool exactly once and then stops at a
+    /// visible boundary. It must never wrap back to the photo it started on.
+    func testANamedTraversalCompletesWithoutWrapping() {
+        let app = launchApp()
+        _ = openChoosePhoto(app)
+        app.buttons["choosePhoto.oldest"].tap()
+
+        var seen: [String] = []
+        for step in 0..<24 {
+            let photo = photoElement(app)
+            XCTAssertTrue(photo.waitForExistence(timeout: 10), "Oldest first stopped after \(step) photos")
+            seen.append(photo.label)
+            photo.swipeRight()
+        }
+
+        XCTAssertEqual(
+            seen,
+            (0..<24).map { fixtureLabel($0) },
+            "Oldest first must walk every fixture once, oldest to newest, without repeating one"
+        )
+        XCTAssertFalse(
+            photoElement(app).waitForExistence(timeout: 5),
+            "a finished traversal must not wrap back to a photo"
+        )
+        XCTAssertTrue(
+            app.buttons["viewer.finish"].waitForExistence(timeout: 10),
+            "the traversal must end at the visible completion boundary"
+        )
+        XCTAssertTrue(app.staticTexts["You've reviewed everything"].exists)
+        capture("Choose a photo — traversal finished without wrapping")
     }
 
     func testChoosePhotoCanJumpStraightToAMonth() {

@@ -117,18 +117,20 @@ struct ChoosePhotoView: View {
         model.preferences.defaultDirection == .older ? "older" : "newer"
     }
 
-    /// The two named traversals. At accessibility sizes they stack, because a
-    /// two-across row squeezes each label down to an ellipsis.
+    /// The named traversals plus the separate Random action. At accessibility
+    /// sizes they stack, because a row squeezes each label down to an ellipsis.
     private var traversalRow: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 10) {
                     newestButton
+                    oldestButton
                     randomButton
                 }
             } else {
                 HStack(spacing: 10) {
                     newestButton
+                    oldestButton
                     randomButton
                 }
             }
@@ -139,8 +141,14 @@ struct ChoosePhotoView: View {
     }
 
     private var newestButton: some View {
-        traversalButton(systemImage: "clock.arrow.circlepath", title: "Newest", identifier: "choosePhoto.newest") {
+        traversalButton(systemImage: "clock.arrow.circlepath", title: "Newest first", identifier: "choosePhoto.newest") {
             model.startNewest()
+        }
+    }
+
+    private var oldestButton: some View {
+        traversalButton(systemImage: "clock", title: "Oldest first", identifier: "choosePhoto.oldest") {
+            model.startOldest()
         }
     }
 
@@ -240,6 +248,9 @@ struct ChoosePhotoView: View {
             .foregroundStyle(.white)
             .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
         }
+        // The symbol's name must never leak into the spoken label; the visible
+        // words already say exactly what the toggle does.
+        .accessibilityLabel(newestFirst ? "Newest first" : "Oldest first")
         .accessibilityIdentifier("choosePhoto.sort")
     }
 

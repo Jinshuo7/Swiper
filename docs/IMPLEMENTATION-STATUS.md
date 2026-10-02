@@ -43,7 +43,24 @@
 > real library. The focused `SWIPRUITests` class is green (43 tests, 0 failures);
 > the known AX5 reachability failure in
 > `PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize` is
-> unchanged and still skipped in CI.
+> unchanged and still skipped in CI. #47 is merged as PR #53 (commit
+> `10aa678`).
+>
+> **#55 update (2026-10-03):** the starting point now offers **Newest first**
+> (`choosePhoto.newest`, walks toward older) and **Oldest first**
+> (`choosePhoto.oldest`, walks toward newer) as named start actions, alongside
+> the untouched **Random** action and a specific-item start from the grid. The
+> grid's separate **Newest first / Oldest first** order toggle still reorders
+> the months and **Jump to month** still works. `AppModel.startOldest()` pins
+> `.newer` the way `startNewest()` pins `.older`, so a named traversal always
+> does what its label says and never depends on the saved default direction.
+> The focused `SWIPRUITests` class is green (45 tests, 0 failures), adding a
+> both-directions start test and a full Oldest-first traversal that reaches the
+> visible completion boundary without repeating a photo. The known AX5
+> reachability failure in
+> `PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize` is
+> unchanged (still fails to scroll `choosePhoto.newest`) and is still skipped in
+> CI, left for #58.
 
 ---
 
@@ -57,7 +74,8 @@
 | [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44) | 1 | 1 | 0 | No | Yes (#49) |
 | [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
 | [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
-| [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | No (branch ready; PR pending driver) |
+| [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | Yes (#53) |
+| [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | No (branch ready; PR pending driver) |
 
 ---
 

@@ -307,8 +307,16 @@ final class AppModel: ObservableObject {
 
     // MARK: - Entry points
 
+    /// Starts at the newest asset and walks older. The direction is pinned,
+    /// never taken from the preference, so the button always does what its
+    /// label says.
     func startNewest() {
         enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .older) }
+    }
+
+    /// Starts at the oldest asset and walks newer, mirroring ``startNewest()``.
+    func startOldest() {
+        enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .newer) }
     }
 
     func startTumbler() {
