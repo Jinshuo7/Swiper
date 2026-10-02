@@ -27,12 +27,12 @@
   Undo, after a jump, and after reconciliation), a terminated-and-relaunched
   session resumes the exact saved order and position, and reconciliation drops
   vanished members while crediting no deletion and touching no photo. Kit maths
-  is 186 tests with 0 failures; `SWIPRAppTests` is 42 tests with 0 failures. The
-  CI AX5 `-skip-testing` line is untouched. **No PR opened yet** — the driver
-  opens it after review.
-- **Next up:** open the PRs for #58 and #57, wait for `checks`, merge, then run
-  the remaining V1-03 sub-ticket (#56 replacement confirmation) through the same
-  worker/reviewer flow.
+  is 188 tests with 0 failures; `SWIPRAppTests` is 42 tests with 0 failures. The
+  CI AX5 `-skip-testing` line is untouched. **PR #62 is open** and awaits the
+  owner's review (`needs-strong-review`); the replacement-confirmation ticket
+  #56 also has an open PR (#61).
+- **Next up:** park #56 and #57 for the owner's review, then continue the
+  remaining V1-03 and later tickets.
 
 ### Note: the AX5 skip belongs to #32
 

@@ -87,7 +87,7 @@
 > repeats (plain, after Undo, after a jump, and after reconciliation), a
 > terminated-and-relaunched session resumes the exact saved order and position,
 > and reconciliation drops vanished members while crediting no deletion and
-> touching no photo. Kit maths: 186 tests, 0 failures. `SWIPRAppTests`: 42
+> touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
 > tests, 0 failures. The AX5 `-skip-testing` line is untouched.
 
 ---
