@@ -901,20 +901,29 @@ final class PlaySessionUITests: XCTestCase {
         capture("Play — result at the largest text size")
         app.buttons["result.done"].tap()
 
-        // Choose a photo, including its explanation and the way back. The jump
-        // bar can sit a few points low at AX5, so it only has to stay tappable.
+        // Choose a photo, working down the screen in the order the controls
+        // appear. The AX5 chrome is taller than one screen, so the top controls
+        // have to be checked before scrolling down to the jump bar, the order
+        // toggle and the grid: `assertReachable` only ever scrolls downward.
         goHome(app)
         _ = openChoosePhoto(app)
-        assertReachable(app, "choosePhoto.jump", "\(context) Choose a photo", scrollUpTo: 4)
-        XCTAssertTrue(element(app, "choosePhoto.explanation").waitForExistence(timeout: 10))
+        assertReachable(app, "choosePhoto.explanation", "\(context) Choose a photo")
+        capture("Play — Choose a photo at the largest text size")
         assertReachable(app, "choosePhoto.newest", context, scrollUpTo: 4)
+        assertReachable(app, "choosePhoto.oldest", context, scrollUpTo: 4)
+        assertReachable(app, "choosePhoto.random", context, scrollUpTo: 4)
         // The fix that keeps the labels whole: at this size they stack.
         XCTAssertLessThan(
             app.buttons["choosePhoto.newest"].frame.maxY,
             app.buttons["choosePhoto.random"].frame.minY + 1,
             "at the largest text size the traversal buttons stack so their labels survive"
         )
-        capture("Play — Choose a photo at the largest text size")
+        assertReachable(app, "choosePhoto.jump", "\(context) Choose a photo", scrollUpTo: 6)
+        assertReachable(app, "choosePhoto.sort", context, scrollUpTo: 6)
+        // The grid is the point of the screen, so a cell must survive the scroll
+        // too, not just the chrome above it.
+        assertReachable(app, "choosePhoto.cell.fake-22", "\(context) Choose a photo grid", scrollUpTo: 8)
+        capture("Play — Choose a photo grid at the largest text size")
         app.buttons["choosePhoto.back"].tap()
         app.buttons["filter.back"].tap()
 
