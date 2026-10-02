@@ -26,6 +26,14 @@
 
 ---
 
+## Ticket log
+
+| Ticket | Codex steps | DeepSeek attempts | Corrections needed |
+| --- | --- | --- | --- |
+| Setup — DeepSeek + GitHub Actions guardrails | 3 | 2 | Yes |
+
+---
+
 ## Legacy checkpoint (issues #11–#16, photo-only — as-built history)
 
 Final checkpoint for the autonomous implementation of GitHub issues #11–#16

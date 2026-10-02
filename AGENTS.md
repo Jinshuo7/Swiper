@@ -4,6 +4,26 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 - Add durable project-specific notes here as they are discovered through real work.
 
+## Owner workflow (mandatory)
+
+- **Codex manages and reviews; DeepSeek (through Pi) makes all project-file
+  edits**, unless the owner explicitly tells Codex to do a specific ticket.
+- **Every ticket uses a fresh git worktree and its own branch.** Never work in
+  the owner's main folder.
+- **Never** reset, clean, stash, restore, rebase, force-push, delete
+  branches/worktrees, or delete out-of-scope files.
+- **Never push to `main`.** Always open a pull request.
+- **Only the owner approves merges** by replying "merge"; then merge with a
+  merge commit and close the issue.
+- **One ticket at a time.** After opening a PR, stop until it is merged or the
+  owner directs otherwise.
+- **Never invent or substitute** visual references, product decisions, or test
+  results. When required material is unclear, stop and ask one plain question.
+- **Do not use** `Scripts/ticket_controller.py` or PR #37.
+- **Test results come from script/command output**, never from assumption.
+- **Log every ticket** — Codex steps, DeepSeek attempts, and whether corrections
+  were needed — in `docs/IMPLEMENTATION-STATUS.md`.
+
 ## Build and test
 
 - Xcode 27.x, iOS deployment target 17.0. The scheme is `SWIPR`; the project is
