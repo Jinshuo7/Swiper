@@ -17,6 +17,23 @@ final class StorageEstimateTests: XCTestCase {
         XCTAssertEqual(StorageEstimate.bytes(width: 0, height: 0, kind: .photo), StorageEstimate.minimumStillBytes)
     }
 
+    func testVideoEstimateIsConservativeZero() {
+        XCTAssertEqual(StorageEstimate.bytes(width: 3_840, height: 2_160, kind: .video), 0)
+        XCTAssertEqual(StorageEstimate.bytes(width: 0, height: 0, kind: .video), 0)
+    }
+
+    func testVideoDescriptorEstimatesZeroBytes() {
+        let video = AssetDescriptor(
+            id: "video",
+            creationDate: nil,
+            pixelWidth: 3_840,
+            pixelHeight: 2_160,
+            kind: .video
+        )
+        XCTAssertEqual(video.estimatedBytes, 0)
+        XCTAssertEqual(StorageEstimate.bytes(for: video), 0)
+    }
+
     func testByteFormatterScalesUnits() {
         XCTAssertEqual(ByteFormatter.string(fromBytes: 1), "1 byte")
         XCTAssertEqual(ByteFormatter.string(fromBytes: 999), "999 bytes")
