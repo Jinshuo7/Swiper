@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Compile-checks the whole iOS app and the SwiperKit framework against the iOS
+# Compile-checks the whole iOS app and the SWIPRKit framework against the iOS
 # Simulator SDK without xcodebuild.
 #
 # Useful when `xcodebuild` cannot run (for example the installed Xcode license
@@ -27,13 +27,13 @@ fi
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
 
-echo "==> Building SwiperKit for iOS ($TARGET)"
+echo "==> Building SWIPRKit for iOS ($TARGET)"
 "$SWIFTC" -sdk "$IOSSDK" -target "$TARGET" -parse-as-library -enable-testing \
-  -module-name SwiperKit -emit-module \
-  -emit-module-path "$BUILD/SwiperKit.swiftmodule" \
-  $(find "$ROOT/SwiperKit" -name '*.swift' | sort)
+  -module-name SWIPRKit -emit-module \
+  -emit-module-path "$BUILD/SWIPRKit.swiftmodule" \
+  $(find "$ROOT/SWIPRKit" -name '*.swift' | sort)
 
-echo "==> Type-checking the Swiper app"
+echo "==> Type-checking the SWIPR app"
 # -disable-sandbox: SwiftUI's macros are expanded by swift-plugin-server, which
 # wraps the plugin in its own sandbox. That nested sandbox fails when this
 # script already runs inside one (for example an agent-harness sandbox), and the
@@ -42,6 +42,6 @@ echo "==> Type-checking the Swiper app"
 "$SWIFTC" -sdk "$IOSSDK" -target "$TARGET" -parse-as-library -typecheck \
   -I "$BUILD" \
   -Xfrontend -disable-sandbox \
-  $(find "$ROOT/Swiper" -name '*.swift' | sort)
+  $(find "$ROOT/SWIPR" -name '*.swift' | sort)
 
 echo "OK"

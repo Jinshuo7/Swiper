@@ -13,4 +13,4 @@ a deliberate trade of precision for correctness and durability. Because the
 estimate is woven through the result screen and lifetime storage totals,
 revisiting it later means reworking that whole surface, so it is recorded here.
 
-The calculation is documented in code in `SwiperKit/StorageEstimate.swift`.
+The calculation is documented in code in `SWIPRKit/StorageEstimate.swift`.

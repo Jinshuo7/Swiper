@@ -1,205 +1,243 @@
-# Behavioural specification
+# Behavioural specification (production v1)
 
-This is the contract a build must satisfy. It describes behaviour, not code.
+> **Authoritative source: [issue #24](https://github.com/Jinshuo7/Swiper/issues/24).**
+> This document is the in-repo, human-readable contract a production-v1 build
+> must satisfy. It is a **target**: much of it is not built yet. As-built legacy
+> behaviour is tracked separately in
+> [`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md); read the two together.
+> Where the legacy contract in this file's history, an ADR, a mock or a prototype
+> conflicts with #24, #24 wins.
 
-## 1. Access
+This describes behaviour, not code. Numeric interaction constants may be tuned
+on real hardware without changing the contract.
 
-1. On first launch Swiper asks for read-write photo access, because both
-   favouriting and deleting mutate the library. Swiper never requests more than
-   this.
-2. Before asking, Swiper explains what access is for and that all data stays on
-   the device.
-3. Limited-library access is supported: Swiper shows the visible subset and
-   offers a control to select more photos.
-4. If access is denied or restricted, Swiper explains how to change it in
-   Settings and does not present the library.
+## 1. Access and privacy
 
-## 2. Entry
+1. On first launch SWIPR explains, before asking, why it needs **read-write**
+   photo access (favouriting is out of scope; deletion mutates the library) and
+   that all media stays on the device.
+2. SWIPR operates without accounts, tracking, analytics, advertising or uploaded
+   media. It never requests more than read-write access.
+3. **Limited-library access** is supported: SWIPR sorts the visible subset and
+   offers **Select More Photos**.
+4. If access is denied or restricted, SWIPR explains how to change it in Settings
+   and offers a route to system Settings; it does not present the library.
 
-The entry screen offers exactly these choices:
+## 2. Home, entry and filters
 
-* **Continue sorting** — shown only when unfinished session state exists, and
-  resumes it at the saved position with its Undo history.
-* **Review & delete · N** — shown whenever N photos are marked for deletion, and
-  opens deletion review directly from home.
-* **Recent** — start a sequential session at the newest asset, traversing
-  toward older photos.
-* **Start Here** — open a lazily loaded grid of the whole library, grouped into
-  calendar months with the newest first, and begin at the chosen asset. The
-  screen states what it is for (choosing where to begin, after which Swiper walks
-  toward older photos and skips anything already decided or marked). A month menu
-  jumps straight to any point in the library, and a control flips the order
-  between newest and oldest, so no one has to scroll in from one end. Only
-  visible thumbnails are decoded; full images are not loaded. Photos already
-  marked for deletion are badged and cannot be started on.
-* **Tumbler** — begin a randomised, repeat-free session.
+1. Home uses the approved **Orange & Porcelain** composition: Settings and Review
+   in stable mirrored top-corner positions, photographic **Everything**,
+   **Photos** and **Videos** choices, a conditional **Continue sorting** action,
+   a separate conditional **Review marked items** action, and a quiet conditional
+   **Your impact** section.
+2. **Continue sorting** (resume) is distinct from starting a new session, and
+   **Review marked items** is distinct from both; reviewing never changes a
+   session.
+3. Each media choice opens **editable filters**:
+   * **Everything** initially selects all photo categories *and* videos.
+   * **Photos** initially selects all photo categories.
+   * **Videos** initially selects the single video category.
+   * Previous exclusions are not silently reused for a new session; Continue
+     sorting always keeps its saved session filters.
+4. Photo categories are **Screenshots, Live Photos, Panoramas, Other Photos**;
+   there is exactly one general **Videos** selection. **Other Photos** means
+   still photos outside the named categories, so every still photo has an
+   understandable category.
+5. A category row toggles without disturbing other choices, an **Only** action
+   isolates one category, and **exclusions win when categories overlap**, so the
+   result is deterministic.
+6. Every matching library item appears **once**; overlapping categories never
+   create duplicates. A plain-language pool summary lets the user verify it.
+7. **Continue** is disabled when nothing is selected. An empty pool explains that
+   nothing matches and offers **Change filters**. Returning from the
+   starting-point grid preserves filters.
 
-Home always states the marked count with the wording "N photos marked for
-deletion" and "Nothing deleted yet.", so a leftover mark is never mistaken for a
-completed deletion.
+## 3. Starting point and the fixed session pool
 
-A subtle statistics icon opens the statistics page; a settings icon opens
-settings. Statistics are not otherwise visible.
+1. The starting-point grid is grouped by month and supports month navigation.
+2. Order choices are **Newest first** (walks older) and **Oldest first** (walks
+   newer), plus tapping a specific grid item as the start.
+3. **Random** creates a persisted, deterministic, repeat-free **Tumbler** order.
+4. Traversal **completes rather than wraps** at the end of the selected
+   traversal; there is a clear boundary.
+5. A session captures a **fixed set of stable library identifiers** at creation.
+   New library arrivals wait for a new session; missing or newly inaccessible
+   identifiers reconcile safely.
+6. Browsing filters and the grid leave an unfinished session untouched. Starting
+   a replacement session requires a confirmation that position and Undo history
+   will be replaced **while marked items remain**, and never clears the deletion
+   list.
 
-## 3. The full-screen viewer
+## 4. The full-screen viewer
 
-1. The viewer contains the complete asset at its original aspect ratio, centred
-   against black and as large as the display allows. It is never cropped merely
-   to fill the screen; unused area stays black. Live Photos show their still and
-   can play their motion.
-2. A Live Photo is labelled as one — a "LIVE" chip beside Close, with the
-   `livephoto` symbol and the word, plus a spoken hint that press-and-hold plays
-   the motion — so the asset kind is never something the user has to infer.
-3. Only the current asset's display image and a small prefetch window of
-   neighbours are requested. Requests for assets that are no longer current are
-   cancelled.
-4. Every control and overlay stays inside the viewport and its safe area, so
-   Close, Favorite and Undo are always reachable. There is no permanent
-   instruction text over the photo.
-5. Whenever photos are marked for deletion, the viewer shows a compact
-   `Review · N` control that opens deletion review without ending the session.
-6. Default Swipe preset gestures. The photo follows the finger, and the drag
-   reveals a feedback-only well in the lower corner it is heading for: trash on
-   the left, check on the right. The wells are never separate tap targets.
-   * drag left past the threshold and release → mark for deletion and advance;
-   * drag right past the threshold and release → keep and advance.
-7. The commit threshold is visible — the well arms with a brighter fill and a
-   stronger stroke — and is confirmed with a single light haptic at the moment it
-   is crossed, not on every update. Releasing below the threshold, releasing a
-   vertical drag and cancelling all make no decision.
-8. Reduce Motion removes the spring-back animation and the well's scale change;
-   the meaning is still carried by symbol, wording and stroke, never by colour or
-   motion alone.
-9. A heart control marks the asset as an Apple Photos favorite, keeps it and
-   advances. It is always available, so nobody has to perform a gesture.
-10. Undo reverses the most recent decision of this session, including removing a
-   just-marked photo from the deletion list, and returns to that photo. Undo
-   never deletes.
-11. Traversal moves in the preferred direction, skipping assets already decided
-   in this session and assets marked for deletion. At the end of the library it
-   continues in the other direction if undecided assets remain.
-12. Nothing is ever deleted from the viewer.
+1. The viewer shows the **complete current asset at its original aspect ratio**,
+   centred and as large as the display allows. It is never cropped to fill the
+   screen; unused area is letterboxed. Chrome never changes the media's size,
+   position or crop ([ADR-0006](adr/0006-photo-never-moves-for-chrome.md)).
+2. Overlays float over the media inside safe areas. A small neutral **Photo /
+   Live / Video** badge sits **beneath Review**. Home, Review, media labels,
+   playback controls and decisions stay inside safe touch bounds.
+3. The palette is adaptive **neutral glass/material** over the Orange & Porcelain
+   application. Red and green are limited to extremely faint desaturated edge
+   illumination; symbols, wording, stroke and weight carry meaning.
+4. Swipe decisions are **always available** regardless of button visibility
+   ([ADR-0009](adr/0009-swipe-always-buttons-optional.md)). The media follows the
+   finger. **Dragging left past the threshold marks for deletion; dragging right
+   past the threshold keeps.** The commit threshold is confirmed by strengthened
+   outline/symbol weight rather than saturation, with one light haptic at the
+   crossing. Below-threshold, vertical and cancelled drags decide nothing.
+5. **Undo** reverses the most recent decision of this session, including removing
+   a just-marked item from the deletion list, and returns to that item. Undo never
+   deletes, and it is the only way to reverse an individual decision. Its position
+   is described as Before actions or After actions (see §5.6).
 
-## 4. Control rail and presets
+## 5. The decision dock
 
-Every control lives on **one rail**. Nothing about the current photo, the number
-of marks or the active preset moves a control: the rail is anchored to the screen,
-not to the photo, and the review entry sits in the separate top strip rather than
-in the rail.
+1. There are exactly **three fixed destinations**: left edge, bottom centre and
+   right edge ([ADR-0007](adr/0007-three-fixed-control-positions.md)). Bottom is
+   a centred **Delete / Keep** pair of labelled pills with a separate smaller
+   **Undo** control; side positions are separate icon controls with a functional
+   non-action gap and safe-area insets.
+2. The **complete dock is directly draggable** from its buttons or gaps — there is
+   no permanent grip and no long press. A normal tap performs its action with no
+   movement delay.
+3. Moving a finger roughly **9 pt cancels the pending tap permanently** for that
+   gesture and morphs the dock into a compact neutral token. Three subtle
+   destination markers appear; the nearest strengthens without saturated colour.
+4. Recommended tuning starts near an 85 pt capture radius, 12 pt maximum
+   attraction and 15 pt hysteresis; these may change without changing the
+   contract. A valid release lands and restores all controls together; an invalid
+   release returns to the source with no haptic.
+5. Haptics: none on pickup, one light response on entering capture, one soft
+   response on valid landing, none on invalid release, and no repeats while
+   captured. A **Haptics** preference disables all optional responses.
+6. Dock position is persisted **immediately**. **Control Position** is also in
+   Settings, so placement never depends on dragging. **Undo position** is
+   described as **Before actions** (default; left of the bottom pair, above a side
+   pair) or **After actions**. Delete and Keep never move relative to each other
+   ([ADR-0011](adr/0011-undo-at-the-outer-end.md)).
+7. Stored preferences are: Control Position, Show Buttons, Haptics, Appearance,
+   Language handoff and Undo Position. **Swipe decisions remain available when
+   buttons are hidden.**
 
-* The rail runs along one edge: **Bottom**, **Left side** or **Right side**.
-  This is the handedness choice — a right thumb reaches the bottom or right rail,
-  a left thumb the bottom or left one.
-* Along that edge it is anchored at the start, centre or end (left/centre/right on
-  a bottom rail; top/middle/bottom on a side rail).
-* The order is the other half of the handedness choice. **Close first** (the
-  default) runs least to most thumb-accessible — Close, Favorite, Undo, then the
-  decision pair with Keep last — so a side rail has Close at the top and Keep at
-  the bottom. **Keep first** mirrors it, which is what a left thumb on a bottom
-  rail needs: the decisions come to the near end and Close goes to the far one.
-  The fixed set of actions is the same either way; only the ends swap.
-* The preset decides which controls exist, never where they are:
+## 6. Video playback
 
-| Preset | Keep | Delete | Favorite | Undo | Swipe gestures |
-| --- | --- | --- | --- | --- | --- |
-| Swipe | gesture | gesture | rail | rail | yes |
-| Thumb | rail | rail | rail | rail | no |
-| Delete only | advancing | rail | rail | rail | no |
-| Extended | rail | rail | rail | rail | no |
+1. Ordinary videos begin with a **still preview, duration and Play control** —
+   every clip requires an explicit Play action; advancing never auto-plays.
+2. Playback starts **muted** with an explicit sound control; the **mute
+   preference is remembered during the current sorting visit** only, so returning
+   from Home starts muted again.
+3. A dedicated **timeline** seeks without moving the media. Keep and Delete
+   remain available during playback.
+4. Beginning a sorting drag **pauses** a playing video; cancelling that drag
+   resumes **only if it was previously playing**; committing a decision stops
+   playback and advances. Undo and session resume return to a **paused** video.
+5. Playback position is retained during the current **app visit** but is **not
+   durable sorting state**. Mute scope (sorting visit) and playback-position
+   scope (app visit) are deliberately different.
+6. A usable preview permits sorting while full playback loads. If no usable
+   preview can be obtained, offer **Retry** and **Skip**; **Skip records neither
+   Keep nor Mark for deletion** and leaves the item eligible later.
 
-* In **Delete only**, advancing (tapping the photo) keeps it; only the Delete
-  control marks it.
-* The rail, its anchor, the preset and the direction are persisted immediately,
-  and no choice ever removes the full-screen photo.
-* A Live Photo is labelled in the top strip; the review entry appears there once
-  photos are marked.
+## 7. Deletion review, commit and results
 
-## 4a. Teaching
+1. Photos and videos share **one durable deletion list** that outlives sorting
+   sessions and relaunches ([ADR-0005](adr/0005-deletion-list-outlives-sessions.md)).
+   Items in the list are skipped by sorting.
+2. Review is reachable from Home and the viewer. Thumbnails expose media kind and
+   video duration; tapping opens full-screen inspection with playback.
+   Individual and batch **Restore** are supported, including drag-selection.
+3. Restoring removes an item from the list and keeps it for the current session
+   so it is not immediately re-presented. Undo entries that would reapply a
+   restored mark are dropped. No statistics are shown during review.
+4. Tapping Delete in review is the explicit final action. SWIPR adds **no
+   confirmation dialog of its own** — the single confirmation is the system's,
+   which PhotoKit always presents and which is the only thing that authorises
+   deletion. Review copy states the total item count and a photo/video breakdown.
+5. **Actual deletion happens only from review and only after the system
+   confirmation** ([ADR-0001](adr/0001-never-delete-while-swiping.md)). Sorting
+   never mutates the library. Cancelling the system prompt retains every mark and
+   changes no statistics.
+6. Local storage and PhotoKit are not one transaction. After a commit SWIPR
+   re-reads the library: only **confirmed** deletions count, unsuccessful items
+   stay marked and are never re-counted, and retry is safe. Assets removed
+   outside SWIPR are reconciled without being credited as SWIPR deletions.
+7. A **fully successful** deletion shows one short no-sound fireworks moment
+   around the result, then settles into a result reporting confirmed count and
+   **estimated** storage freed ([ADR-0002](adr/0002-public-api-storage-estimates.md)).
+   **Reduce Motion** replaces it with a gentle fade. Cancelled, failed and
+   partial outcomes never celebrate.
+8. Statistics are a read-only block inline in Settings. A quiet **Your impact**
+   summary appears on Home after the first success and routes to those stats.
+   Only confirmed deletions are ever counted; units scale naturally.
 
-1. The first time a photo is presented, Swiper explains the flow once: how to
-   mark for deletion, how to keep, that nothing is deleted until review is
-   confirmed, and that accepted decisions are saved as they are made.
-2. The explanation matches the selected preset: the Swipe preset describes the
-   drag, the button presets describe the buttons and never tell the user to
-   swipe.
-3. Dismissing it is permanent until the user replays it from Settings → How to
-   use. It is teaching state, not saved work, and never blocks sorting again
-   after it is dismissed.
+## 8. Persistence
 
-## 5. Resume and persistence
+1. Position, filters, order, decisions, Tumbler order and Undo are restored so
+   **Continue sorting** is truthful.
+2. An acknowledged decision is **saved before the session advances**. A failed
+   save pauses input, parks a recoverable pending decision, blocks further input
+   and offers **Retry** without duplicate effects.
+3. Stored state carries a **schema version** and migrates atomically
+   ([ADR-0004](adr/0004-schema-versioned-session-persistence.md)). Unreadable or
+   newer-version data is reported and **never overwritten** as if empty. Only
+   stable identifiers and logical, playback-independent session state are
+   persisted — never image or video data.
 
-1. Progress (current asset, direction, decisions, undo history, Tumbler order)
-   is saved on device and offered as Continue sorting.
-2. The deletion list is stored separately from the sorting session and survives
-   starting a new session, switching mode and relaunching. See
-   [ADR-0005](adr/0005-deletion-list-outlives-sessions.md).
-3. Persistence stores stable PhotoKit local identifiers only, never images.
-4. On resume, identifiers that no longer exist in the library are dropped and
-   the current asset falls back to the nearest still-present asset in the
-   preferred direction. Externally removed assets are never counted as deletions,
-   and the user is told that they were removed from the list rather than left to
-   wonder where a mark went.
-5. Tumbler never repeats an asset within a session.
-6. A new session resets traversal position, in-session decisions and Undo; it
-   never clears a mark. Photos marked for deletion are skipped by every sorting
-   entry point, so a photo is decided once.
-7. Stored state carries a schema version. Data written by a newer version of
-   Swiper, or data that cannot be read, is reported to the user and is never
-   overwritten as if the session were empty. See
-   [ADR-0004](adr/0004-schema-versioned-session-persistence.md).
-8. A decision is acknowledged only after it has been saved. A failed save pauses
-   sorting, keeps the decision recoverable and offers an explicit retry; the
-   session never advances on an unsaved decision.
+## 9. Appearance, accessibility and languages
 
-## 6. Deletion review
+1. **System, Light and Dark** appearances ship. Prefer native Liquid Glass where
+   available, with a deliberate **iOS 17 opaque/material fallback** of identical
+   geometry and semantics.
+2. Accessibility is part of the contract: minimum 44 pt touch targets, no
+   colour-only meaning, responsive **Dynamic Type** without truncation or
+   disappearing actions, individual **VoiceOver** elements with meaningful
+   labels and hints, direct placement accessibility actions that announce the
+   result, stable **Voice Control** names, Reduce Motion, Reduce Transparency,
+   sufficient contrast and safe-area containment.
+3. **English and Simplified Chinese ship complete.** Application and domain-layer
+   copy each use the correct resource bundle; safety, error, recovery, plural,
+   accessibility, store, privacy and support copy are included. A fluent human
+   reviews Simplified Chinese before release. See
+   [`LOCALIZATION.md`](LOCALIZATION.md).
+4. **Known release blocker:** the largest-accessibility-text ("AX5") reachability
+   failure must be fixed and the suite green before the release gate. It is
+   release-blocking, not cosmetic.
 
-1. The review shows the marked photos as a grid of thumbnails. It is reachable
-   from home and from the viewer at any time, not only at the end of a session.
-2. Tapping a thumbnail opens full-screen inspection.
-3. A single photo can be restored. Selection mode lets the user drag across
-   thumbnails to select a batch, and restore the selected batch.
-4. Restoring removes a photo from the deletion list, so a later session may
-   present it again, and keeps it for the current session so it is not
-   immediately re-presented. Undo entries that would reapply a restored mark are
-   dropped.
-5. No statistics or reclaimed-storage totals are displayed during review.
-6. Tapping Delete in review is the explicit final action; it asks the system to
-   delete the remaining marked photos. Swiper adds **no confirmation dialog of
-   its own** — the single confirmation is the system's, which PhotoKit always
-   presents and which is the only thing that authorises the deletion. The review
-   screen states what the commit will do, since that explanation no longer lives
-   in a dialog.
-7. After the commit, only assets that are confirmed gone count as deleted.
-   Unsuccessful or cancelled deletions stay marked and are not counted.
-8. Leaving review returns to the place it was opened from, or home when there is
-   no active sorting session.
-9. Local storage and PhotoKit are not one transaction. Swiper never claims a
-   deletion it did not confirm: after a commit it re-reads the library, removes
-   only confirmed-deleted assets from the list, keeps unsuccessful ones marked,
-   and re-checks stored state against the library on the next launch. Assets that
-   vanished outside Swiper are dropped from the list without being counted as
-   deletions, and a retry never re-requests or re-counts an asset that is already
-   gone.
+## 10. App Store release
 
-## 7. Result and statistics
+1. Product name **SWIPR** (if available), recommended subtitle "Clean photos and
+   videos", Photo & Video category, free, no accounts/ads/analytics/tracking/
+   purchases/subscriptions.
+2. Minimal Orange & Porcelain app icon with one clear stacked-media/swipe mark,
+   no text. **The owner approves the final rendered asset before submission.**
+3. Localized store metadata and **five screenshots** covering Home, Filters,
+   Viewer, mixed Review and successful impact. No promotional App Preview video.
+4. A bilingual privacy policy and a support page with contact information.
+   Declare "no data collected" only after auditing the final binary and
+   dependencies, with accurate required-reason API declarations and
+   privacy-manifest output.
+5. Validate the minimum iOS 17 fallback and the latest supported iOS; use
+   simulator widths plus at least one physical iPhone. **A locked or unavailable
+   device is a blocked manual gate, never bypassed.**
+6. Build and validate a distribution archive, upload the exact release candidate
+   to App Store Connect and complete internal TestFlight validation. The owner
+   completes at least three full cleanup sessions; a fluent reviewer completes
+   the Simplified Chinese pass.
+7. **Release manually after App Review. The submitted binary must be built from
+   the exact tested release-candidate commit**, and it must carry no known crash,
+   data-loss risk, deletion-safety defect, correctness defect or accessibility
+   blocker. A purely cosmetic defect may ship only through an explicit recorded
+   waiver.
 
-1. After a successful deletion, a dismissible result reports the number of
-   photos deleted and approximately how much storage was reclaimed.
-2. A separate statistics page shows current-session and lifetime totals for
-   confirmed deletions, plus the number of completed cleanup sessions.
-3. Only confirmed deletions are ever counted.
-4. Units scale naturally: bytes → KB → MB → GB → TB.
-5. Storage is presented as approximate. See
-   [ADR-0002](adr/0002-public-api-storage-estimates.md).
+## 11. Safety invariants
 
-## 8. Safety invariants
-
-* Swiper never deletes while swiping.
-* Deleting requires two deliberate acts: tapping Delete in review, then allowing
-  it in the system prompt. Swiper never adds a third.
-* A marked photo is reversible until the final commit.
-* Restored photos become kept and leave the deletion list.
+* SWIPR never deletes while sorting.
+* Deleting requires two deliberate acts: the final Delete action in review, then
+  the system confirmation. SWIPR never adds a third.
+* A marked item is reversible until the final commit; restored items become kept
+  and leave the deletion list.
 * An acknowledged decision is always saved first; a failed save is visible and
-  retryable, and is never presented as success.
-* Statistics only reflect confirmed successful changes.
-* Automated tests never touch a real library.
+  retryable and is never presented as success.
+* Statistics reflect only confirmed successful changes.
+* Automated tests never touch a real photo library.

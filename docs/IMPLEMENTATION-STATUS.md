@@ -1,4 +1,32 @@
-# Implementation status checkpoint
+# Implementation status
+
+> ## Read this first: two different things share this file
+>
+> **1. Required production v1** — specified by
+> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) and the in-repo
+> target contract [`SPEC.md`](SPEC.md), delivered by tickets
+> [#25–#36](ROADMAP.md). #24 is authoritative. **Almost none of the v1 target
+> behaviour below is implemented yet**: ordinary video, Home media choices,
+> editable filters, the fixed non-wrapping pool, playback, the neutral whole-dock
+> 3-position interaction, Before/After Undo, complete EN/zh-Hans and the App
+> Store release work are requirements, not as-built facts. Do not read the
+> legacy checkpoint as evidence that any of them exist.
+>
+> **2. As-built legacy state** — the finished checkpoint below, covering the
+> photo-only build from issues #11–#16 (spec #10) and later audit rounds. It is
+> real, tested work on the committed history. Its durable safety and persistence
+> substance is preserved by v1; its mutable product surface (single-entry flow,
+> grip cluster, photo-only scope) is superseded.
+>
+> **Known status for the v1 baseline:** the existing test baseline is not yet
+> all-green — the largest-accessibility-text ("AX5") reachability failure is
+> outstanding and is release-blocking (no known crash, data-loss,
+> deletion-safety or accessibility block may ship). Do not claim a green suite
+> until that is fixed and re-run on a named commit.
+
+---
+
+## Legacy checkpoint (issues #11–#16, photo-only — as-built history)
 
 Final checkpoint for the autonomous implementation of GitHub issues #11–#16
 (parent spec #10). Read with `docs/IMPLEMENTATION-PROMPT.md`,
@@ -10,9 +38,9 @@ The iPhone became available, and **the full suite now runs green on it**:
 
 | Target | Tests | Result |
 | --- | --- | --- |
-| `SwiperKitTests` | 111 | 0 failures |
-| `SwiperAppTests` | 29 | 0 failures |
-| `SwiperUITests` | 20 | 0 failures |
+| `SWIPRKitTests` | 111 | 0 failures |
+| `SWIPRAppTests` | 29 | 0 failures |
+| `SWIPRUITests` | 20 | 0 failures |
 
 **160 tests, 0 failures, `** TEST SUCCEEDED **`** on the iPhone 11 Pro
 (`00008030-000669DE3408802E`, iOS 26.2.1). Run twice: once at 21:09 and again at
@@ -73,14 +101,14 @@ evidence is pending. #16 is commented and left open for the same reason. Parent
 
    ```
    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer TMPDIR=$PWD/.tmp \
-   xcodebuild build-for-testing -project Swiper.xcodeproj -scheme Swiper \
+   xcodebuild build-for-testing -project SWIPR.xcodeproj -scheme SWIPR \
      -destination 'generic/platform=iOS' -derivedDataPath ./.derivedData \
      -allowProvisioningUpdates \
      OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -disable-sandbox'
    ```
 
-   **`** TEST BUILD SUCCEEDED **`**, including `SwiperAppTests` and
-   `SwiperUITests`.
+   **`** TEST BUILD SUCCEEDED **`**, including `SWIPRAppTests` and
+   `SWIPRUITests`.
 
 4. The #11 commit was additionally verified in isolation in a clean git worktree
    (`git worktree add … c61491f`), where `Scripts/run-kit-tests.sh` passed, so the
@@ -96,9 +124,9 @@ evidence is pending. #16 is commented and left open for the same reason. Parent
   sandbox, so the wait was bounded by hand.
 - No Simulator fallback exists: `xcrun simctl list runtimes` is empty (the runtime
   was removed for disk), and the prompt forbids reinstalling it.
-- Therefore not executed: every `SwiperAppTests` case (durable save/retry,
+- Therefore not executed: every `SWIPRAppTests` case (durable save/retry,
   restart, migration, unreadable/newer state, cross-session marks, deletion
-  recovery, the integrated journey, tutorial state) and every `SwiperUITests`
+  recovery, the integrated journey, tutorial state) and every `SWIPRUITests`
   case (viewer bounds, drag wells, tutorial, home/review navigation).
 - **No screenshot exists.** The UI tests are written to attach them (see the
   table in `docs/TESTING.md`), and mid-gesture shots are captured while the drag
@@ -169,7 +197,7 @@ The device block is unchanged, so the new UI test is likewise unexecuted.
 
 Three real problems, none of which any amount of local building would have found:
 
-1. **`SwiperAppTests` was testing a fresh library, not a relaunch.** My
+1. **`SWIPRAppTests` was testing a fresh library, not a relaunch.** My
    "relaunch" test built a second `FakePhotoLibrary`, so the deleted photo came
    back and nothing reconciled. Fixed to share the library instance; the
    production behaviour was correct all along.
@@ -261,7 +289,7 @@ and interruption verified on the device.
 Genuinely outstanding, and deliberately so:
 
 - The localisation **migration** has not started. `docs/LOCALIZATION.md` says why:
-  it is all-or-nothing, it needs the SwiperKit catalog first, and it needs a
+  it is all-or-nothing, it needs the SWIPRKit catalog first, and it needs a
   decision about who supplies the `zh-Hans` translation. This is the largest
   remaining piece of the user's brief ("at least English and Chinese").
 - Real **Live Photo playback with a real live photo** was confirmed manually by
@@ -284,7 +312,7 @@ the oldest photo"):
   counts, newest first by default.
 - A "Jump to month" menu scrolls straight to any month, and an order control
   flips newest/oldest. Both are asserted by UI tests.
-- `SwiperKit/LibraryCalendar` holds the grouping and the localised month titles,
+- `SWIPRKit/LibraryCalendar` holds the grouping and the localised month titles,
   with nine unit tests, including one asserting a Chinese title (`2024年11月`).
 - The demo fixtures now spread across months rather than hours, so the grid has
   real sections in tests and screenshots.
@@ -299,7 +327,7 @@ totals, so inventing one would have contradicted the glossary.
 
 **Localisation: surveyed, not migrated.** `docs/LOCALIZATION.md` inventories ~150
 user-facing strings and names the blockers, the most important being that much of
-the copy lives in `SwiperKit` and so needs a framework catalog with
+the copy lives in `SWIPRKit` and so needs a framework catalog with
 `bundle: .module` lookups. Six places build plurals by hand and must become
 catalog plural variations. `Scripts/check_localizations.sh` enforces the
 no-half-migrated rule; it was verified to pass a complete catalog, fail an empty
