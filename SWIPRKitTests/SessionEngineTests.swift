@@ -170,4 +170,76 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertEqual(engine.start(), .sessionFinished)
         XCTAssertTrue(engine.isFinished)
     }
+
+    // MARK: - Captured pool
+
+    func testPoolConfinesTraversalAndExcludesNewArrivals() {
+        // "f" arrived after the pool was captured and must never be presented.
+        let full = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+            TestLibrary.descriptor(id: "c", dayOffset: 2),
+            TestLibrary.descriptor(id: "d", dayOffset: 3),
+            TestLibrary.descriptor(id: "e", dayOffset: 4),
+            TestLibrary.descriptor(id: "f", dayOffset: 5),
+        ])
+        var engine = SessionEngine(order: full, direction: .older, poolIDs: Set(["a", "c", "e"]))
+        engine.start()
+
+        var visited: [String] = []
+        while let id = engine.current?.id {
+            visited.append(id)
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(visited, ["e", "c", "a"], "a captured pool walks only its own members")
+        XCTAssertFalse(visited.contains("f"))
+        XCTAssertTrue(engine.isFinished)
+    }
+
+    func testLegacyEngineWithoutPoolWalksTheFullOrder() {
+        var engine = SessionEngine(order: TestLibrary.order(), direction: .older)
+        engine.start()
+        var visited: [String] = []
+        while let id = engine.current?.id {
+            visited.append(id)
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(visited, ["e", "d", "c", "b", "a"], "no pool means the prior full order")
+    }
+
+    func testPoolUpcomingIDsIgnoreNewArrivals() {
+        let full = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+            TestLibrary.descriptor(id: "c", dayOffset: 2),
+            TestLibrary.descriptor(id: "f", dayOffset: 5),
+        ])
+        var engine = SessionEngine(order: full, direction: .older, poolIDs: Set(["a", "c"]))
+        engine.start()
+        XCTAssertEqual(engine.upcomingIDs(limit: 3), ["a"])
+        XCTAssertEqual(engine.remainingCount, 2)
+    }
+
+    func testTumblerPoolNeverServesNewArrivals() {
+        let full = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+            TestLibrary.descriptor(id: "c", dayOffset: 2),
+            TestLibrary.descriptor(id: "f", dayOffset: 5),
+        ])
+        var engine = SessionEngine(
+            order: full,
+            mode: .tumbler,
+            tumblerSeed: 7,
+            poolIDs: Set(["a", "b", "c"])
+        )
+        engine.start()
+        var visited: [String] = []
+        while let id = engine.current?.id {
+            visited.append(id)
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(Set(visited), Set(["a", "b", "c"]))
+        XCTAssertFalse(visited.contains("f"))
+    }
 }

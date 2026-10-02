@@ -378,4 +378,80 @@ final class SessionPersistenceTests: XCTestCase {
             XCTAssertEqual(error as? SessionStoreError, .stateIsUnreadable)
         }
     }
+
+    func testInMemoryStoreReportsMigratedContent() async throws {
+        let migrated = PersistedState(
+            marks: ["b"],
+            session: PersistedSession(currentAssetID: "c", filterCategories: [.screenshot], poolIDs: ["a", "c"])
+        )
+        let store = InMemorySessionStore(content: .migrated(migrated))
+        XCTAssertEqual(store.loadState(), .migrated(migrated))
+        XCTAssertEqual(store.state, migrated)
+    }
+
+    // MARK: - Filter and pool round trips
+
+    func testPersistedSessionRoundTripsFilterAndPool() throws {
+        let session = PersistedSession(
+            currentAssetID: "c",
+            direction: .older,
+            filterCategories: [.screenshot, .video],
+            poolIDs: ["a", "b", "c"]
+        )
+        let data = try JSONEncoder().encode(session)
+        let decoded = try JSONDecoder().decode(PersistedSession.self, from: data)
+        XCTAssertEqual(decoded, session)
+        XCTAssertEqual(decoded.filterCategories, [.screenshot, .video])
+        XCTAssertEqual(decoded.poolIDs, ["a", "b", "c"])
+    }
+
+    func testEngineRoundTripsFilterAndPool() {
+        let poolOrder = LibraryOrder(TestLibrary.sequential().filter { ["b", "c", "e"].contains($0.id) })
+        var engine = SessionEngine(
+            order: poolOrder,
+            direction: .older,
+            poolIDs: ["b", "c", "e"],
+            filterCategories: [.screenshot, .video]
+        )
+        engine.start()
+        engine.apply(.keep)
+
+        let persisted = engine.persisted()
+        XCTAssertEqual(persisted.poolIDs, ["b", "c", "e"])
+        XCTAssertEqual(persisted.filterCategories, [.screenshot, .video])
+
+        let restored = SessionEngine.restored(from: persisted, order: TestLibrary.order(), marks: [])
+        XCTAssertEqual(restored.order.ids, ["b", "c", "e"])
+        XCTAssertEqual(restored.poolIDs, Set(["b", "c", "e"]))
+        XCTAssertEqual(restored.filterCategories, [.screenshot, .video])
+        XCTAssertEqual(restored.current?.id, engine.current?.id)
+    }
+
+    // MARK: - Schema 4 migration
+
+    /// Version 3 had no pool or filter. Migrating it must keep every piece of
+    /// acknowledged progress: position, marks, decisions and Undo.
+    func testVersionThreeSessionMigratesToFourWithoutLoss() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let versionThree = #"""
+        {"schemaVersion":3,"marks":["b"],"updatedAt":0,"session":{"currentAssetID":"d","currentAssetDate":0,"direction":"older","mode":"sequential","decidedIDs":["e","d"],"keptIDs":["e"],"undoEntries":[{"assetID":"e","effect":{"queuedDeletion":{}},"displacedAssetID":null}],"tumbler":null,"updatedAt":0,"isFinished":false}}
+        """#
+        try Data(versionThree.utf8).write(to: directory.appendingPathComponent("session.json"))
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let state) = store.loadState() else {
+            return XCTFail("schema 3 should be migrated, got \(store.loadState())")
+        }
+        XCTAssertEqual(state.schemaVersion, 4)
+        XCTAssertEqual(state.marks, ["b"], "marks survive migration")
+        XCTAssertEqual(state.session?.currentAssetID, "d", "position survives migration")
+        XCTAssertEqual(state.session?.decidedIDs, ["e", "d"], "decisions survive migration")
+        XCTAssertEqual(state.session?.keptIDs, ["e"])
+        XCTAssertEqual(state.session?.undoEntries.first?.assetID, "e")
+        XCTAssertEqual(state.session?.undoEntries.first?.effect, .queuedDeletion, "Undo survives migration")
+        XCTAssertNil(state.session?.filterCategories, "a legacy session has no persisted filter")
+        XCTAssertNil(state.session?.poolIDs, "a legacy session has no captured pool")
+    }
 }

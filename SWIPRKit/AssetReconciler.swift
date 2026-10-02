@@ -57,6 +57,19 @@ public enum AssetReconciler {
     ) -> ReconciledSession {
         let available = order.idSet
 
+        // The captured pool drops only identifiers that left the library. New
+        // arrivals are never added, so a session's membership stays fixed.
+        let poolIDs = session.poolIDs.map { $0.filter { available.contains($0) } }
+        // Traversal is confined to the pool when one was captured; a legacy
+        // session without a pool keeps walking the full library order.
+        let workingOrder: LibraryOrder
+        if let poolIDs {
+            let pool = Set(poolIDs)
+            workingOrder = LibraryOrder(order.assets.filter { pool.contains($0.id) })
+        } else {
+            workingOrder = order
+        }
+
         let queueIDs = marks.filter { available.contains($0) }
         let decidedIDs = session.decidedIDs.filter { available.contains($0) }
         let keptIDs = session.keptIDs.filter { available.contains($0) }
@@ -77,16 +90,16 @@ public enum AssetReconciler {
 
         var resolvedCurrentID = session.currentAssetID
         var resolvedCurrentDate = session.currentAssetDate
-        if let currentID = resolvedCurrentID, available.contains(currentID) {
-            resolvedCurrentDate = order.asset(byID: currentID)?.creationDate ?? resolvedCurrentDate
+        if let currentID = resolvedCurrentID, workingOrder.contains(id: currentID) {
+            resolvedCurrentDate = workingOrder.asset(byID: currentID)?.creationDate ?? resolvedCurrentDate
         } else {
             // The persisted current asset is gone. Fall back to the nearest
             // still-present asset in the user's preferred direction, skipping
             // anything already decided or marked.
             let excluded = Set(decidedIDs).union(queueIDs)
-            if let index = order.nearestIndex(toDate: session.currentAssetDate, direction: session.direction) {
+            if let index = workingOrder.nearestIndex(toDate: session.currentAssetDate, direction: session.direction) {
                 let candidate = firstUndecided(
-                    in: order,
+                    in: workingOrder,
                     from: index,
                     direction: session.direction,
                     excluded: excluded
@@ -100,7 +113,7 @@ public enum AssetReconciler {
         }
 
         let nothingLeftToShow = resolvedCurrentID == nil
-            && Set(decidedIDs).union(queueIDs).isSuperset(of: available)
+            && Set(decidedIDs).union(queueIDs).isSuperset(of: workingOrder.idSet)
 
         let reconciled = PersistedSession(
             currentAssetID: resolvedCurrentID,
@@ -111,6 +124,8 @@ public enum AssetReconciler {
             keptIDs: keptIDs,
             undoEntries: undoEntries,
             tumbler: tumbler,
+            filterCategories: session.filterCategories,
+            poolIDs: poolIDs,
             updatedAt: session.updatedAt,
             isFinished: session.isFinished || nothingLeftToShow
         )
