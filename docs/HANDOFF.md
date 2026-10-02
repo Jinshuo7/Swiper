@@ -17,16 +17,31 @@
 
 ## Current ticket
 
-- **Ticket:** [#47 — V1-02e: Show mixed-media still previews and neutral kind
-  badges](https://github.com/Jinshuo7/Swiper/issues/47) — **implemented** on
-  branch `driver/47-viewer-badges` by the worker. The viewer now shows a
-  complete still preview for Photo, Live Photo and Video with a neutral
-  Photo/Live/Video badge beneath Review on the trailing edge; no playback UI
-  ships. The focused `SWIPRUITests` class is green (43 tests, 0 failures) and
-  the nine viewer milestone screenshots are committed. **No PR opened yet** —
-  the driver opens it after review.
-- **Next up:** open the PR for #47, wait for `checks`, merge, then run the next
-  roadmap ticket (#29 V1-03) through the same worker/reviewer flow.
+- **Ticket:** [#55 — V1-03a: Offer both named traversals and complete without
+  wrapping](https://github.com/Jinshuo7/Swiper/issues/55) — **implemented** on
+  branch `driver/55-traversals` by the worker. The starting point now offers
+  **Newest first** (`choosePhoto.newest`, walks older) and **Oldest first**
+  (`choosePhoto.oldest`, walks newer) as start actions alongside the unchanged
+  **Random** action, and tapping a grid item still starts at that item in the
+  saved default direction. The grid's **Newest first / Oldest first** order
+  toggle and **Jump to month** still work. `AppModel.startOldest()` pins the
+  `.newer` direction, matching the pinned `.older` of `startNewest()`. The
+  focused `SWIPRUITests` class is green (45 tests, 0 failures), including a new
+  both-directions test and a full Oldest-first traversal that proves the
+  session reaches the completion boundary without repeating a photo. **No PR
+  opened yet** — the driver opens it after review.
+- **Next up:** open the PR for #55, wait for `checks`, merge, then run the
+  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler,
+  #58 AX5 starting point) through the same worker/reviewer flow.
+
+### Note: the two named traversals never wrap
+
+`SessionEngine` still turns around (`testFlipsDirectionAtEndOfLibrary`) when a
+session is jumped into the middle of the pool; that engine fallback is outside
+#55's file list. The two named starts begin at an end and walk one way, and
+`isUnavailable` excludes every decided photo, so a `Newest first` or `Oldest
+first` run visits its whole pool once and then finishes at the visible
+completion overlay rather than revisiting the first photo.
 
 ### Note: how the viewer tests reach a video
 
@@ -47,7 +62,8 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #47's branch is ready for the driver to open a PR.
+- None from this worker. #55's branch is ready for the driver to open a PR.
+  (#47 was merged as PR #53, commit `10aa678`.)
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -70,8 +86,8 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #47, wait for `checks`, and merge if the diff only touches
+1. Open the PR for #55, wait for `checks`, and merge if the diff only touches
    the ticket's files and every acceptance criterion is met.
-2. Run ticket #29 (V1-03) through the worker/reviewer flow from the roadmap
-   order in `PROJECT-BRIEF.md`; keep `docs/IMPLEMENTATION-STATUS.md` and this
-   file current after every ticket.
+2. Run the remaining #29 (V1-03) sub-tickets (#56, #57, #58) through the
+   worker/reviewer flow from the roadmap order in `PROJECT-BRIEF.md`; keep
+   `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
