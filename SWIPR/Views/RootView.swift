@@ -4,10 +4,25 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    /// Screenshot/test seam. The app is currently pinned to dark while the
+    /// viewer work lands, so a UI test can ask the Home and filter screens to
+    /// render in the other appearance without changing the shipped default.
+    /// The later appearance ticket replaces this with the System / Light / Dark
+    /// setting.
+    private var forcedColorScheme: ColorScheme? {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-uiTestingForceLight") { return .light }
+        if arguments.contains("-uiTestingForceDark") { return .dark }
+        return nil
+    }
+
+    private var effectiveColorScheme: ColorScheme { forcedColorScheme ?? systemColorScheme }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            background
             content
             persistenceLayer
             if model.isShowingTutorial {
@@ -17,6 +32,7 @@ struct RootView: View {
                 .transition(.opacity)
             }
         }
+        .environment(\.colorScheme, effectiveColorScheme)
         .animation(.easeInOut(duration: 0.2), value: model.route)
         .task { await model.bootstrap() }
         .onChange(of: scenePhase) { _, phase in
@@ -37,6 +53,19 @@ struct RootView: View {
         }
     }
 
+    /// The porcelain Home and filter screens sit on a cream/near-black ground;
+    /// every other screen keeps the dark viewer chrome it was built for.
+    private var background: some View {
+        Group {
+            switch model.route {
+            case .entry, .filters:
+                PorcelainPalette.forScheme(effectiveColorScheme).background.ignoresSafeArea()
+            default:
+                Color.black.ignoresSafeArea()
+            }
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch model.route {
@@ -54,6 +83,8 @@ struct RootView: View {
             SessionResultView(outcome: model.lastDeletion)
         case .settings:
             SettingsView()
+        case .filters:
+            FilterView()
         case .choosePhoto:
             ChoosePhotoView()
         }

@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "E246697AF75E2373F03F6C14"
+               BlueprintIdentifier = "CF6033550295A0300662C77D"
                BuildableName = "SWIPR.app"
                BlueprintName = "SWIPR"
                ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -28,7 +28,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "7C409E548F2873BDC10A16DE"
+               BlueprintIdentifier = "1305835423D25FB647598908"
                BuildableName = "SWIPRKit.framework"
                BlueprintName = "SWIPRKit"
                ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -44,7 +44,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E246697AF75E2373F03F6C14"
+            BlueprintIdentifier = "CF6033550295A0300662C77D"
             BuildableName = "SWIPR.app"
             BlueprintName = "SWIPR"
             ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -55,7 +55,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "419D4822379D58BA1A6508AF"
+               BlueprintIdentifier = "70C429A0793BDC35B5287453"
                BuildableName = "SWIPRKitTests.xctest"
                BlueprintName = "SWIPRKitTests"
                ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -65,7 +65,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "71D2FDB59170BDF24E858426"
+               BlueprintIdentifier = "67045FE3F2D8A7355C7310DA"
                BuildableName = "SWIPRAppTests.xctest"
                BlueprintName = "SWIPRAppTests"
                ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -75,7 +75,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "56AF1A9C8EB5EC167BD02921"
+               BlueprintIdentifier = "A635677B3B89FBA3C2B72CC7"
                BuildableName = "SWIPRUITests.xctest"
                BlueprintName = "SWIPRUITests"
                ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -97,7 +97,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E246697AF75E2373F03F6C14"
+            BlueprintIdentifier = "CF6033550295A0300662C77D"
             BuildableName = "SWIPR.app"
             BlueprintName = "SWIPR"
             ReferencedContainer = "container:SWIPR.xcodeproj">
@@ -114,7 +114,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E246697AF75E2373F03F6C14"
+            BlueprintIdentifier = "CF6033550295A0300662C77D"
             BuildableName = "SWIPR.app"
             BlueprintName = "SWIPR"
             ReferencedContainer = "container:SWIPR.xcodeproj">
