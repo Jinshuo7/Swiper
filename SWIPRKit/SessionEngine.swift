@@ -201,6 +201,11 @@ public struct SessionEngine: Equatable, Sendable {
     /// Places the cursor for a fresh session and returns the first effect.
     @discardableResult
     public mutating func start() -> SessionEffect {
+        // The cursor may have been reserved by ``init`` because it was placed
+        // outside the plan's own ``next()``. A fresh start discards that
+        // cursor, so hand the asset back to the plan instead of letting the
+        // reservation swallow it for the whole walk.
+        if mode == .tumbler, let cursorID { tumbler?.requeue(cursorID) }
         cursorID = nil
         isFinished = false
         return advance()

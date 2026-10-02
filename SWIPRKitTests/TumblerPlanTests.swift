@@ -66,6 +66,29 @@ final class TumblerPlanTests: XCTestCase {
         XCTAssertEqual(Set(visited).count, visited.count, "no repeats")
     }
 
+    /// A cursor supplied at construction is reserved so a restored walk cannot
+    /// serve it twice. Starting a fresh session discards that cursor, so the
+    /// reservation must be released or the asset is swallowed for good.
+    func testTumblerEngineBuiltWithACursorThenStartedStillServesIt() {
+        let library = TestLibrary.order()
+        var engine = SessionEngine(
+            order: library,
+            mode: .tumbler,
+            cursorID: "c",
+            tumblerSeed: 5
+        )
+        engine.start()
+
+        var seen: [String] = []
+        while let id = engine.current?.id {
+            seen.append(id)
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(seen.count, library.ids.count, "a 5-asset pool still covers all 5")
+        XCTAssertEqual(Set(seen), Set(library.ids), "the once-reserved cursor is served")
+        XCTAssertEqual(seen.count, Set(seen).count, "and exactly once")
+    }
+
     // MARK: - Random: repeat prevention under Undo and reconciliation (#57)
 
     /// ``reserve(_:)`` claims an asset the cursor already shows, so a later
@@ -137,6 +160,39 @@ final class TumblerPlanTests: XCTestCase {
         XCTAssertEqual(Set(seen), Set(TestLibrary.sequential().map(\.id)), "every asset is still served")
     }
 
+    /// Two Undos in a row unwind the two most recent decisions. The second
+    /// Undo hits the requeue guard for an id the first Undo already put back,
+    /// and the walk from there is still complete and repeat-free.
+    func testTwoUndosInARowLeaveACompleteRepeatFreeWalk() throws {
+        let library = TestLibrary.order()
+        var engine = SessionEngine(order: library, mode: .tumbler, tumblerSeed: 9)
+        engine.start()
+        let first = try XCTUnwrap(engine.current?.id)
+        engine.apply(.keep)
+        let second = try XCTUnwrap(engine.current?.id)
+        engine.apply(.keep)
+
+        engine.undo()
+        XCTAssertEqual(engine.current?.id, second, "the first Undo returns to the second decision")
+        engine.undo()
+        XCTAssertEqual(engine.current?.id, first, "the cursor is back on the first undone asset")
+
+        // The second Undo requeued an id the first one had already returned to
+        // the plan. The guard must skip it instead of adding a duplicate.
+        let remaining = try XCTUnwrap(engine.tumbler?.remaining)
+        XCTAssertEqual(remaining.count, Set(remaining).count, "no id is requeued twice")
+
+        var seen: [String] = []
+        while let id = engine.current?.id {
+            seen.append(id)
+            engine.apply(.keep)
+        }
+        XCTAssertEqual(seen.first, first, "the walk starts on the first undone asset")
+        XCTAssertEqual(seen.count, Set(seen).count, "no id repeats")
+        XCTAssertEqual(Set(seen), Set(library.ids), "every library asset is still served")
+        XCTAssertEqual(seen.count, library.ids.count, "and exactly once")
+    }
+
     /// A session whose current asset vanished outside SWIPR is recovered onto a
     /// member the plan still had waiting. That recovered member must be claimed,
     /// or the plan would serve it a second time further down the walk.
@@ -164,13 +220,20 @@ final class TumblerPlanTests: XCTestCase {
         XCTAssertTrue(restored.tumbler?.handled.contains("e") ?? false, "the recovered cursor is claimed")
         XCTAssertFalse(restored.tumbler?.remaining.contains("e") ?? true, "and no longer waits in the plan")
 
+        // Step off the recovered cursor without deciding it. The restored
+        // cursor claimed the asset, so the walk must still never serve it.
+        let recovered = restored.current?.id
+        XCTAssertEqual(recovered, "e")
+        restored.advance()
+
         var seen: [String] = []
         while let id = restored.current?.id {
             seen.append(id)
             restored.apply(.keep)
         }
-        XCTAssertEqual(seen.count, Set(seen).count, "the recovered asset must never be served twice")
-        XCTAssertEqual(Set(seen), Set(library.ids), "every member is still served")
+        XCTAssertFalse(seen.contains("e"), "the recovered asset is never served again")
+        XCTAssertEqual(seen.count, Set(seen).count, "no repeats")
+        XCTAssertEqual(Set(seen).union(["e"]), Set(library.ids), "every member is still served")
     }
 
     /// Reconciliation only drops what left the library. It invents no deletion
