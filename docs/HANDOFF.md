@@ -17,26 +17,21 @@
 
 ## Current ticket
 
-- **Ticket:** [#58 — V1-03d: Make the starting point reachable at the largest
-  text size](https://github.com/Jinshuo7/Swiper/issues/58) — **implemented** on
-  branch `driver/58-ax5` by the worker. The AX5 failure in
-  `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize` was
-  the test scrolling down to **Jump to month** before checking the controls
-  above it; `assertReachable` only ever scrolls downward, so the traversal
-  buttons it had already scrolled past could never be brought back on screen.
-  The AX5 case now walks the starting point top-down and asserts the
-  explanation, **Newest first**, **Oldest first**, **Random**, **Jump to
-  month**, the order toggle and a grid cell (`choosePhoto.cell.fake-22`), with a
-  screenshot of the top of the screen. The screen itself already scrolls its
-  chrome with the grid at accessibility sizes (its height exceeds one screen),
-  so no view change was needed. The AX5 case passes (1 test, 0 failures), the
-  rest of `PlaySessionUITests` stays green with the CI skip in place (16 tests,
-  0 failures), and the committed `choose-photo-ax5.png` shows the explanation
-  and both traversal actions whole. **No PR opened yet** — the driver opens it
-  after review.
-- **Next up:** open the PR for #58, wait for `checks`, merge, then run the
-  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler)
-  through the same worker/reviewer flow.
+- **Ticket:** none in progress. The V1-03 (#29) work is implemented up to two
+  risky PRs that now await the owner's Codex review and must **not** be
+  auto-merged:
+  - **#56 — V1-03b: replace an unfinished session only after confirmation** —
+    branch `driver/56-replace-session`, **PR #61**, labelled
+    `needs-strong-review`; two independent reviewers both said ACCEPT.
+  - **#57 — V1-03c: keep Random deterministic, repeat-free and reconciled** —
+    branch `driver/57-tumbler`, **PR #62**, labelled `needs-strong-review`; two
+    independent reviewers both said ACCEPT. One correction round fixed a
+    reserved-cursor leak on `start()` and made the two-Undo and reconciliation
+    tests reserve-sensitive, plus two doc test counts.
+- **Next up:** after the owner merges #61 and #62, start V1-04 (#26, the neutral
+  direct-move decision dock). #55 (PR #59) and #58 (PR #60) are already merged,
+  so V1-03a (both named traversals) and V1-03d (AX5 starting point) are done.
+- The V1-02 milestone report was posted as issue #54.
 
 ### Note: the AX5 skip belongs to #32
 
@@ -73,15 +68,16 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #58's branch is ready for the driver to open a PR.
-  (#55 was merged as PR #59, commit `ddaba0f`; #47 as PR #53, commit
-  `10aa678`.)
+- **#61** (#56) and **#62** (#57): open, `needs-strong-review`, awaiting the
+  owner's Codex review; both have two ACCEPT reviews.
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#60 — Implement #58: make the starting point reachable at the largest text
+  size** (merged as commit `25e6418`), which closed **#58**.
 - **#59 — Implement #55: offer both named traversals and finish without
   wrapping** (merged as commit `ddaba0f`), which closed **#55**.
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
@@ -100,8 +96,7 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #58, wait for `checks`, and merge if the diff only touches
-   the ticket's files and every acceptance criterion is met.
-2. Run the remaining #29 (V1-03) sub-tickets (#56, #57) through the
-   worker/reviewer flow from the roadmap order in `PROJECT-BRIEF.md`; keep
-   `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. Owner reviews and merges **PR #61** (#56) and **PR #62** (#57); both are
+   `needs-strong-review`, so the driver left them open.
+2. Start the next milestone, V1-04 (#26 — the neutral direct-move decision dock).
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
