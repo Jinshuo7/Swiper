@@ -61,6 +61,21 @@
 > `PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize` is
 > unchanged (still fails to scroll `choosePhoto.newest`) and is still skipped in
 > CI, left for #58.
+>
+> **#58 update (2026-10-03):** the AX5 reachability failure in
+> `PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize` is
+> fixed. The case was checking **Jump to month** before the controls above it,
+> but `assertReachable` only scrolls downward, so the traversal buttons it had
+> already scrolled past could never be brought back on screen. At AX5 the
+> starting point now checks its controls in the order they appear: explanation,
+> **Newest first**, **Oldest first**, **Random**, **Jump to month**, the order
+> toggle and a grid cell (`choosePhoto.cell.fake-22`). The view itself is
+> unchanged — it already scrolls its chrome with the grid at accessibility
+> sizes — and the CI `-skip-testing` line is untouched for #32. The AX5 case is
+> green (1 test, 0 failures), the rest of `PlaySessionUITests` stays green with
+> the skip in place (16 tests, 0 failures), and
+> `docs/screenshots/milestones/v1-03-starting-point/choose-photo-ax5.png` shows
+> the explanation and both traversal actions whole at AX5.
 
 ---
 
@@ -75,7 +90,8 @@
 | [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
 | [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
 | [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | Yes (#53) |
-| [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | No (branch ready; PR pending driver) |
+| [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
+| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | No (branch ready; PR pending driver) |
 
 ---
 

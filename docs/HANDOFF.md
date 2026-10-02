@@ -17,22 +17,33 @@
 
 ## Current ticket
 
-- **Ticket:** [#55 — V1-03a: Offer both named traversals and complete without
-  wrapping](https://github.com/Jinshuo7/Swiper/issues/55) — **implemented** on
-  branch `driver/55-traversals` by the worker. The starting point now offers
-  **Newest first** (`choosePhoto.newest`, walks older) and **Oldest first**
-  (`choosePhoto.oldest`, walks newer) as start actions alongside the unchanged
-  **Random** action, and tapping a grid item still starts at that item in the
-  saved default direction. The grid's **Newest first / Oldest first** order
-  toggle and **Jump to month** still work. `AppModel.startOldest()` pins the
-  `.newer` direction, matching the pinned `.older` of `startNewest()`. The
-  focused `SWIPRUITests` class is green (45 tests, 0 failures), including a new
-  both-directions test and a full Oldest-first traversal that proves the
-  session reaches the completion boundary without repeating a photo. **No PR
-  opened yet** — the driver opens it after review.
-- **Next up:** open the PR for #55, wait for `checks`, merge, then run the
-  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler,
-  #58 AX5 starting point) through the same worker/reviewer flow.
+- **Ticket:** [#58 — V1-03d: Make the starting point reachable at the largest
+  text size](https://github.com/Jinshuo7/Swiper/issues/58) — **implemented** on
+  branch `driver/58-ax5` by the worker. The AX5 failure in
+  `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize` was
+  the test scrolling down to **Jump to month** before checking the controls
+  above it; `assertReachable` only ever scrolls downward, so the traversal
+  buttons it had already scrolled past could never be brought back on screen.
+  The AX5 case now walks the starting point top-down and asserts the
+  explanation, **Newest first**, **Oldest first**, **Random**, **Jump to
+  month**, the order toggle and a grid cell (`choosePhoto.cell.fake-22`), with a
+  screenshot of the top of the screen. The screen itself already scrolls its
+  chrome with the grid at accessibility sizes (its height exceeds one screen),
+  so no view change was needed. The AX5 case passes (1 test, 0 failures), the
+  rest of `PlaySessionUITests` stays green with the CI skip in place (16 tests,
+  0 failures), and the committed `choose-photo-ax5.png` shows the explanation
+  and both traversal actions whole. **No PR opened yet** — the driver opens it
+  after review.
+- **Next up:** open the PR for #58, wait for `checks`, merge, then run the
+  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler)
+  through the same worker/reviewer flow.
+
+### Note: the AX5 skip belongs to #32
+
+The CI job still carries
+`-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
+#58 does not touch it; removing that line is ticket #32's job now that the case
+passes locally.
 
 ### Note: the two named traversals never wrap
 
@@ -62,14 +73,17 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #55's branch is ready for the driver to open a PR.
-  (#47 was merged as PR #53, commit `10aa678`.)
+- None from this worker. #58's branch is ready for the driver to open a PR.
+  (#55 was merged as PR #59, commit `ddaba0f`; #47 as PR #53, commit
+  `10aa678`.)
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#59 — Implement #55: offer both named traversals and finish without
+  wrapping** (merged as commit `ddaba0f`), which closed **#55**.
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
   (merged as commit `907f12a`), which closed **#46**.
 - **#51 — Driver bootstrap** (Roles section in `OWNER-INSTRUCTIONS.md` + this
@@ -86,8 +100,8 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #55, wait for `checks`, and merge if the diff only touches
+1. Open the PR for #58, wait for `checks`, and merge if the diff only touches
    the ticket's files and every acceptance criterion is met.
-2. Run the remaining #29 (V1-03) sub-tickets (#56, #57, #58) through the
+2. Run the remaining #29 (V1-03) sub-tickets (#56, #57) through the
    worker/reviewer flow from the roadmap order in `PROJECT-BRIEF.md`; keep
    `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
