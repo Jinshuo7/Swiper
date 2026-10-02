@@ -11,13 +11,15 @@
   persistence-safety review, 2 Codex steps). Local checks green — `git diff --check`,
   `Scripts/run-kit-tests.sh` (179 tests, 0 failures), `Scripts/typecheck-ios.sh`
   (`OK`), focused `SWIPRAppTests/AppModelTests` on the simulator (33 tests,
-  0 failures). Opening the PR now.
+  0 failures). **PR [#50](https://github.com/Jinshuo7/Swiper/pull/50) open, awaiting CI.**
 - **Risky:** saved sessions and migration — covered by the extra review and the
   fake-library tests proving saved progress survives migration/relaunch and
   nothing is deleted without explicit confirmation.
 
 ## Open PRs
 
+- **[#50 — Implement #45](https://github.com/Jinshuo7/Swiper/pull/50)** (open,
+  awaiting CI; do not merge until safety rule 4 holds).
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -34,6 +36,6 @@
 
 ## What is next
 
-1. Open the PR for #45 to `main` (`Closes #45`), then wait for CI with
-   `gh pr checks <PR> --watch --fail-fast`. Merge only when safety rule 4 holds.
+1. Wait for CI on #50 (`gh pr checks 50 --watch --fail-fast`). Merge only when
+   safety rule 4 holds.
 2. Continue with the next ticket from `docs/ROADMAP.md`.
