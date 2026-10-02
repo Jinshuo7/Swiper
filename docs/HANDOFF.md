@@ -9,7 +9,7 @@
 - **Branch:** `deepseek/43-media-metadata` (fresh worktree at `SWIPR-ticket-43`)
 - **State:** Codex approved (review 2 of 2). Local checks green — `git diff --check`,
   `Scripts/run-kit-tests.sh` (148 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
-  Opening a PR now.
+- **PR:** [#48](https://github.com/Jinshuo7/Swiper/pull/48) — awaiting CI.
 
 ## Open PRs
 
@@ -23,7 +23,7 @@ accounting log.
 
 ## What is next
 
-1. Open the PR for #43 and wait for CI (`gh pr checks <PR> --watch --fail-fast`).
+1. Wait for CI on #48 (`gh pr checks 48 --watch --fail-fast`).
 2. Merge only when safety rule 4 holds (green checks, diff touches only the ticket's files,
    every acceptance criterion met). Do not merge now.
 3. Continue with the next ticket from `docs/ROADMAP.md`.
