@@ -8,9 +8,10 @@ import UIKit
 /// Design notes:
 /// * Every fetch is metadata-only; full-resolution images are requested on
 ///   demand and cancelled when the viewer moves on.
-/// * Only photos and Live Photos are fetched. The predicate excludes
-///   `PHAssetMediaType.video`, matching the product decision to leave ordinary
-///   videos out of the first version.
+/// * Both images (photos and Live Photos) and ordinary videos are fetched and
+///   classified using only the documented `PHAsset.mediaType` and
+///   `PHAsset.mediaSubtypes` metadata. Whether videos enter a session is a
+///   later filtering decision, not something this fetch decides.
 /// * Deletion is the only destructive call and PhotoKit presents the system's
 ///   own confirmation before anything is removed.
 final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeObserver {
@@ -48,7 +49,11 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
 
     func fetchAllDescriptors() async -> [AssetDescriptor] {
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        options.predicate = NSPredicate(
+            format: "mediaType == %d OR mediaType == %d",
+            PHAssetMediaType.image.rawValue,
+            PHAssetMediaType.video.rawValue
+        )
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
         let result = PHAsset.fetchAssets(with: options)
         var descriptors = [AssetDescriptor]()
@@ -207,13 +212,25 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
     }
 
     static func descriptor(from asset: PHAsset) -> AssetDescriptor {
-        let kind: MediaKind = asset.mediaSubtypes.contains(.photoLive) ? .livePhoto : .photo
+        let kind: MediaKind
+        switch asset.mediaType {
+        case .image:
+            kind = asset.mediaSubtypes.contains(.photoLive) ? .livePhoto : .photo
+        case .video:
+            kind = .video
+        default:
+            // Audio and unknown assets are excluded by the fetch predicate; if
+            // one slips through it is treated as a plain photo.
+            kind = .photo
+        }
         return AssetDescriptor(
             id: asset.localIdentifier,
             creationDate: asset.creationDate,
             pixelWidth: asset.pixelWidth,
             pixelHeight: asset.pixelHeight,
-            kind: kind
+            kind: kind,
+            isScreenshot: asset.mediaSubtypes.contains(.photoScreenshot),
+            isPanorama: asset.mediaSubtypes.contains(.photoPanorama)
         )
     }
 }

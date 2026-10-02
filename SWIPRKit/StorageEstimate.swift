@@ -19,6 +19,11 @@ import Foundation
 /// * Live Photo: the still plus the motion clip. A Live Photo's video
 ///   component is a short (~3 s) HEVC clip; we charge a flat
 ///   `livePhotoMotionBytes` (≈1.8 MB) on top of the still.
+/// * Video: `0` — a deliberately conservative estimate. PhotoKit's public API
+///   exposes neither an asset's byte size nor a reliable per-second bitrate, and
+///   average-bitrate heuristics are too wrong for ordinary videos of unknown
+///   length. The later deletion/storage milestone will define a public estimate;
+///   until then videos contribute zero to reclaimed-space totals.
 public enum StorageEstimate {
     /// Average bytes per pixel for an Apple HEIC still image.
     public static let stillBytesPerPixel: Double = 0.22
@@ -37,6 +42,8 @@ public enum StorageEstimate {
             return still
         case .livePhoto:
             return still + livePhotoMotionBytes
+        case .video:
+            return 0
         }
     }
 

@@ -84,6 +84,29 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
         FakePhotoLibrary(assets: demoDescriptors(count: count))
     }
 
+    /// Additional mixed-media fixtures covering all five categories — Other
+    /// Photo, Screenshot, Panorama, Live Photo and Video — plus the overlaps
+    /// (a Live Photo that is also a screenshot or a panorama). They are
+    /// separate from ``demoDescriptors(count:)``, whose ids, shapes, dates and
+    /// kinds stay exactly as they are.
+    static func mixedMediaDescriptors() -> [AssetDescriptor] {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let day: TimeInterval = 86_400
+        return [
+            AssetDescriptor(id: "mixed-other-photo", creationDate: base, pixelWidth: 4_032, pixelHeight: 3_024, kind: .photo),
+            AssetDescriptor(id: "mixed-screenshot", creationDate: base.addingTimeInterval(day), pixelWidth: 1_179, pixelHeight: 2_556, kind: .photo, isScreenshot: true),
+            AssetDescriptor(id: "mixed-panorama", creationDate: base.addingTimeInterval(day * 2), pixelWidth: 8_000, pixelHeight: 2_000, kind: .photo, isPanorama: true),
+            AssetDescriptor(id: "mixed-live-photo", creationDate: base.addingTimeInterval(day * 3), pixelWidth: 4_032, pixelHeight: 3_024, kind: .livePhoto),
+            AssetDescriptor(id: "mixed-live-screenshot", creationDate: base.addingTimeInterval(day * 4), pixelWidth: 1_179, pixelHeight: 2_556, kind: .livePhoto, isScreenshot: true),
+            AssetDescriptor(id: "mixed-live-panorama", creationDate: base.addingTimeInterval(day * 5), pixelWidth: 8_000, pixelHeight: 2_000, kind: .livePhoto, isPanorama: true),
+            AssetDescriptor(id: "mixed-video", creationDate: base.addingTimeInterval(day * 6), pixelWidth: 3_840, pixelHeight: 2_160, kind: .video),
+        ]
+    }
+
+    static func mixedMedia() -> FakePhotoLibrary {
+        FakePhotoLibrary(assets: mixedMediaDescriptors())
+    }
+
     // MARK: - Authorization
 
     func currentAuthorization() -> LibraryAuthorization { .authorized }
@@ -101,7 +124,9 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
                     creationDate: descriptor.creationDate,
                     pixelWidth: descriptor.pixelWidth,
                     pixelHeight: descriptor.pixelHeight,
-                    kind: descriptor.kind
+                    kind: descriptor.kind,
+                    isScreenshot: descriptor.isScreenshot,
+                    isPanorama: descriptor.isPanorama
                 )
             }
     }

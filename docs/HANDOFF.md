@@ -5,24 +5,25 @@
 
 ## Current ticket
 
-- **Ticket:** [#41 — Setup: persist owner workflow and compact project brief](https://github.com/Jinshuo7/Swiper/issues/41)
-- **Branch:** `deepseek/41-owner-brief` (fresh worktree at `SWIPR-ticket-41`)
-- **PR:** [#42](https://github.com/Jinshuo7/Swiper/pull/42)
-- **State:** awaiting CI.
+- **Ticket:** [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43)
+- **Branch:** `deepseek/43-media-metadata` (fresh worktree at `SWIPR-ticket-43`)
+- **State:** Codex approved (review 2 of 2). Local checks green — `git diff --check`,
+  `Scripts/run-kit-tests.sh` (148 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
+  Opening a PR now.
 
 ## Open PRs
 
-- **#42 — Setup #41: persist owner workflow and compact project brief** (this
-  ticket, awaiting CI).
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
-Merged for context only: **#40 — Add DeepSeek workflow guardrails and GitHub
-Actions** (merged 2026-10-02), which added the Codex/DeepSeek guardrails and the
-ticket accounting log.
+Merged for context only: **#42 — Setup #41: persist owner workflow and compact project brief**
+(merged as commit `4c775bd`), which added the Codex/DeepSeek guardrails and the ticket
+accounting log.
 
 ## What is next
 
-1. Wait for CI on #42 (`gh pr checks 42 --watch --fail-fast`).
-2. After merge, continue with the next ticket from `docs/ROADMAP.md`.
+1. Open the PR for #43 and wait for CI (`gh pr checks <PR> --watch --fail-fast`).
+2. Merge only when safety rule 4 holds (green checks, diff touches only the ticket's files,
+   every acceptance criterion met). Do not merge now.
+3. Continue with the next ticket from `docs/ROADMAP.md`.

@@ -1,13 +1,28 @@
 import Foundation
 
-/// The kinds of library items SWIPR can present.
+/// The kinds of library items SWIPR can represent.
 ///
-/// The first version intentionally supports only still images and Live Photos.
-/// There is deliberately no `video` case, so ordinary videos can never enter a
-/// session, the deletion queue, or any statistic.
+/// `video` covers ordinary videos (not Live Photo motion clips). Ordinary
+/// videos are represented so later milestones can filter and play them; whether
+/// one enters a session is a filtering decision, not a property of this type.
 public enum MediaKind: String, Codable, CaseIterable, Sendable {
     case photo
     case livePhoto
+    case video
+}
+
+/// The five top-level media buckets the Home filter presents.
+///
+/// A single asset can belong to more than one category (for example a Live
+/// Photo that is also a screenshot), so classification is expressed as a set
+/// rather than a single value. Later exclusion-wins filtering can then resolve
+/// which bucket wins without losing the overlap.
+public enum MediaCategory: String, Codable, CaseIterable, Hashable, Sendable {
+    case screenshot
+    case livePhoto
+    case panorama
+    case otherPhoto
+    case video
 }
 
 /// A lightweight, `Codable` description of one photo-library asset.
@@ -22,19 +37,30 @@ public struct AssetDescriptor: Codable, Equatable, Hashable, Identifiable, Senda
     public let pixelWidth: Int
     public let pixelHeight: Int
     public let kind: MediaKind
+    /// Whether PhotoKit reports this asset as a screenshot
+    /// (`PHAssetMediaSubtype.photoScreenshot`). A Live Photo can also be a
+    /// screenshot, so this overlaps `isLivePhoto`.
+    public let isScreenshot: Bool
+    /// Whether PhotoKit reports this asset as a panorama
+    /// (`PHAssetMediaSubtype.photoPanorama`).
+    public let isPanorama: Bool
 
     public init(
         id: String,
         creationDate: Date?,
         pixelWidth: Int,
         pixelHeight: Int,
-        kind: MediaKind
+        kind: MediaKind,
+        isScreenshot: Bool = false,
+        isPanorama: Bool = false
     ) {
         self.id = id
         self.creationDate = creationDate
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
         self.kind = kind
+        self.isScreenshot = isScreenshot
+        self.isPanorama = isPanorama
     }
 
     /// Estimated on-disk size. See ``StorageEstimate`` for the documented
@@ -44,6 +70,25 @@ public struct AssetDescriptor: Codable, Equatable, Hashable, Identifiable, Senda
     }
 
     public var isLivePhoto: Bool { kind == .livePhoto }
+
+    /// Whether this is an ordinary video (not a Live Photo motion clip).
+    public var isVideo: Bool { kind == .video }
+
+    /// The media categories this asset belongs to.
+    ///
+    /// Overlaps are retained: a Live Photo screenshot appears in both `.livePhoto`
+    /// and `.screenshot`, so later exclusion-wins filtering can still decide which
+    /// bucket wins. A photo with no distinguishing subtype is `.otherPhoto`, and
+    /// an ordinary video is `.video`.
+    public var categories: Set<MediaCategory> {
+        if isVideo { return [.video] }
+        var result: Set<MediaCategory> = []
+        if isLivePhoto { result.insert(.livePhoto) }
+        if isScreenshot { result.insert(.screenshot) }
+        if isPanorama { result.insert(.panorama) }
+        if result.isEmpty { result.insert(.otherPhoto) }
+        return result
+    }
 
     /// Width ÷ height in pixels. Used to contain the asset at its original
     /// aspect ratio; see ``PhotoLayout``.
