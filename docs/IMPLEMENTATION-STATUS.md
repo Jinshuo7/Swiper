@@ -25,12 +25,25 @@
 > until that is fixed and re-run on a named commit.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
-> are now wired to the fixed filtered session. The full simulator suite is green
-> (276 tests, 0 failures) with the existing AX5 skip still in place; the AX5
-> reachability failure itself is unchanged and still owned by the later AX5
-> ticket. Because `SWIPRApp.swift` still pins the app to dark (outside #46's
-> file list), `RootView` exposes a `-uiTestingForceLight` / `-uiTestingForceDark`
-> screenshot seam; the light milestone screenshots use it.
+> are now wired to the fixed filtered session. The full simulator suite was green
+> (276 tests, 0 failures) with the existing AX5 skip still in place at the time
+> the branch was produced; #46 was merged as PR #52. Because `SWIPRApp.swift`
+> still pins the app to dark (outside #46's file list), `RootView` exposes a
+> `-uiTestingForceLight` / `-uiTestingForceDark` screenshot seam; the light
+> milestone screenshots use it.
+>
+> **#47 update (2026-10-02):** the viewer now shows a complete still preview for
+> a Photo, Live Photo or Video and names the kind in a neutral
+> Photo/Live/Video badge beneath Review on the trailing edge. The badge carries a
+> symbol and a word, so its meaning never rests on colour. No Play, duration,
+> timeline, mute, Retry or Skip ships — that stays with #28. `FakePhotoLibrary`
+> gained a test-only launch argument (`-uiTestingMixedMediaLibrary`) that adds a
+> photo, a Live Photo and a video on top of the untouched 24-item demo fixture,
+> so the all-kinds UI tests and screenshots can reach a video without touching a
+> real library. The focused `SWIPRUITests` class is green (43 tests, 0 failures);
+> the known AX5 reachability failure in
+> `PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize` is
+> unchanged and still skipped in CI.
 
 ---
 
@@ -43,7 +56,8 @@
 | [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | Yes (#48) |
 | [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44) | 1 | 1 | 0 | No | Yes (#49) |
 | [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
-| [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | No (branch ready; PR pending driver) |
+| [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
+| [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | No (branch ready; PR pending driver) |
 
 ---
 
