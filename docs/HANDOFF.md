@@ -9,8 +9,7 @@
 - **Branch:** `deepseek/44-media-filter` (fresh worktree at `SWIPR-ticket-44`)
 - **State:** Codex approved (review 1 of 1). Local checks green — `git diff --check`,
   `Scripts/run-kit-tests.sh` (167 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
-  Opening the PR.
-- **PR:** none yet.
+- **PR:** [#49](https://github.com/Jinshuo7/Swiper/pull/49) — awaiting CI.
 
 ## Open PRs
 
@@ -28,7 +27,7 @@
 
 ## What is next
 
-1. Open the PR for `deepseek/44-media-filter` (Closes #44).
+1. Wait for CI on #49 (`gh pr checks 49 --watch --fail-fast`).
 2. Merge only when safety rule 4 holds (green checks, diff touches only the ticket's files,
    every acceptance criterion met). Do not merge now.
 3. Continue with the next ticket from `docs/ROADMAP.md`.
