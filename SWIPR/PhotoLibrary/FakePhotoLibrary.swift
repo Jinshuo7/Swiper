@@ -81,7 +81,32 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
     }
 
     static func demo(count: Int = 24) -> FakePhotoLibrary {
-        FakePhotoLibrary(assets: demoDescriptors(count: count))
+        var descriptors = demoDescriptors(count: count)
+        if ProcessInfo.processInfo.arguments.contains(mixedMediaLaunchArgument) {
+            descriptors.append(contentsOf: kindShowcaseDescriptors())
+        }
+        return FakePhotoLibrary(assets: descriptors)
+    }
+
+    /// The launch argument that adds ``kindShowcaseDescriptors()`` on top of the
+    /// ordinary demo library. It is only ever read by the app when a fake
+    /// library is already in use (UI tests and previews), so a real library run
+    /// can never see it.
+    static let mixedMediaLaunchArgument = "-uiTestingMixedMediaLibrary"
+
+    /// Three extra assets placed *newer* than every ``demoDescriptors(count:)``
+    /// fixture, newest first: an ordinary photo, a Live Photo, then a video.
+    /// "Newest first" therefore opens on the photo and walks straight through
+    /// the other two kinds, which is what the all-kinds viewer UI tests need
+    /// without disturbing the 24-item fixture those tests count on.
+    static func kindShowcaseDescriptors() -> [AssetDescriptor] {
+        let newestDemoDate = Date(timeIntervalSince1970: 1_700_000_000)
+            .addingTimeInterval(86_400 * 9 * 24)
+        return [
+            AssetDescriptor(id: "kind-photo", creationDate: newestDemoDate.addingTimeInterval(60), pixelWidth: 4_032, pixelHeight: 3_024, kind: .photo),
+            AssetDescriptor(id: "kind-live", creationDate: newestDemoDate.addingTimeInterval(30), pixelWidth: 3_024, pixelHeight: 4_032, kind: .livePhoto),
+            AssetDescriptor(id: "kind-video", creationDate: newestDemoDate, pixelWidth: 3_840, pixelHeight: 2_160, kind: .video),
+        ]
     }
 
     /// Additional mixed-media fixtures covering all five categories — Other

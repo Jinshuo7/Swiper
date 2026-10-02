@@ -17,14 +17,24 @@
 
 ## Current ticket
 
-- **Ticket:** [#46 — V1-02d: Wire Home and editable filters into a fixed
-  session](https://github.com/Jinshuo7/Swiper/issues/46) — **implemented** on
-  branch `driver/46-home-filters` by the worker. All mandatory checks are green
-  (276 tests, 0 failures on the iPhone 17 / iOS 27.0 simulator with the existing
-  AX5 skip), and the six milestone screenshots are committed. **No PR opened
-  yet** — the driver opens it after review.
-- **Next up:** open the PR for #46, wait for `checks`, merge, then run the next
+- **Ticket:** [#47 — V1-02e: Show mixed-media still previews and neutral kind
+  badges](https://github.com/Jinshuo7/Swiper/issues/47) — **implemented** on
+  branch `driver/47-viewer-badges` by the worker. The viewer now shows a
+  complete still preview for Photo, Live Photo and Video with a neutral
+  Photo/Live/Video badge beneath Review on the trailing edge; no playback UI
+  ships. The focused `SWIPRUITests` class is green (43 tests, 0 failures) and
+  the nine viewer milestone screenshots are committed. **No PR opened yet** —
+  the driver opens it after review.
+- **Next up:** open the PR for #47, wait for `checks`, merge, then run the next
   roadmap ticket (#29 V1-03) through the same worker/reviewer flow.
+
+### Note: how the viewer tests reach a video
+
+`FakePhotoLibrary.demo()` appends three extra assets (photo, Live Photo, video)
+when the launch argument `-uiTestingMixedMediaLibrary` is present. The argument
+is only read while a fake library is already in use, so a real library run can
+never see it, and the ordinary 24-item demo fixture every other test counts on is
+left untouched.
 
 ### Note: appearance seam for the Home and filter screens
 
@@ -37,13 +47,15 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #46's branch is ready for the driver to open a PR.
+- None from this worker. #47's branch is ready for the driver to open a PR.
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#52 — Implement #46: wire Home and editable filters into a fixed session**
+  (merged as commit `907f12a`), which closed **#46**.
 - **#51 — Driver bootstrap** (Roles section in `OWNER-INSTRUCTIONS.md` + this
   HANDOFF update) — merged as commit `4188fa3`.
 - **#50 — Implement #45: persist and reconcile the fixed filtered session pool**
@@ -58,7 +70,7 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #46, wait for `checks`, and merge if the diff only touches
+1. Open the PR for #47, wait for `checks`, and merge if the diff only touches
    the ticket's files and every acceptance criterion is met.
 2. Run ticket #29 (V1-03) through the worker/reviewer flow from the roadmap
    order in `PROJECT-BRIEF.md`; keep `docs/IMPLEMENTATION-STATUS.md` and this
