@@ -5,11 +5,12 @@
 
 ## Current ticket
 
-- **Ticket:** [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43)
-- **Branch:** `deepseek/43-media-metadata` (fresh worktree at `SWIPR-ticket-43`)
-- **State:** Codex approved (review 2 of 2). Local checks green — `git diff --check`,
-  `Scripts/run-kit-tests.sh` (148 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
-- **PR:** [#48](https://github.com/Jinshuo7/Swiper/pull/48) — awaiting CI.
+- **Ticket:** [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44)
+- **Branch:** `deepseek/44-media-filter` (fresh worktree at `SWIPR-ticket-44`)
+- **State:** Codex approved (review 1 of 1). Local checks green — `git diff --check`,
+  `Scripts/run-kit-tests.sh` (167 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
+  Opening the PR.
+- **PR:** none yet.
 
 ## Open PRs
 
@@ -17,13 +18,17 @@
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
-Merged for context only: **#42 — Setup #41: persist owner workflow and compact project brief**
-(merged as commit `4c775bd`), which added the Codex/DeepSeek guardrails and the ticket
-accounting log.
+## Recently merged
+
+- **#48 — Implement #43: expose mixed-media metadata through public APIs** (merged),
+  which closed **#43**.
+- **#42 — Setup #41: persist owner workflow and compact project brief**
+  (merged as commit `4c775bd`), which added the Codex/DeepSeek guardrails and the ticket
+  accounting log.
 
 ## What is next
 
-1. Wait for CI on #48 (`gh pr checks 48 --watch --fail-fast`).
+1. Open the PR for `deepseek/44-media-filter` (Closes #44).
 2. Merge only when safety rule 4 holds (green checks, diff touches only the ticket's files,
    every acceptance criterion met). Do not merge now.
 3. Continue with the next ticket from `docs/ROADMAP.md`.

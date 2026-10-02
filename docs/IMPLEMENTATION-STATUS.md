@@ -32,7 +32,8 @@
 | --- | --- | --- | --- | --- | --- |
 | Setup — DeepSeek + GitHub Actions guardrails | 3 | 2 | — | Yes | Yes (#40) |
 | [#41 — Setup: persist owner workflow and compact project brief](https://github.com/Jinshuo7/Swiper/issues/41) | 2 | 2 | 1 | Yes — compressed PROJECT-BRIEF.md to ≤2 pages; listed open PRs (incl. prohibited #37); expanded log columns | Yes (#42) |
-| [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | No (approved — PR opened, awaiting CI) |
+| [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | Yes (#48) |
+| [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44) | 1 | 1 | 0 | No | No (approved) |
 
 ---
 
