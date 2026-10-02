@@ -1,5 +1,9 @@
 # Movable controls research
 
+> **Historical research note.** The product questions this investigation left
+> open are now settled by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+> and [`docs/SPEC.md`](../SPEC.md); those sources are authoritative.
+
 ## Question
 
 The owner wants the viewer's three remaining controls (Trash, Undo, Checkmark)
@@ -175,7 +179,7 @@ automated fetching, so its toolbar is unverified.
    evidence, is to make only the cluster's empty background draggable; with three
    tightly packed buttons that area is small, so I prefer the explicit mode.
 
-8. **Open questions.** Horizontal row versus vertical stack; whether the cluster
+8. **Questions this research left open (now superseded).** Horizontal row versus vertical stack; whether the cluster
    may sit in the top half; whether the snap animates; whether move mode also lets
    people reorder the three actions. No source covers a three-button cluster.
 
