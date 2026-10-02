@@ -15,10 +15,10 @@ final class PlaySessionUITests: XCTestCase {
     private let allClusterControls = ["control.delete", "control.undo", "control.keep"]
 
     /// Everything fixed in the top strip. The cluster must never cover any of
-    /// it, because the strip is where the way out, the review entry and the Live
-    /// Photo badge live.
+    /// it, because the strip is where the way out, the review entry and the
+    /// media-kind badge live.
     private let topStripElements = [
-        "viewer.close", "viewer.liveBadge", "viewer.review",
+        "viewer.close", "viewer.mediaBadge", "viewer.review",
     ]
 
     /// The demo fixtures are `index * 9` days after this instant; see
@@ -216,13 +216,13 @@ final class PlaySessionUITests: XCTestCase {
     /// Advances the fake library until a Live Photo is on screen, so the top
     /// strip is carrying everything it ever carries.
     private func advanceToALivePhoto(_ app: XCUIApplication) {
-        let badge = element(app, "viewer.liveBadge")
+        let badge = element(app, "viewer.mediaBadge")
         var steps = 0
-        while !badge.exists && steps < 8 {
+        while badge.label != "Live Photo" && steps < 8 {
             keepCurrent(app)
             steps += 1
         }
-        XCTAssertTrue(badge.exists, "never reached a Live Photo to put a badge in the top strip")
+        XCTAssertEqual(badge.label, "Live Photo", "never reached a Live Photo to put a badge in the top strip")
     }
 
     // MARK: - Invariants
@@ -359,7 +359,7 @@ final class PlaySessionUITests: XCTestCase {
 
     /// Wherever the cluster is, every control has to stay on screen and clear of
     /// the other controls and of the top strip. The strip is carrying everything
-    /// it can carry here: a Live Photo badge and a Review entry.
+    /// it can carry here: a media badge and a Review entry.
     func testPlayEveryControlPosition() {
         let app = launchApp()
         _ = startViewer(app)

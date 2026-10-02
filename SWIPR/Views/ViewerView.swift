@@ -92,7 +92,7 @@ struct ViewerView: View {
     /// photo is and whether it is already marked, instead of an unlabelled
     /// image.
     private func accessibilityDescription(for asset: AssetDescriptor) -> String {
-        var parts = [asset.isLivePhoto ? "Live Photo" : "Photo"]
+        var parts = [MediaKindPresentation(kind: asset.kind).accessibilityLabel]
         if let date = asset.creationDate {
             parts.append(date.formatted(date: .abbreviated, time: .shortened))
         }
@@ -266,43 +266,45 @@ struct ViewerView: View {
     /// into review. None of it moves when the cluster moves, because it is
     /// anchored independently at the top.
     private var topBar: some View {
-        ZStack {
-            // Centred, so it sits in the middle whatever the two ends are doing.
-            if model.currentAsset?.isLivePhoto == true {
-                livePhotoBadge
-            }
-
-            HStack(spacing: 10) {
-                closeControl
-                Spacer(minLength: 0)
+        HStack(alignment: .top, spacing: 10) {
+            closeControl
+            Spacer(minLength: 0)
+            // The media kind sits on the trailing edge, directly beneath the way
+            // into Review, so the two read as one quiet column.
+            VStack(alignment: .trailing, spacing: 8) {
                 reviewControl
+                mediaKindBadge
             }
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
     }
 
-    /// Says plainly that this asset has motion, so nobody has to guess why a
-    /// press-and-hold behaves differently. Symbol *and* the word "LIVE", so the
-    /// meaning never rests on the symbol alone.
-    private var livePhotoBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "livephoto")
-                .font(.caption2.weight(.bold))
-            Text("LIVE")
-                .font(.caption2.weight(.bold))
+    /// A small neutral glass capsule naming what is on screen: Photo, Live or
+    /// Video. The symbol *and* the word carry the meaning, so nothing rests on
+    /// colour alone, and a plain photo is named as plainly as a Live Photo or a
+    /// video. It sits beneath Review on the trailing edge.
+    @ViewBuilder
+    private var mediaKindBadge: some View {
+        if let asset = model.currentAsset {
+            let presentation = MediaKindPresentation(kind: asset.kind)
+            HStack(spacing: 4) {
+                Image(systemName: presentation.symbol)
+                    .font(.caption2.weight(.bold))
+                Text(presentation.title)
+                    .font(.caption2.weight(.bold))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+            .foregroundStyle(.white)
+            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+            // One element, not a container plus inherited children, so a UI test
+            // query for the identifier matches exactly once.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(presentation.accessibilityLabel)
+            .accessibilityIdentifier("viewer.mediaBadge")
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .foregroundStyle(.white)
-        .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
-        // One element, not a container plus inherited children, so a UI test
-        // query for the identifier matches exactly once.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Live Photo")
-        .accessibilityHint("Press and hold the photo to play its motion")
-        .accessibilityIdentifier("viewer.liveBadge")
     }
 
     /// Leaving is always the same corner, the way a Back button is on every
@@ -656,6 +658,32 @@ struct ViewerView: View {
         guard !cachedIDs.isEmpty else { return }
         model.library.stopCaching(ids: cachedIDs, targetSize: CGSize(width: 1_200, height: 1_200))
         cachedIDs = []
+    }
+}
+
+/// How one media kind is named on the viewer badge and to assistive
+/// technology. Keeping it in one place means the visible word, the symbol and
+/// the spoken label can never drift apart.
+private struct MediaKindPresentation {
+    let symbol: String
+    let title: String
+    let accessibilityLabel: String
+
+    init(kind: MediaKind) {
+        switch kind {
+        case .photo:
+            symbol = "photo"
+            title = "Photo"
+            accessibilityLabel = "Photo"
+        case .livePhoto:
+            symbol = "livephoto"
+            title = "Live"
+            accessibilityLabel = "Live Photo"
+        case .video:
+            symbol = "video"
+            title = "Video"
+            accessibilityLabel = "Video"
+        }
     }
 }
 

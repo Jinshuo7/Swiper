@@ -3,6 +3,11 @@ import XCTest
 /// Smoke tests that drive the app against the in-memory fake library
 /// (`-uiTestingFakeLibrary`), so they never touch real photos.
 final class SWIPRUITests: XCTestCase {
+    /// Mirrors `FakePhotoLibrary.mixedMediaLaunchArgument`. A UI-test bundle is a
+    /// separate process and cannot import the app module, so the value has to be
+    /// repeated here.
+    private let mixedMediaLaunchArgument = "-uiTestingMixedMediaLibrary"
+
     override func setUp() {
         continueAfterFailure = false
     }
@@ -723,29 +728,129 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Review deletion"].waitForExistence(timeout: 5))
     }
 
-    /// The fake library cycles a Live Photo every fifth asset (indices 4, 9, 14,
-    /// 19), and Newest starts at index 23 walking older, so the fifth photo is
-    /// the first Live Photo.
-    func testLivePhotosAreLabelledInTheViewer() {
+    /// The media badge always names the kind, beneath Review on the trailing
+    /// edge. The fake library cycles a Live Photo every fifth asset (indices 4,
+    /// 9, 14, 19), and Newest starts at index 23 walking older, so the fifth
+    /// fixture is the first Live Photo.
+    func testMediaKindBadgeAlwaysNamesTheCurrentAsset() {
         let app = launchApp()
         _ = startViewer(app)
 
-        let badge = app.descendants(matching: .any)["viewer.liveBadge"]
-        XCTAssertFalse(badge.exists, "the first fixture is a still, so it must not be labelled")
+        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 10), "every asset needs a media badge")
+        XCTAssertEqual(badge.label, "Photo", "the first fixture is a still, so the badge must read Photo")
 
-        var swipes = 0
-        while !badge.exists && swipes < 6 {
+        var steps = 0
+        while badge.label != "Live Photo" && steps < 6 {
             photoElement(app).swipeRight()
-            swipes += 1
+            steps += 1
         }
 
-        XCTAssertTrue(badge.exists, "a Live Photo must be labelled in the viewer")
-        XCTAssertEqual(badge.label, "Live Photo")
+        XCTAssertEqual(badge.label, "Live Photo", "a Live Photo must be named in the viewer")
         XCTAssertTrue(
             photoElement(app).label.contains("Live Photo"),
             "the spoken description must name the kind too, got \(photoElement(app).label)"
         )
         capture("Viewer — Live Photo labelled")
+    }
+
+    /// The badge is anchored to the trailing edge, directly beneath the Review
+    /// entry, so Review and the media kind read as one quiet column.
+    func testMediaKindBadgeSitsBeneathReview() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        photo.swipeLeft()   // mark this one, so Review appears
+
+        let review = app.buttons["viewer.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5), "Review should appear once something is marked")
+        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the media badge should stay visible")
+
+        XCTAssertGreaterThanOrEqual(
+            badge.frame.minY,
+            review.frame.maxY,
+            "the media badge must sit beneath Review, not beside it"
+        )
+        XCTAssertEqual(
+            badge.frame.maxX,
+            review.frame.maxX,
+            accuracy: 1,
+            "the badge must share Review's trailing edge"
+        )
+        capture("Viewer — media badge beneath Review")
+    }
+
+    /// A mixed pool shows a complete still preview for all three kinds, at the
+    /// asset's own aspect ratio, centred and letterboxed, with the neutral kind
+    /// badge beneath Review. No playback UI appears for the video: this story
+    /// only shows its poster.
+    func testMixedMediaPreviewAndBadgeCoverAllThreeKinds() {
+        let app = launchApp(extraArguments: [mixedMediaLaunchArgument])
+        _ = startViewer(app)
+        let window = app.windows.firstMatch.frame
+
+        let expectations: [(label: String, ratio: CGFloat)] = [
+            ("Photo", 4.0 / 3.0),
+            ("Live Photo", 3.0 / 4.0),
+            ("Video", 16.0 / 9.0),
+        ]
+
+        for (index, expected) in expectations.enumerated() {
+            let photo = photoElement(app)
+            XCTAssertTrue(photo.waitForExistence(timeout: 10), "preview \(index) never appeared")
+            let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+            XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge at step \(index)")
+            XCTAssertEqual(badge.label, expected.label, "step \(index) badge")
+            XCTAssertTrue(
+                photo.label.hasPrefix(expected.label),
+                "step \(index) spoken kind, got \(photo.label)"
+            )
+
+            let frame = photo.frame
+            XCTAssertTrue(window.contains(frame), "step \(index) preview \(frame) escapes \(window)")
+            let ratio = frame.width / frame.height
+            XCTAssertEqual(ratio, expected.ratio, accuracy: 0.02, "step \(index) is not at its original aspect ratio")
+            XCTAssertEqual(frame.midX, window.midX, accuracy: 1, "step \(index) is not centred")
+            XCTAssertGreaterThan(frame.height, 40, "step \(index) preview is suspiciously small")
+
+            if index < expectations.count - 1 { photoElement(app).swipeRight() }
+        }
+
+        XCTAssertFalse(app.buttons["Play"].exists, "a video poster must not offer playback in this story")
+    }
+
+    /// The nine viewer screenshots: each kind at light, dark and the largest
+    /// accessibility text size. They go through the same fake library as every
+    /// other test.
+    func testCaptureViewerKindScreensInEveryAppearance() {
+        captureViewerKinds(extraArguments: ["-uiTestingForceLight"], suffix: "light")
+        captureViewerKinds(extraArguments: ["-uiTestingForceDark"], suffix: "dark")
+        captureViewerKinds(
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            ],
+            suffix: "ax5"
+        )
+    }
+
+    private func captureViewerKinds(extraArguments: [String], suffix: String) {
+        let app = launchApp(
+            extraArguments: extraArguments + [mixedMediaLaunchArgument]
+        )
+        _ = startViewer(app)
+        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+
+        XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge for the \(suffix) screenshots")
+        XCTAssertEqual(badge.label, "Photo")
+        capture("viewer-photo-\(suffix)")
+
+        photoElement(app).swipeRight()
+        XCTAssertEqual(badge.label, "Live Photo")
+        capture("viewer-live-\(suffix)")
+
+        photoElement(app).swipeRight()
+        XCTAssertEqual(badge.label, "Video")
+        capture("viewer-video-\(suffix)")
     }
 
     private func assertControlsInsideScreen(_ app: XCUIApplication, window: CGRect) {
