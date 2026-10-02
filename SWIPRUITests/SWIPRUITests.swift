@@ -12,7 +12,8 @@ final class SWIPRUITests: XCTestCase {
         persistentStore: Bool = false,
         resetStore: Bool = false,
         failDeletion: Bool = false,
-        failFirstDecisionSave: Bool = false
+        failFirstDecisionSave: Bool = false,
+        extraArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -23,6 +24,7 @@ final class SWIPRUITests: XCTestCase {
         if resetStore { app.launchArguments += ["-uiTestingResetStore"] }
         if failDeletion { app.launchArguments += ["-uiTestingFailDeletion"] }
         if failFirstDecisionSave { app.launchArguments += ["-uiTestingFailFirstDecisionSave"] }
+        app.launchArguments += extraArguments
         app.launch()
         return app
     }
@@ -92,13 +94,25 @@ final class SWIPRUITests: XCTestCase {
         add(attachment)
     }
 
-    /// Opens the one entry action and starts the newest-first traversal, which
-    /// is where every viewer test begins.
-    private func startViewer(_ app: XCUIApplication) -> XCUIElement {
-        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
-        app.buttons["entry.start"].tap()
+    /// Opens the starting-point grid the way Home reaches it now: through a
+    /// media choice and its editable filters. `Everything` includes the whole
+    /// fake library, so viewer tests walk exactly what they did before.
+    @discardableResult
+    private func openChoosePhoto(_ app: XCUIApplication) -> XCUIElement {
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        app.buttons["entry.preset.everything"].tap()
+        let cont = app.buttons["filter.continue"]
+        XCTAssertTrue(cont.waitForExistence(timeout: 10), "the filters must offer Continue")
+        cont.tap()
         let newest = app.buttons["choosePhoto.newest"]
         XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        return newest
+    }
+
+    /// Opens the Home media choice and starts the newest-first traversal, which
+    /// is where every viewer test begins.
+    private func startViewer(_ app: XCUIApplication) -> XCUIElement {
+        let newest = openChoosePhoto(app)
         newest.tap()
         let photo = photoElement(app)
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
@@ -108,6 +122,124 @@ final class SWIPRUITests: XCTestCase {
     func testNewestStartsAViewerSession() {
         let app = launchApp()
         _ = startViewer(app)
+    }
+
+    // MARK: - Home and the editable filters (#46)
+
+    func testHomeOffersTheThreeMediaChoicesAndStableSettings() {
+        let app = launchApp()
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.preset.photos"].exists, "Home has a Photos choice")
+        XCTAssertTrue(app.buttons["entry.preset.videos"].exists, "Home has a Videos choice")
+        XCTAssertTrue(app.buttons["entry.settings"].exists, "Settings keeps its stable place")
+        XCTAssertFalse(app.buttons["entry.resume"].exists, "nothing is waiting to continue")
+        XCTAssertFalse(app.buttons["entry.review"].exists, "nothing is marked")
+        capture("Home — Everything, Photos and Videos")
+    }
+
+    /// Every media choice opens the filters with its documented preset, and a
+    /// fresh preset drops a previous attempt's exclusions.
+    func testMediaChoicesOpenTheirPresetsAndResetEachTime() {
+        let app = launchApp()
+        let summary = app.descendants(matching: .any)["filter.summary"]
+
+        app.buttons["entry.preset.photos"].tap()
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertEqual(summary.label, "Photos · 24 items")
+        XCTAssertEqual(app.buttons["filter.toggle.video"].value as? String, "Excluded", "Photos leaves videos out")
+
+        // Exclude Live Photos, then choose Photos again: the exclusion is gone.
+        app.buttons["filter.toggle.livePhoto"].tap()
+        XCTAssertEqual(summary.label, "Screenshots, Panoramas, Other Photos · 20 items")
+        app.buttons["filter.back"].tap()
+        XCTAssertTrue(app.buttons["entry.preset.photos"].waitForExistence(timeout: 5))
+        app.buttons["entry.preset.photos"].tap()
+        XCTAssertEqual(summary.label, "Photos · 24 items", "a fresh preset never reuses exclusions")
+
+        // Everything includes the single Videos category too.
+        app.buttons["filter.back"].tap()
+        app.buttons["entry.preset.everything"].tap()
+        XCTAssertEqual(summary.label, "Everything · 24 items")
+        capture("Filters — Everything selected")
+    }
+
+    /// Five rows toggle independently, Only isolates one, and the selection
+    /// follows the user onto the grid and back.
+    func testFilterRowsToggleIndependentlyAndOnlyIsolates() {
+        let app = launchApp()
+        app.buttons["entry.preset.everything"].tap()
+        let summary = app.descendants(matching: .any)["filter.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertEqual(summary.label, "Everything · 24 items")
+
+        // Toggle one row; the others keep their own state.
+        app.buttons["filter.toggle.livePhoto"].tap()
+        XCTAssertEqual(summary.label, "Screenshots, Panoramas, Other Photos, Videos · 20 items")
+        XCTAssertEqual(app.buttons["filter.toggle.otherPhoto"].value as? String, "Included")
+        XCTAssertEqual(app.buttons["filter.toggle.livePhoto"].value as? String, "Excluded")
+        XCTAssertEqual(app.buttons["filter.toggle.video"].value as? String, "Included", "other rows are untouched")
+
+        // Only Other Photos isolates the whole selection.
+        app.buttons["filter.only.otherPhoto"].tap()
+        XCTAssertEqual(summary.label, "Other Photos · 20 items")
+
+        // Continue preserves the selection onto the grid, and going back keeps it.
+        app.buttons["filter.continue"].tap()
+        XCTAssertTrue(app.buttons["choosePhoto.newest"].waitForExistence(timeout: 10))
+        app.buttons["choosePhoto.back"].tap()
+        XCTAssertTrue(summary.waitForExistence(timeout: 5))
+        XCTAssertEqual(summary.label, "Other Photos · 20 items", "returning from the grid preserves the filters")
+
+        // Newest then walks only the matching assets.
+        app.buttons["filter.continue"].tap()
+        let newest = app.buttons["choosePhoto.newest"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        newest.tap()
+        let photo = photoElement(app)
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        XCTAssertTrue(photo.label.hasPrefix("Photo"), "no Live Photo may enter an Other Photos pool")
+    }
+
+    /// An empty selection is explained and Continue is disabled, rather than
+    /// silently starting an empty session.
+    func testAnEmptyFilterExplainsItselfAndDisablesContinue() {
+        let app = launchApp()
+        app.buttons["entry.preset.videos"].tap()
+        let summary = app.descendants(matching: .any)["filter.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertEqual(summary.label, "Videos · 0 items")
+        XCTAssertTrue(app.descendants(matching: .any)["filter.empty"].exists, "the empty state must explain itself")
+        XCTAssertFalse(app.buttons["filter.continue"].isEnabled, "an empty pool cannot continue")
+        capture("Filters — empty selection, Continue disabled")
+
+        // Clearing everything is the same honest state.
+        app.buttons["filter.clear"].tap()
+        XCTAssertEqual(summary.label, "Nothing selected · 0 items")
+        XCTAssertFalse(app.buttons["filter.continue"].isEnabled)
+    }
+
+    /// Captures the Home and filter screens in light, dark and the largest
+    /// accessibility text size for the milestone. The attachments are exported
+    /// from the result bundle; see docs/TESTING.md.
+    func testCaptureHomeAndFilterScreensInEveryAppearance() {
+        captureHomeAndFilters(extraArguments: ["-uiTestingForceLight"], suffix: "light")
+        captureHomeAndFilters(extraArguments: ["-uiTestingForceDark"], suffix: "dark")
+        captureHomeAndFilters(
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            ],
+            suffix: "ax5"
+        )
+    }
+
+    private func captureHomeAndFilters(extraArguments: [String], suffix: String) {
+        let app = launchApp(extraArguments: extraArguments)
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        capture("home-\(suffix)")
+
+        app.buttons["entry.preset.photos"].tap()
+        XCTAssertTrue(app.buttons["filter.continue"].waitForExistence(timeout: 10))
+        capture("filters-\(suffix)")
     }
 
     /// Every demo fixture is contained, never cropped to fill, and stays inside
@@ -175,7 +307,7 @@ final class SWIPRUITests: XCTestCase {
 
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.resume"].waitForExistence(timeout: 10))
-        XCTAssertEqual(relaunched.buttons["entry.resume"].label, "Resume")
+        XCTAssertEqual(relaunched.buttons["entry.resume"].label, "Continue sorting")
         XCTAssertEqual(
             relaunched.buttons["entry.review"].label,
             "1 photo marked for deletion",
@@ -202,8 +334,7 @@ final class SWIPRUITests: XCTestCase {
 
     func testChoosePhotoExplainsItselfAndGroupsTheLibraryByMonth() {
         let app = launchApp()
-        XCTAssertTrue(app.buttons["entry.start"].waitForExistence(timeout: 10))
-        app.buttons["entry.start"].tap()
+        _ = openChoosePhoto(app)
 
         XCTAssertTrue(
             app.descendants(matching: .any)["choosePhoto.explanation"].waitForExistence(timeout: 10),
@@ -233,7 +364,7 @@ final class SWIPRUITests: XCTestCase {
 
     func testChoosePhotoCanJumpStraightToAMonth() {
         let app = launchApp()
-        app.buttons["entry.start"].tap()
+        _ = openChoosePhoto(app)
 
         let jump = app.descendants(matching: .any)["choosePhoto.jump"]
         XCTAssertTrue(jump.waitForExistence(timeout: 10))
@@ -255,7 +386,7 @@ final class SWIPRUITests: XCTestCase {
 
     func testChoosingAPhotoStartsSortingAtThatPhoto() {
         let app = launchApp()
-        app.buttons["entry.start"].tap()
+        _ = openChoosePhoto(app)
 
         // fake-23 is the newest photo and a 4:1 panorama, so the viewer's own
         // aspect ratio proves the session started where it was chosen.
@@ -649,7 +780,7 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
         app.buttons["result.done"].tap()
         XCTAssertTrue(
-            app.buttons["entry.start"].waitForExistence(timeout: 10) || app.buttons["entry.settings"].waitForExistence(timeout: 10)
+            app.buttons["entry.preset.everything"].waitForExistence(timeout: 10) || app.buttons["entry.settings"].waitForExistence(timeout: 10)
         )
     }
 
@@ -666,7 +797,7 @@ final class SWIPRUITests: XCTestCase {
         let review = app.buttons["entry.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
         XCTAssertEqual(review.label, "1 photo marked for deletion")
-        XCTAssertEqual(app.buttons["entry.resume"].label, "Resume")
+        XCTAssertEqual(app.buttons["entry.resume"].label, "Continue sorting")
         XCTAssertFalse(markedLabel.isEmpty)
     }
 
@@ -698,7 +829,7 @@ final class SWIPRUITests: XCTestCase {
 
         app.terminate()
         let relaunched = launchApp(persistentStore: true)
-        XCTAssertTrue(relaunched.buttons["entry.start"].waitForExistence(timeout: 10))
+        XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         XCTAssertTrue(relaunched.buttons["entry.review"].exists, "marks survive a relaunch")
 
         // Continue sorting resumes at the saved position, never on the mark.
@@ -709,8 +840,11 @@ final class SWIPRUITests: XCTestCase {
 
         // A brand-new mode also skips it.
         relaunched.buttons["viewer.close"].tap()
-        XCTAssertTrue(relaunched.buttons["entry.start"].waitForExistence(timeout: 5))
-        relaunched.buttons["entry.start"].tap()
+        XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 5))
+        relaunched.buttons["entry.preset.everything"].tap()
+        let continueToGrid = relaunched.buttons["filter.continue"]
+        XCTAssertTrue(continueToGrid.waitForExistence(timeout: 5))
+        continueToGrid.tap()
         let random = relaunched.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 5))
         random.tap()
@@ -952,16 +1086,16 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 5))
 
         // Opening Choose a photo and coming back must not disturb the session.
-        app.buttons["entry.start"].tap()
-        XCTAssertTrue(app.buttons["choosePhoto.newest"].waitForExistence(timeout: 10))
+        _ = openChoosePhoto(app)
         app.buttons["choosePhoto.back"].tap()
+        app.buttons["filter.back"].tap()
         XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 5))
         app.buttons["entry.resume"].tap()
         XCTAssertEqual(photoElement(app).label, position, "opening Choose a photo must not disturb the session")
 
         // Choosing a photo replaces it: fake-23 is the 4:1 panorama.
         app.buttons["viewer.close"].tap()
-        app.buttons["entry.start"].tap()
+        _ = openChoosePhoto(app)
         let cell = app.descendants(matching: .any)["choosePhoto.cell.fake-23"]
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()

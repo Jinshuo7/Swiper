@@ -26,6 +26,7 @@ final class AppModel: ObservableObject {
         case review
         case result
         case settings
+        case filters
         case choosePhoto
     }
 
@@ -44,6 +45,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var preferences: ControlPreferences
     @Published private(set) var statistics: SessionStatistics
     @Published private(set) var resumableSession: PersistedSession?
+    /// The media categories chosen for the next session. Editing starts from a
+    /// Home preset, so a previous session's exclusions are never silently
+    /// reused; Continue sorting restores its own saved filters instead.
+    @Published private(set) var filter: MediaFilter = .everything
     /// The durable deletion list. It is written with every decision, and a
     /// session started from home is seeded from it.
     @Published private(set) var marks: DeletionQueue = .empty
@@ -99,6 +104,14 @@ final class AppModel: ObservableObject {
     var markedIDs: [String] { engine?.queue.ids ?? marks.ids }
     var queueCount: Int { markedIDs.count }
     var hasPhotos: Bool { !order.isEmpty }
+
+    /// The pool a new session would walk right now: the live library confined to
+    /// the current filter. Captured once when the session starts, so later
+    /// library changes cannot move the goalposts.
+    var filteredOrder: LibraryOrder { filter.apply(to: order) }
+    var filteredCount: Int { filteredOrder.count }
+    /// Plain-language summary of the current filter and how many assets match.
+    var filterSummary: String { filter.summary(matchingCount: filteredCount) }
 
     /// Decision input is refused while a save is in flight or a failed save is
     /// waiting to be retried.
@@ -312,15 +325,44 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func showChoosePhoto() { route = .choosePhoto }
+    /// Opens the editable filters for one Home media choice. The preset is
+    /// applied fresh, so exclusions from an earlier attempt never leak in.
+    func showFilters(_ preset: MediaFilter) {
+        filter = preset
+        route = .filters
+    }
+
+    func toggleFilterCategory(_ category: MediaCategory) {
+        var updated = filter
+        updated.toggle(category)
+        filter = updated
+    }
+
+    func onlyFilterCategory(_ category: MediaCategory) {
+        var updated = filter
+        updated.selectOnly(category)
+        filter = updated
+    }
+
+    func clearFilter() { filter = .empty }
+
+    /// Leaves the filters for the starting-point grid, preserving the selection
+    /// so coming back from the grid shows exactly what was chosen.
+    func continueToChoosePhoto() {
+        guard !filteredOrder.isEmpty else { return }
+        route = .choosePhoto
+    }
 
     private func startSession(
         mode: SessionMode,
         cursorID: String?,
         direction: TraversalDirection? = nil
     ) async {
-        guard hasPhotos else {
-            errorMessage = "There are no photos or Live Photos to review."
+        let sessionOrder = filteredOrder
+        guard !sessionOrder.isEmpty else {
+            errorMessage = hasPhotos
+                ? "Nothing matches these filters. Change what's included and try again."
+                : "There are no photos or Live Photos to review."
             return
         }
 
@@ -334,13 +376,18 @@ final class AppModel: ObservableObject {
         statistics.beginSession()
         store.saveStatistics(statistics)
 
+        // The session captures the filtered stable identifiers now. New library
+        // arrivals then wait for a new session, and vanished members reconcile
+        // on the next reload.
         var newEngine = SessionEngine(
-            order: order,
+            order: sessionOrder,
             direction: direction ?? preferences.defaultDirection,
             mode: mode,
             cursorID: cursorID,
             queue: sessionMarks,
-            tumblerSeed: mode == .tumbler ? SessionEngine.makeSeed() : nil
+            tumblerSeed: mode == .tumbler ? SessionEngine.makeSeed() : nil,
+            poolIDs: Set(sessionOrder.ids),
+            filterCategories: filter.categories
         )
         if cursorID == nil || mode == .tumbler {
             newEngine.start()
@@ -363,6 +410,11 @@ final class AppModel: ObservableObject {
 
     func resumeSession() {
         guard let persisted = resumableSession ?? storedState.session else { return }
+        // Continue sorting restores the session's own saved filters and captured
+        // pool, never whatever the Home filters happen to show now.
+        if let categories = persisted.filterCategories {
+            filter = MediaFilter(categories: categories)
+        }
         let restored = SessionEngine.restored(from: persisted, order: order, marks: storedState.marks)
         engine = restored
         route = restored.isFinished ? .review : .viewer

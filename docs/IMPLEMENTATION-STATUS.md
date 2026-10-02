@@ -23,6 +23,14 @@
 > outstanding and is release-blocking (no known crash, data-loss,
 > deletion-safety or accessibility block may ship). Do not claim a green suite
 > until that is fixed and re-run on a named commit.
+>
+> **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
+> are now wired to the fixed filtered session. The full simulator suite is green
+> (276 tests, 0 failures) with the existing AX5 skip still in place; the AX5
+> reachability failure itself is unchanged and still owned by the later AX5
+> ticket. Because `SWIPRApp.swift` still pins the app to dark (outside #46's
+> file list), `RootView` exposes a `-uiTestingForceLight` / `-uiTestingForceDark`
+> screenshot seam; the light milestone screenshots use it.
 
 ---
 
@@ -34,7 +42,8 @@
 | [#41 — Setup: persist owner workflow and compact project brief](https://github.com/Jinshuo7/Swiper/issues/41) | 2 | 2 | 1 | Yes — compressed PROJECT-BRIEF.md to ≤2 pages; listed open PRs (incl. prohibited #37); expanded log columns | Yes (#42) |
 | [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | Yes (#48) |
 | [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44) | 1 | 1 | 0 | No | Yes (#49) |
-| [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | No (PR open) |
+| [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
+| [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | No (branch ready; PR pending driver) |
 
 ---
 

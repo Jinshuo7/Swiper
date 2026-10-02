@@ -852,4 +852,173 @@ final class AppModelTests: XCTestCase {
         let stillThere = await lib.existingAssetIDs(among: allIDs)
         XCTAssertEqual(stillThere, Set(allIDs), "migration and relaunch delete nothing")
     }
+
+    // MARK: - Home filters and the filtered pool (#46)
+
+    /// Each Home media choice opens its documented defaults, and choosing a
+    /// preset again starts clean rather than reusing the last exclusions.
+    func testHomePresetsStartFromDocumentedDefaultsAndNeverReuseExclusions() async {
+        let (model, _, _) = await bootstrapped(library: FakePhotoLibrary.mixedMedia())
+
+        model.showFilters(.everything)
+        XCTAssertEqual(model.route, .filters)
+        XCTAssertEqual(model.filter.categories, MediaFilter.everything.categories)
+        XCTAssertTrue(model.filter.contains(.video), "Everything includes videos")
+
+        model.showFilters(.photos)
+        XCTAssertEqual(model.filter.categories, MediaFilter.photos.categories)
+        XCTAssertFalse(model.filter.contains(.video), "Photos leaves videos out")
+
+        // Exclude a category, then choose the same preset again: the exclusion
+        // must not leak into the fresh attempt.
+        model.toggleFilterCategory(.screenshot)
+        XCTAssertFalse(model.filter.contains(.screenshot))
+        model.showFilters(.photos)
+        XCTAssertTrue(model.filter.contains(.screenshot), "a fresh preset drops the previous exclusion")
+
+        model.showFilters(.videos)
+        XCTAssertEqual(model.filter.categories, [.video], "Videos selects only the video category")
+    }
+
+    /// Toggle changes one category, Only isolates one, and the summary names the
+    /// selection and its matching count.
+    func testFilterRowsToggleIndependentlyAndOnlyIsolates() async {
+        let (model, _, _) = await bootstrapped(library: FakePhotoLibrary.mixedMedia())
+        model.showFilters(.everything)
+
+        model.toggleFilterCategory(.video)
+        XCTAssertFalse(model.filter.contains(.video))
+        XCTAssertTrue(model.filter.contains(.screenshot), "toggling one row leaves the others alone")
+        XCTAssertTrue(model.filter.contains(.livePhoto))
+
+        model.onlyFilterCategory(.panorama)
+        XCTAssertEqual(model.filter.categories, [.panorama], "Only replaces the whole selection")
+        XCTAssertEqual(model.filterSummary, "Panoramas · 1 item")
+
+        model.showFilters(.videos)
+        XCTAssertEqual(model.filterSummary, "Videos · 1 item")
+
+        model.showFilters(.photos)
+        XCTAssertEqual(model.filterSummary, "Photos · 6 items")
+    }
+
+    /// Continue is a no-op when nothing is selected, and the empty filter is a
+    /// clear state rather than a hidden crash.
+    func testContinueIsRefusedWhenNothingIsSelected() async {
+        let (model, _, _) = await bootstrapped(library: FakePhotoLibrary.mixedMedia())
+        model.showFilters(.videos)
+        model.clearFilter()
+
+        XCTAssertTrue(model.filter.isEmpty)
+        XCTAssertEqual(model.filteredCount, 0)
+        model.continueToChoosePhoto()
+
+        XCTAssertEqual(model.route, .filters, "an empty filter cannot reach the grid")
+    }
+
+    /// Starting a session captures the filtered stable-ID pool and its filter
+    /// categories; the saved session carries exactly those.
+    func testStartingASessionCapturesTheFilteredPool() async {
+        let (model, _, store) = await bootstrapped(library: FakePhotoLibrary.mixedMedia())
+
+        model.showFilters(.videos)
+        XCTAssertEqual(model.filteredCount, 1)
+        model.startNewest()
+        await model.settle()
+
+        XCTAssertEqual(model.route, .viewer)
+        XCTAssertEqual(model.engine?.order.ids, ["mixed-video"])
+        XCTAssertEqual(store.state?.session?.poolIDs, ["mixed-video"])
+        XCTAssertEqual(store.state?.session?.filterCategories, [.video])
+        XCTAssertEqual(model.currentAsset?.id, "mixed-video")
+    }
+
+    /// Continue sorting restores the saved filters and the captured pool, not
+    /// whatever the Home filters happen to show now.
+    func testContinueRestoresTheSavedFiltersAndPool() async {
+        let library = FakePhotoLibrary.mixedMedia()
+        let store = InMemorySessionStore()
+
+        let first = await bootstrapped(library: library, store: store)
+        first.model.showFilters(.photos)
+        first.model.startNewest()
+        await first.model.settle()
+        first.model.apply(.keep)
+        await first.model.settle()
+
+        let savedPool = store.state?.session?.poolIDs
+        XCTAssertEqual(Set(savedPool ?? []), Set(FakePhotoLibrary.mixedMediaDescriptors().filter { !$0.isVideo }.map(\.id)))
+
+        // A relaunch starts with the default filter; Continue must restore the
+        // session's own saved filters and pool.
+        let second = AppModel(library: library, store: store, defaults: isolatedDefaults())
+        await second.bootstrap()
+        second.showFilters(.everything)
+        XCTAssertTrue(second.filter.contains(.video), "the Home filter starts from its own preset")
+
+        second.resumeSession()
+        XCTAssertEqual(second.route, .viewer)
+        XCTAssertEqual(second.filter.categories, MediaFilter.photos.categories, "the session's saved filters are restored")
+        XCTAssertEqual(second.resumableSession?.poolIDs, savedPool, "the captured pool is restored")
+        XCTAssertEqual(second.engine?.poolIDs, Set(savedPool ?? []))
+    }
+
+    /// A captured pool is fixed: library assets outside it are arrivals that
+    /// wait for a new session instead of being appended to this one.
+    func testAssetsOutsideTheCapturedPoolAreNeverOffered() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore(
+            content: .state(
+                PersistedState(
+                    marks: [],
+                    session: PersistedSession(
+                        currentAssetID: "fake-2",
+                        direction: .older,
+                        filterCategories: [.otherPhoto, .livePhoto],
+                        poolIDs: ["fake-2"]
+                    )
+                )
+            )
+        )
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+        model.resumeSession()
+
+        var seen: [String] = []
+        while let id = model.currentAsset?.id {
+            seen.append(id)
+            model.apply(.keep)
+            await model.settle()
+        }
+        XCTAssertEqual(seen, ["fake-2"], "only the captured member is walked")
+        XCTAssertTrue(model.engine?.isFinished ?? false)
+    }
+
+    /// A captured member that left the library is dropped while the rest of the
+    /// session survives untouched.
+    func testAVanishedPoolMemberReconcilesWithoutLosingTheSession() async {
+        let store = InMemorySessionStore(
+            content: .state(
+                PersistedState(
+                    marks: [],
+                    session: PersistedSession(
+                        currentAssetID: "mixed-video",
+                        direction: .older,
+                        filterCategories: [.video, .otherPhoto],
+                        poolIDs: ["ghost-id", "mixed-video", "mixed-other-photo"]
+                    )
+                )
+            )
+        )
+        let (model, _, _) = await bootstrapped(library: FakePhotoLibrary.mixedMedia(), store: store)
+
+        XCTAssertEqual(
+            model.resumableSession?.poolIDs?.sorted(),
+            ["mixed-other-photo", "mixed-video"],
+            "only the vanished member is dropped"
+        )
+        model.resumeSession()
+        XCTAssertEqual(model.route, .viewer)
+        XCTAssertEqual(model.currentAsset?.id, "mixed-video")
+        XCTAssertNotNil(model.engine)
+    }
 }

@@ -22,15 +22,15 @@ struct ChoosePhotoView: View {
     private let columns = [GridItem(.adaptive(minimum: 92), spacing: 2)]
 
     private var months: [LibraryMonth] {
-        LibraryCalendar.months(in: model.order, newestFirst: newestFirst)
+        LibraryCalendar.months(in: model.filteredOrder, newestFirst: newestFirst)
     }
 
     /// Recompute the titles only when the library or the sort order changes,
     /// rather than building a `DateFormatter` on every redraw.
     private var monthsSignature: String {
-        let first = model.order.assets.first?.id ?? ""
-        let last = model.order.assets.last?.id ?? ""
-        return "\(model.order.count)|\(first)|\(last)|\(newestFirst)"
+        let first = model.filteredOrder.assets.first?.id ?? ""
+        let last = model.filteredOrder.assets.last?.id ?? ""
+        return "\(model.filteredOrder.count)|\(first)|\(last)|\(newestFirst)"
     }
 
     var body: some View {
@@ -56,10 +56,9 @@ struct ChoosePhotoView: View {
                     jumpBar(proxy)
                     Divider().overlay(Color.white.opacity(0.12))
 
-                    if model.order.isEmpty {
+                    if model.filteredOrder.isEmpty {
                         Spacer()
-                        Text("No photos or Live Photos are visible.")
-                            .foregroundStyle(.white.opacity(0.6))
+                        emptyPool
                         Spacer()
                     } else {
                         grid
@@ -77,7 +76,7 @@ struct ChoosePhotoView: View {
     private var header: some View {
         HStack {
             Button {
-                model.route = .entry
+                model.route = .filters
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
@@ -136,7 +135,7 @@ struct ChoosePhotoView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
-        .disabled(model.order.isEmpty)
+        .disabled(model.filteredOrder.isEmpty)
     }
 
     private var newestButton: some View {
@@ -245,6 +244,27 @@ struct ChoosePhotoView: View {
     }
 
     // MARK: - Grid
+
+    /// The empty state explains why there is nothing here and offers the one
+    /// action that fixes it, rather than showing a blank grid.
+    private var emptyPool: some View {
+        VStack(spacing: 14) {
+            Text("Nothing matches these filters.")
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.7))
+                .accessibilityIdentifier("choosePhoto.empty")
+            Button {
+                model.route = .filters
+            } label: {
+                Text("Change filters")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityIdentifier("choosePhoto.changeFilters")
+        }
+        .padding(.horizontal, 24)
+    }
 
     private var grid: some View {
         ScrollView { gridBody }
