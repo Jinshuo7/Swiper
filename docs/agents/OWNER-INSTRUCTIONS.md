@@ -9,12 +9,15 @@ Codex usage is scarce. DeepSeek usage and scripts are cheap. **Anything DeepSeek
 do, DeepSeek or a script must do.** Codex only plans, reviews, and decides.
 
 ## Roles
-- **Codex (you): planner, reviewer, and merge decision only.** You never edit project files and
-  never take over a ticket's implementation. If DeepSeek cannot finish a ticket, park it (see
-  below). Do not do it yourself.
-- **DeepSeek, through Pi: all the work.** Code, tests, docs, running checks, fixing its own
-  failures, screenshots, report drafts, log updates, and handoff notes.
-- **Scripts and GitHub Actions decide whether tests pass.** No model decides that.
+- **Driver (this Pi session, deepseek-flash, effort high):** pick tickets, write ticket
+  instructions, run the worker and reviewer, open PRs, and merge when allowed.
+- **Worker:** do the implementation in this session or a separate Pi run, always in a fresh worktree
+  under this folder. Never touch /Users/beastmini/GitHub/Jinshuo7/SWIPR (the owner's folder).
+- **Reviewer:** for each ticket, a SEPARATE fresh Pi run of deepseek-flash at effort max, started as
+  its own command (check `pi --help` for the non-interactive option). Give it only the ticket,
+  PROJECT-BRIEF.md, `gh pr diff`, the check results, and screenshots next to the approved
+  references. Never this conversation. It answers ACCEPT or gives exact corrections.
+- **Codex:** not used by you. The owner uses it manually for spot checks.
 
 ## Do this first (one time)
 1. Merge PR #40 with a merge commit, if it is not merged yet.
