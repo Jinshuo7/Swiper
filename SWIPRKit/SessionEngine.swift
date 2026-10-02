@@ -17,6 +17,11 @@ public struct SessionEngine: Equatable, Sendable {
     public private(set) var decidedIDs: Set<String>
     public private(set) var keptIDs: Set<String>
     public private(set) var tumbler: TumblerPlan?
+    /// The captured session pool, or `nil` for a legacy session that walks the
+    /// whole library. The engine's ``order`` is already confined to this pool.
+    public private(set) var poolIDs: Set<String>?
+    /// The media categories selected when the session started.
+    public private(set) var filterCategories: Set<MediaCategory>?
     public private(set) var isFinished: Bool
 
     public init(
@@ -30,9 +35,17 @@ public struct SessionEngine: Equatable, Sendable {
         keptIDs: Set<String> = [],
         tumbler: TumblerPlan? = nil,
         tumblerSeed: UInt64? = nil,
+        poolIDs: Set<String>? = nil,
+        filterCategories: Set<MediaCategory>? = nil,
         isFinished: Bool = false
     ) {
-        self.order = order
+        // The engine's order is the traversal order. A captured pool confines it
+        // to the fixed identifiers; a legacy session keeps the full order.
+        let traversalOrder = poolIDs.map { pool in
+            LibraryOrder(order.assets.filter { pool.contains($0.id) })
+        } ?? order
+
+        self.order = traversalOrder
         self.direction = direction
         self.mode = mode
         self.cursorID = cursorID
@@ -40,9 +53,11 @@ public struct SessionEngine: Equatable, Sendable {
         self.undoStack = undoStack
         self.decidedIDs = decidedIDs
         self.keptIDs = keptIDs
+        self.poolIDs = poolIDs
+        self.filterCategories = filterCategories
         self.isFinished = isFinished
         if mode == .tumbler {
-            self.tumbler = tumbler ?? TumblerPlan(assetIDs: order.ids, seed: tumblerSeed ?? SessionEngine.makeSeed())
+            self.tumbler = tumbler ?? TumblerPlan(assetIDs: traversalOrder.ids, seed: tumblerSeed ?? SessionEngine.makeSeed())
         } else {
             self.tumbler = tumbler
         }
@@ -316,6 +331,8 @@ public struct SessionEngine: Equatable, Sendable {
             keptIDs: Array(keptIDs),
             undoEntries: undoStack.entries,
             tumbler: tumbler,
+            filterCategories: filterCategories,
+            poolIDs: poolIDs == nil ? nil : order.ids,
             updatedAt: updatedAt,
             isFinished: isFinished
         )
@@ -338,6 +355,8 @@ public struct SessionEngine: Equatable, Sendable {
             decidedIDs: Set(persisted.decidedIDs),
             keptIDs: Set(persisted.keptIDs),
             tumbler: persisted.tumbler,
+            poolIDs: persisted.poolIDs.map { Set($0) },
+            filterCategories: persisted.filterCategories,
             isFinished: persisted.isFinished
         )
     }

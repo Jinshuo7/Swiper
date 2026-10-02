@@ -16,6 +16,13 @@ public struct PersistedSession: Codable, Equatable, Sendable {
     public var keptIDs: [String]
     public var undoEntries: [UndoEntry]
     public var tumbler: TumblerPlan?
+    /// The media categories selected when the session started, or `nil` for a
+    /// legacy session that predates persisted filters.
+    public var filterCategories: Set<MediaCategory>?
+    /// The fixed set of stable library identifiers captured at session
+    /// creation, or `nil` for a legacy session that walks the whole library.
+    /// An empty array means a captured-but-empty pool.
+    public var poolIDs: [String]?
     public var updatedAt: Date
     public var isFinished: Bool
 
@@ -28,6 +35,8 @@ public struct PersistedSession: Codable, Equatable, Sendable {
         keptIDs: [String] = [],
         undoEntries: [UndoEntry] = [],
         tumbler: TumblerPlan? = nil,
+        filterCategories: Set<MediaCategory>? = nil,
+        poolIDs: [String]? = nil,
         updatedAt: Date = Date(),
         isFinished: Bool = false
     ) {
@@ -39,6 +48,8 @@ public struct PersistedSession: Codable, Equatable, Sendable {
         self.keptIDs = keptIDs
         self.undoEntries = undoEntries
         self.tumbler = tumbler
+        self.filterCategories = filterCategories
+        self.poolIDs = poolIDs
         self.updatedAt = updatedAt
         self.isFinished = isFinished
     }
@@ -62,10 +73,11 @@ public struct PersistedState: Codable, Equatable, Sendable {
     /// changes, and teach ``FileSessionStore`` how to migrate from every older
     /// version.
     ///
+    /// Version 4 added the captured session pool and its filter categories.
     /// Version 3 removed favouriting. A version 2 session can therefore contain a
     /// favourite undo entry, which ``UndoEntry/Effect`` still decodes, mapping it
     /// to `.kept` so undoing it only returns to the photo.
-    public static let currentSchemaVersion = 3
+    public static let currentSchemaVersion = 4
 
     public var schemaVersion: Int
     /// The ordered list of assets marked for deletion, oldest mark first.
@@ -402,6 +414,9 @@ public final class InMemorySessionStore: SessionStoring {
     public enum StoredContent {
         case empty
         case state(PersistedState)
+        /// State reported as already migrated by the store (as `FileSessionStore`
+        /// does after upgrading older bytes in memory).
+        case migrated(PersistedState)
         case unreadable
         case unsupportedVersion(found: Int)
     }
@@ -454,6 +469,8 @@ public final class InMemorySessionStore: SessionStoring {
             return .absent
         case .state(let state):
             return .loaded(state)
+        case .migrated(let state):
+            return .migrated(state)
         case .unreadable:
             return .unreadable(reason: "test fixture")
         case .unsupportedVersion(let found):
@@ -495,7 +512,9 @@ public final class InMemorySessionStore: SessionStoring {
 
 private extension InMemorySessionStore.StoredContent {
     var state: PersistedState? {
-        if case .state(let state) = self { return state }
-        return nil
+        switch self {
+        case .state(let state), .migrated(let state): return state
+        case .empty, .unreadable, .unsupportedVersion: return nil
+        }
     }
 }

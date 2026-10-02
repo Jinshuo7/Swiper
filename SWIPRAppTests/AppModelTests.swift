@@ -759,4 +759,97 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.engine)
         XCTAssertNil(store.state?.session)
     }
+
+    // MARK: - Saved sessions, migration and the fixed pool (#45)
+
+    /// A relaunch is a fresh model over the same store and the same library.
+    /// Every piece of saved progress — pool, filter, position, marks and Undo —
+    /// must survive, and no photo may be deleted without an explicit
+    /// confirmation.
+    func testSavedProgressSurvivesRelaunchWithPoolFilterAndUndoAndNothingIsDeleted() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let pool = ["fake-0", "fake-1", "fake-2", "fake-3", "fake-4", "fake-5"]
+        let store = InMemorySessionStore(
+            content: .state(
+                PersistedState(
+                    marks: ["fake-5"],
+                    session: PersistedSession(
+                        currentAssetID: "fake-4",
+                        direction: .older,
+                        decidedIDs: ["fake-5"],
+                        keptIDs: [],
+                        undoEntries: [UndoEntry(assetID: "fake-5", effect: .queuedDeletion)],
+                        filterCategories: [.screenshot, .otherPhoto],
+                        poolIDs: pool
+                    )
+                )
+            )
+        )
+        let (model, lib, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertNotNil(model.resumableSession)
+        XCTAssertEqual(model.resumableSession?.filterCategories, [.screenshot, .otherPhoto])
+        XCTAssertEqual(model.resumableSession?.poolIDs, pool, "the exact stable-ID pool round-trips")
+
+        model.resumeSession()
+        XCTAssertEqual(model.route, .viewer)
+        XCTAssertEqual(model.currentAsset?.id, "fake-4", "position survives relaunch")
+        XCTAssertEqual(model.markedIDs, ["fake-5"], "the deletion list survives relaunch")
+        XCTAssertTrue(model.engine?.undoStack.canUndo ?? false, "Undo survives relaunch")
+        XCTAssertEqual(model.engine?.poolIDs, Set(pool), "the engine stays confined to the pool")
+
+        // The fixed pool keeps the traversal inside its members: the marked
+        // photo is skipped and nothing outside the pool is offered.
+        var seen: [String] = []
+        while let id = model.currentAsset?.id {
+            seen.append(id)
+            model.apply(.keep)
+            await model.settle()
+        }
+        XCTAssertFalse(seen.contains("fake-5"), "a marked photo is never presented again")
+
+        // Nothing was deleted: sorting never mutates the library, and no
+        // confirmation ever happened.
+        let allIDs = FakePhotoLibrary.demoDescriptors(count: 6).map(\.id)
+        let stillThere = await lib.existingAssetIDs(among: allIDs)
+        XCTAssertEqual(stillThere, Set(allIDs), "relaunch and sorting delete nothing")
+    }
+
+    /// A store reporting already-migrated state is saved to finish the migration
+    /// and keeps every piece of progress; the library is untouched.
+    func testMigratedStateIsSavedAndPreservesProgressWithoutDeletingAnything() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore(
+            content: .migrated(
+                PersistedState(
+                    schemaVersion: PersistedState.currentSchemaVersion,
+                    marks: ["fake-1"],
+                    session: PersistedSession(
+                        currentAssetID: "fake-4",
+                        direction: .older,
+                        decidedIDs: ["fake-5"],
+                        keptIDs: ["fake-5"],
+                        undoEntries: [UndoEntry(assetID: "fake-5", effect: .kept)],
+                        filterCategories: [.video],
+                        poolIDs: ["fake-0", "fake-2", "fake-4", "fake-5"]
+                    )
+                )
+            )
+        )
+        let (model, lib, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertFalse(store.savedStates.isEmpty, "the migration is completed by a save")
+        XCTAssertNotNil(model.resumableSession)
+        XCTAssertEqual(model.resumableSession?.filterCategories, [.video])
+        XCTAssertEqual(model.resumableSession?.poolIDs, ["fake-0", "fake-2", "fake-4", "fake-5"])
+
+        model.resumeSession()
+        XCTAssertEqual(model.currentAsset?.id, "fake-4")
+        XCTAssertEqual(model.markedIDs, ["fake-1"])
+        XCTAssertTrue(model.engine?.undoStack.canUndo ?? false)
+
+        let allIDs = FakePhotoLibrary.demoDescriptors(count: 6).map(\.id)
+        let stillThere = await lib.existingAssetIDs(among: allIDs)
+        XCTAssertEqual(stillThere, Set(allIDs), "migration and relaunch delete nothing")
+    }
 }

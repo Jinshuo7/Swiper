@@ -135,4 +135,73 @@ final class AssetReconcilerTests: XCTestCase {
         XCTAssertFalse(remaining.contains("d"))
         XCTAssertFalse(remaining.contains("f"))
     }
+
+    // MARK: - Captured pool reconciliation
+
+    func testCapturedPoolDropsInaccessibleIDsAndKeepsNewArrivalsOut() {
+        // The live library gained "f" and lost "d" since the pool was captured.
+        let liveOrder = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+            TestLibrary.descriptor(id: "c", dayOffset: 2),
+            TestLibrary.descriptor(id: "e", dayOffset: 4),
+            TestLibrary.descriptor(id: "f", dayOffset: 5),
+        ])
+        let persisted = PersistedSession(
+            currentAssetID: "b",
+            direction: .older,
+            poolIDs: ["a", "b", "c", "d"]
+        )
+        let reconciled = AssetReconciler.reconcile(persisted, order: liveOrder)
+        XCTAssertEqual(
+            reconciled.session.poolIDs,
+            ["a", "b", "c"],
+            "inaccessible pool members drop and new arrivals never enter"
+        )
+        XCTAssertEqual(reconciled.session.currentAssetID, "b")
+    }
+
+    func testMissingCurrentAssetRecoversWithinThePool() {
+        // Pool: a, b, c. "c" (the current asset) vanished; d and e are outside
+        // the pool and must never be offered as a recovery target.
+        let liveOrder = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+            TestLibrary.descriptor(id: "d", dayOffset: 3),
+            TestLibrary.descriptor(id: "e", dayOffset: 4),
+        ])
+        let persisted = PersistedSession(
+            currentAssetID: "c",
+            currentAssetDate: TestLibrary.descriptor(id: "c", dayOffset: 2).creationDate,
+            direction: .older,
+            poolIDs: ["a", "b", "c"]
+        )
+        let reconciled = AssetReconciler.reconcile(persisted, order: liveOrder)
+        XCTAssertEqual(reconciled.session.poolIDs, ["a", "b"])
+        XCTAssertEqual(reconciled.session.currentAssetID, "b", "recovery stays inside the pool")
+    }
+
+    func testFilterCategoriesSurviveReconciliation() {
+        let liveOrder = TestLibrary.order()
+        let persisted = PersistedSession(
+            currentAssetID: "c",
+            direction: .older,
+            filterCategories: [.screenshot, .video],
+            poolIDs: ["a", "b", "c"]
+        )
+        let reconciled = AssetReconciler.reconcile(persisted, order: liveOrder)
+        XCTAssertEqual(reconciled.session.filterCategories, [.screenshot, .video])
+    }
+
+    func testLegacySessionWithoutPoolKeepsTheFullOrder() {
+        let liveOrder = TestLibrary.order()
+        let persisted = PersistedSession(
+            currentAssetID: "c",
+            direction: .older,
+            poolIDs: nil
+        )
+        let reconciled = AssetReconciler.reconcile(persisted, order: liveOrder)
+        XCTAssertNil(reconciled.session.poolIDs, "no pool means the whole library order")
+        XCTAssertEqual(reconciled.session.currentAssetID, "c")
+    }
 }

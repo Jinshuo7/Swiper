@@ -5,11 +5,16 @@
 
 ## Current ticket
 
-- **Ticket:** [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44)
-- **Branch:** `deepseek/44-media-filter` (fresh worktree at `SWIPR-ticket-44`)
-- **State:** Codex approved (review 1 of 1). Local checks green — `git diff --check`,
-  `Scripts/run-kit-tests.sh` (167 tests, 0 failures), `Scripts/typecheck-ios.sh` (`OK`).
-- **PR:** [#49](https://github.com/Jinshuo7/Swiper/pull/49) — awaiting CI.
+- **Ticket:** [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45)
+- **Branch:** `deepseek/45-fixed-pool-persistence` (fresh worktree at `SWIPR-ticket-45`)
+- **State:** Implemented and Codex-approved (normal review + extra
+  persistence-safety review, 2 Codex steps). Local checks green — `git diff --check`,
+  `Scripts/run-kit-tests.sh` (179 tests, 0 failures), `Scripts/typecheck-ios.sh`
+  (`OK`), focused `SWIPRAppTests/AppModelTests` on the simulator (33 tests,
+  0 failures). Opening the PR now.
+- **Risky:** saved sessions and migration — covered by the extra review and the
+  fake-library tests proving saved progress survives migration/relaunch and
+  nothing is deleted without explicit confirmation.
 
 ## Open PRs
 
@@ -19,6 +24,8 @@
 
 ## Recently merged
 
+- **#49 — Implement #44: filter a mixed-media pool with pure domain logic**
+  (merged), which closed **#44**.
 - **#48 — Implement #43: expose mixed-media metadata through public APIs** (merged),
   which closed **#43**.
 - **#42 — Setup #41: persist owner workflow and compact project brief**
@@ -27,7 +34,6 @@
 
 ## What is next
 
-1. Wait for CI on #49 (`gh pr checks 49 --watch --fail-fast`).
-2. Merge only when safety rule 4 holds (green checks, diff touches only the ticket's files,
-   every acceptance criterion met). Do not merge now.
-3. Continue with the next ticket from `docs/ROADMAP.md`.
+1. Open the PR for #45 to `main` (`Closes #45`), then wait for CI with
+   `gh pr checks <PR> --watch --fail-fast`. Merge only when safety rule 4 holds.
+2. Continue with the next ticket from `docs/ROADMAP.md`.
