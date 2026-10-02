@@ -17,26 +17,35 @@
 
 ## Current ticket
 
-- **Ticket:** [#58 — V1-03d: Make the starting point reachable at the largest
-  text size](https://github.com/Jinshuo7/Swiper/issues/58) — **implemented** on
-  branch `driver/58-ax5` by the worker. The AX5 failure in
-  `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize` was
-  the test scrolling down to **Jump to month** before checking the controls
-  above it; `assertReachable` only ever scrolls downward, so the traversal
-  buttons it had already scrolled past could never be brought back on screen.
-  The AX5 case now walks the starting point top-down and asserts the
-  explanation, **Newest first**, **Oldest first**, **Random**, **Jump to
-  month**, the order toggle and a grid cell (`choosePhoto.cell.fake-22`), with a
-  screenshot of the top of the screen. The screen itself already scrolls its
-  chrome with the grid at accessibility sizes (its height exceeds one screen),
-  so no view change was needed. The AX5 case passes (1 test, 0 failures), the
-  rest of `PlaySessionUITests` stays green with the CI skip in place (16 tests,
-  0 failures), and the committed `choose-photo-ax5.png` shows the explanation
-  and both traversal actions whole. **No PR opened yet** — the driver opens it
-  after review.
-- **Next up:** open the PR for #58, wait for `checks`, merge, then run the
-  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler)
-  through the same worker/reviewer flow.
+- **Ticket:** [#56 — V1-03c: Replace a saved session only after
+  confirmation](https://github.com/Jinshuo7/Swiper/issues/56) — **implemented**
+  on branch `driver/56-replace-session`. A start while an unfinished session
+  exists (Newest, Oldest, Random, or a specific item) no longer replaces it
+  silently: `AppModel` parks a `PendingReplacement`, `ChoosePhotoView` shows the
+  `ReplacementConfirmationView` card, and only **Start new** discards the
+  position and session Undo. **Keep current** clears the request without writing
+  anything, and the durable deletion list is only ever read, never cleared, so
+  marked items stay marked and skipped. The gate is `resumableSession != nil`,
+  matching the Home **Continue sorting** offer; a first start still happens with
+  no confirmation. The full simulator suite is green (179 kit + 45 app + 64 UI,
+  0 failures) with the existing AX5 skip in place, and
+  `docs/screenshots/milestones/v1-03-starting-point/replace-session-light.png` /
+  `replace-session-dark.png` show the confirmation in both appearances. **No PR
+  opened yet** — the driver opens it after review.
+- **Next up:** open the PR for #56, wait for `checks`, merge, then run the last
+  V1-03 sub-ticket (#57 Tumbler) through the same worker/reviewer flow.
+
+### Note: the replacement confirmation
+
+The gate lives in `AppModel.requestSession`: when `hasUnfinishedSession` is
+false the start runs immediately, otherwise the request is parked as a
+`PendingReplacement` and the overlay explains that position and Undo history are
+replaced while marked items stay in Review. `startFrom` still refuses a marked
+item before any of this, so tapping a marked cell cannot become a replacement
+request. The confirmation is a purpose-built card (not a system alert) so the
+explanation and both actions stay legible in light and dark and at large text
+sizes; the light/dark captures go through the existing `-uiTestingForceLight` /
+`-uiTestingForceDark` seam.
 
 ### Note: the AX5 skip belongs to #32
 
@@ -73,15 +82,16 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #58's branch is ready for the driver to open a PR.
-  (#55 was merged as PR #59, commit `ddaba0f`; #47 as PR #53, commit
-  `10aa678`.)
+- None from this worker. #56's branch is ready for the driver to open a PR.
+  (#58 was merged as PR #60, commit `25e6418`.)
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#60 — Fix AX5 starting-point reachability (#58)** (merged as commit
+  `25e6418`), which closed **#58**.
 - **#59 — Implement #55: offer both named traversals and finish without
   wrapping** (merged as commit `ddaba0f`), which closed **#55**.
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
@@ -100,8 +110,8 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #58, wait for `checks`, and merge if the diff only touches
+1. Open the PR for #56, wait for `checks`, and merge if the diff only touches
    the ticket's files and every acceptance criterion is met.
-2. Run the remaining #29 (V1-03) sub-tickets (#56, #57) through the
-   worker/reviewer flow from the roadmap order in `PROJECT-BRIEF.md`; keep
+2. Run the last #29 (V1-03) sub-ticket (#57) through the worker/reviewer flow
+   from the roadmap order in `PROJECT-BRIEF.md`; keep
    `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.

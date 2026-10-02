@@ -50,6 +50,10 @@ final class SWIPRUITests: XCTestCase {
         app.descendants(matching: .any)["viewer.photo"]
     }
 
+    private func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier]
+    }
+
     private func tutorialElement(_ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)["viewer.tutorial"]
     }
@@ -126,11 +130,22 @@ final class SWIPRUITests: XCTestCase {
         return newest
     }
 
+    /// Taps a starting-point control and, when an unfinished session makes the
+    /// replacement confirmation appear, chooses **Start new**. Tests that need to
+    /// inspect the confirmation itself drive it directly instead.
+    private func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
+        start.tap()
+        let confirm = app.buttons["replaceSession.startNew"]
+        if confirm.waitForExistence(timeout: 1) {
+            confirm.tap()
+        }
+    }
+
     /// Opens the Home media choice and starts the newest-first traversal, which
     /// is where every viewer test begins.
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
         let newest = openChoosePhoto(app)
-        newest.tap()
+        beginSession(newest, in: app)
         let photo = photoElement(app)
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         return photo
@@ -408,7 +423,7 @@ final class SWIPRUITests: XCTestCase {
         _ = openChoosePhoto(app)
         let newest = app.buttons["choosePhoto.newest"]
         XCTAssertTrue(newest.waitForExistence(timeout: 10))
-        newest.tap()
+        beginSession(newest, in: app)
         let newestPhoto = photoElement(app)
         XCTAssertTrue(newestPhoto.waitForExistence(timeout: 10))
         XCTAssertEqual(newestPhoto.label, fixtureLabel(23), "Newest first starts at the newest photo")
@@ -489,6 +504,104 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         let ratio = photo.frame.width / photo.frame.height
         XCTAssertEqual(ratio, 4.0, accuracy: 0.02, "sorting should have started at the chosen photo")
+    }
+
+    // MARK: - Replacement confirmation (#56)
+
+    /// The confirmation appears only when a session would be discarded.
+    /// **Keep current** resumes the saved position; **Start new** begins a fresh
+    /// traversal while the mark stays in Review. Nothing is deleted either way.
+    func testReplacementConfirmationKeepsOrReplacesTheSession() {
+        let app = launchApp(persistentStore: true, resetStore: true)
+        let photo = startViewer(app)
+        let firstPhoto = photo.label
+        photo.swipeRight()
+        // Wait for each advance before the next gesture so the test never races
+        // the viewer's transition animation.
+        expectation(
+            for: NSPredicate(format: "label != %@", firstPhoto),
+            evaluatedWith: photoElement(app)
+        )
+        waitForExpectations(timeout: 5)
+        let markedLabel = photoElement(app).label
+        photoElement(app).swipeLeft()
+        expectation(
+            for: NSPredicate(format: "label != %@", markedLabel),
+            evaluatedWith: photoElement(app)
+        )
+        waitForExpectations(timeout: 5)
+        let positionAfterMark = photoElement(app).label
+        XCTAssertNotEqual(markedLabel, positionAfterMark)
+
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["entry.review"].label, "1 photo marked for deletion")
+
+        // A second start asks first, and explains what will be replaced.
+        _ = openChoosePhoto(app)
+        app.buttons["choosePhoto.newest"].tap()
+        let confirmation = element(app, "replaceSession.confirmation")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10), "a replacement start must ask first")
+        XCTAssertTrue(
+            app.staticTexts
+                .containing(NSPredicate(format: "label CONTAINS %@", "position and Undo history"))
+                .firstMatch.exists,
+            "the confirmation must say what is replaced"
+        )
+        XCTAssertTrue(
+            app.staticTexts
+                .containing(NSPredicate(format: "label CONTAINS %@", "stay in Review"))
+                .firstMatch.exists,
+            "the confirmation must promise the marks stay in Review"
+        )
+
+        // Keep current: the grid stays, and resuming lands on the saved position.
+        app.buttons["replaceSession.keep"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
+        app.buttons["choosePhoto.back"].tap()
+        app.buttons["filter.back"].tap()
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["entry.review"].label, "1 photo marked for deletion")
+        app.buttons["entry.resume"].tap()
+        XCTAssertEqual(photoElement(app).label, positionAfterMark, "Keep current preserved the saved position")
+
+        // Start new: a fresh traversal from the newest, but the mark stays marked.
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        _ = openChoosePhoto(app)
+        app.buttons["choosePhoto.newest"].tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        app.buttons["replaceSession.startNew"].tap()
+        XCTAssertTrue(photoElement(app).waitForExistence(timeout: 10))
+        XCTAssertEqual(photoElement(app).label, fixtureLabel(23), "Start new begins at the newest photo")
+        XCTAssertEqual(
+            app.buttons["viewer.review"].label,
+            "1 photo marked for deletion",
+            "Start new never clears the deletion list"
+        )
+        XCTAssertNotEqual(photoElement(app).label, markedLabel, "a marked photo stays skipped")
+    }
+
+    /// Captures the replacement confirmation in both appearances. The app is
+    /// pinned dark, so the light capture goes through the `-uiTestingForceLight`
+    /// seam; the porcelain card adapts to whichever appearance it is handed.
+    func testCaptureReplacementConfirmationInEveryAppearance() {
+        captureReplacementConfirmation(extraArguments: ["-uiTestingForceLight"], name: "replace-session-light")
+        captureReplacementConfirmation(extraArguments: ["-uiTestingForceDark"], name: "replace-session-dark")
+    }
+
+    private func captureReplacementConfirmation(extraArguments: [String], name: String) {
+        let app = launchApp(persistentStore: true, resetStore: true, extraArguments: extraArguments)
+        _ = startViewer(app)
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        _ = openChoosePhoto(app)
+        let newest = app.buttons["choosePhoto.newest"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 10))
+        newest.tap()
+        let confirmation = element(app, "replaceSession.confirmation")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10), "an unfinished session must ask before it is replaced")
+        capture(name)
     }
 
     // MARK: - Fixed control positions and the puck move
@@ -1038,7 +1151,7 @@ final class SWIPRUITests: XCTestCase {
         continueToGrid.tap()
         let random = relaunched.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 5))
-        random.tap()
+        beginSession(random, in: relaunched)
         let tumblerPhoto = photoElement(relaunched)
         XCTAssertTrue(tumblerPhoto.waitForExistence(timeout: 10))
         XCTAssertNotEqual(tumblerPhoto.label, markedLabel)
@@ -1271,7 +1384,15 @@ final class SWIPRUITests: XCTestCase {
     func testOpeningChooseAPhotoKeepsAResumableSession() {
         let app = launchApp(persistentStore: true, resetStore: true)
         let photo = startViewer(app)
+        let firstPhoto = photo.label
         photo.swipeRight()                     // keep, so the session is resumable
+        // Wait for the viewer to actually move on before reading the saved
+        // position, so this never races the advance animation.
+        expectation(
+            for: NSPredicate(format: "label != %@", firstPhoto),
+            evaluatedWith: photoElement(app)
+        )
+        waitForExpectations(timeout: 5)
         let position = photoElement(app).label
         app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 5))
@@ -1284,12 +1405,18 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["entry.resume"].tap()
         XCTAssertEqual(photoElement(app).label, position, "opening Choose a photo must not disturb the session")
 
-        // Choosing a photo replaces it: fake-23 is the 4:1 panorama.
+        // Choosing a photo replaces it, after the confirmation: fake-23 is the
+        // 4:1 panorama.
         app.buttons["viewer.close"].tap()
         _ = openChoosePhoto(app)
         let cell = app.descendants(matching: .any)["choosePhoto.cell.fake-23"]
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()
+        XCTAssertTrue(
+            element(app, "replaceSession.confirmation").waitForExistence(timeout: 10),
+            "choosing a photo while a session waits must ask before it replaces it"
+        )
+        app.buttons["replaceSession.startNew"].tap()
         let chosen = photoElement(app)
         XCTAssertTrue(chosen.waitForExistence(timeout: 10))
         XCTAssertEqual(chosen.frame.width / chosen.frame.height, 4.0, accuracy: 0.02, "choosing a photo replaces the session")

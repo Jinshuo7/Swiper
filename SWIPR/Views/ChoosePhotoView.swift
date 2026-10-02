@@ -69,6 +69,16 @@ struct ChoosePhotoView: View {
                 monthTitles = LibraryCalendar.titles(for: months)
             }
         }
+        .overlay {
+            if model.pendingReplacement != nil {
+                ReplacementConfirmationView(
+                    onKeepCurrent: { model.keepCurrentSession() },
+                    onStartNew: { model.confirmReplacement() }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: model.pendingReplacement != nil)
     }
 
     // MARK: - Chrome
