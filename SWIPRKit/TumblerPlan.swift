@@ -54,6 +54,17 @@ public struct TumblerPlan: Codable, Equatable, Sendable {
         remaining.append(id)
     }
 
+    /// Reserves `id` as already served without returning it.
+    ///
+    /// Used when the current asset is placed by something other than ``next()``
+    /// — a restored or reconciled session cursor, or a direct jump. Traversal
+    /// must never hand the same asset out a second time, so the reserved
+    /// identifier leaves ``remaining`` and joins ``handled``.
+    public mutating func reserve(_ id: String) {
+        remaining.removeAll { $0 == id }
+        handled.insert(id)
+    }
+
     /// Drops identifiers that left the library.
     public mutating func reconcile(withAvailableIDs available: Set<String>) {
         remaining.removeAll { !available.contains($0) }

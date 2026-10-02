@@ -57,7 +57,15 @@ public struct SessionEngine: Equatable, Sendable {
         self.filterCategories = filterCategories
         self.isFinished = isFinished
         if mode == .tumbler {
-            self.tumbler = tumbler ?? TumblerPlan(assetIDs: traversalOrder.ids, seed: tumblerSeed ?? SessionEngine.makeSeed())
+            var plan = tumbler ?? TumblerPlan(
+                assetIDs: traversalOrder.ids,
+                seed: tumblerSeed ?? SessionEngine.makeSeed()
+            )
+            // The cursor can be placed by a restored or reconciled session
+            // rather than by the plan's own ``next()``. Reserve it here so the
+            // plan can never serve the current asset a second time.
+            if let cursorID { plan.reserve(cursorID) }
+            self.tumbler = plan
         } else {
             self.tumbler = tumbler
         }
@@ -215,6 +223,7 @@ public struct SessionEngine: Equatable, Sendable {
     @discardableResult
     public mutating func jump(to id: String) -> SessionEffect {
         guard order.contains(id: id), !queue.contains(id) else { return .noOp }
+        if mode == .tumbler { tumbler?.reserve(id) }
         cursorID = id
         isFinished = false
         return .advanced

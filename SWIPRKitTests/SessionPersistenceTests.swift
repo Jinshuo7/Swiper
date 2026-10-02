@@ -42,6 +42,45 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertNotNil(decoded.tumbler)
     }
 
+    /// A Random session is written to bytes, read back on the next launch, and
+    /// walks exactly the order it had left — same seed, same pending members,
+    /// same position, no repeats.
+    func testTumblerOrderAndPositionSurviveTerminationAndRelaunch() throws {
+        let library = TestLibrary.order()
+        var engine = SessionEngine(order: library, mode: .tumbler, tumblerSeed: 4242)
+        engine.start()
+        engine.apply(.keep)
+        engine.apply(.queueDeletion)
+        let queued = engine.queue.ids
+
+        // Terminate: the session becomes bytes on disk. Relaunch: the bytes are
+        // decoded and the engine is rebuilt against the same library.
+        let data = try JSONEncoder().encode(engine.persisted())
+        let decoded = try JSONDecoder().decode(PersistedSession.self, from: data)
+        var resumed = SessionEngine.restored(from: decoded, order: library, marks: queued)
+
+        XCTAssertEqual(resumed.mode, .tumbler)
+        XCTAssertEqual(resumed.current?.id, engine.current?.id, "the position survives")
+        XCTAssertEqual(resumed.tumbler?.seed, engine.tumbler?.seed, "the seed survives")
+        XCTAssertEqual(resumed.tumbler?.remaining, engine.tumbler?.remaining, "the pending order survives")
+        XCTAssertEqual(resumed.tumbler?.handled, engine.tumbler?.handled)
+
+        var original = engine
+        var firstRun: [String] = []
+        while let id = original.current?.id {
+            firstRun.append(id)
+            original.apply(.keep)
+        }
+        var secondRun: [String] = []
+        while let id = resumed.current?.id {
+            secondRun.append(id)
+            resumed.apply(.keep)
+        }
+        XCTAssertEqual(firstRun, secondRun, "the resumed order is exactly the saved one")
+        XCTAssertEqual(secondRun.count, Set(secondRun).count, "and never repeats")
+        XCTAssertFalse(secondRun.contains(queued.first ?? ""))
+    }
+
     func testPersistedSessionDoesNotCarryTheDeletionList() throws {
         var engine = SessionEngine(order: TestLibrary.order())
         engine.start()

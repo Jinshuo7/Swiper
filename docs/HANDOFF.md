@@ -17,26 +17,22 @@
 
 ## Current ticket
 
-- **Ticket:** [#58 — V1-03d: Make the starting point reachable at the largest
-  text size](https://github.com/Jinshuo7/Swiper/issues/58) — **implemented** on
-  branch `driver/58-ax5` by the worker. The AX5 failure in
-  `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize` was
-  the test scrolling down to **Jump to month** before checking the controls
-  above it; `assertReachable` only ever scrolls downward, so the traversal
-  buttons it had already scrolled past could never be brought back on screen.
-  The AX5 case now walks the starting point top-down and asserts the
-  explanation, **Newest first**, **Oldest first**, **Random**, **Jump to
-  month**, the order toggle and a grid cell (`choosePhoto.cell.fake-22`), with a
-  screenshot of the top of the screen. The screen itself already scrolls its
-  chrome with the grid at accessibility sizes (its height exceeds one screen),
-  so no view change was needed. The AX5 case passes (1 test, 0 failures), the
-  rest of `PlaySessionUITests` stays green with the CI skip in place (16 tests,
-  0 failures), and the committed `choose-photo-ax5.png` shows the explanation
-  and both traversal actions whole. **No PR opened yet** — the driver opens it
-  after review.
-- **Next up:** open the PR for #58, wait for `checks`, merge, then run the
-  remaining V1-03 sub-tickets (#56 replacement confirmation, #57 Tumbler)
-  through the same worker/reviewer flow.
+- **Ticket:** [#57 — V1-03c: Keep Random deterministic, repeat-free and
+  reconciled](https://github.com/Jinshuo7/Swiper/issues/57) — **implemented** on
+  branch `driver/57-tumbler` by the worker. `TumblerPlan` gained `reserve(_:)`
+  and `SessionEngine` now reserves the cursor whenever it is placed outside the
+  plan's own `next()` (restore, reconciled recovery, direct jump), closing the
+  one latent repeat path. The new kit tests prove a fixed seed and pool always
+  produce the same order, the whole pool is walked without repeats (plain, after
+  Undo, after a jump, and after reconciliation), a terminated-and-relaunched
+  session resumes the exact saved order and position, and reconciliation drops
+  vanished members while crediting no deletion and touching no photo. Kit maths
+  is 186 tests with 0 failures; `SWIPRAppTests` is 42 tests with 0 failures. The
+  CI AX5 `-skip-testing` line is untouched. **No PR opened yet** — the driver
+  opens it after review.
+- **Next up:** open the PRs for #58 and #57, wait for `checks`, merge, then run
+  the remaining V1-03 sub-ticket (#56 replacement confirmation) through the same
+  worker/reviewer flow.
 
 ### Note: the AX5 skip belongs to #32
 
@@ -44,6 +40,13 @@ The CI job still carries
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
 #58 does not touch it; removing that line is ticket #32's job now that the case
 passes locally.
+
+### Note: 58 is implemented but unmerged
+
+[#58](https://github.com/Jinshuo7/Swiper/issues/58) is implemented on branch
+`driver/58-ax5` (the AX5 `assertReachable` traversal now walks the starting
+point top-down) but its PR is not open yet. It is unrelated to the Tumbler
+work.
 
 ### Note: the two named traversals never wrap
 
