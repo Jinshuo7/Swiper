@@ -17,7 +17,7 @@
 
 ## Current ticket
 
-- **Ticket:** [#56 — V1-03c: Replace a saved session only after
+- **Ticket:** [#56 — V1-03b: Replace an unfinished session only after
   confirmation](https://github.com/Jinshuo7/Swiper/issues/56) — **implemented**
   on branch `driver/56-replace-session`. A start while an unfinished session
   exists (Newest, Oldest, Random, or a specific item) no longer replaces it
@@ -27,13 +27,22 @@
   anything, and the durable deletion list is only ever read, never cleared, so
   marked items stay marked and skipped. The gate is `resumableSession != nil`,
   matching the Home **Continue sorting** offer; a first start still happens with
-  no confirmation. The full simulator suite is green (179 kit + 45 app + 64 UI,
+  no confirmation. The full simulator suite is green (179 kit + 46 app + 64 UI,
   0 failures) with the existing AX5 skip in place, and
   `docs/screenshots/milestones/v1-03-starting-point/replace-session-light.png` /
-  `replace-session-dark.png` show the confirmation in both appearances. **No PR
-  opened yet** — the driver opens it after review.
-- **Next up:** open the PR for #56, wait for `checks`, merge, then run the last
-  V1-03 sub-ticket (#57 Tumbler) through the same worker/reviewer flow.
+  `replace-session-dark.png` show the confirmation in both appearances.
+  **PR #61 is open**, labelled `needs-strong-review`, with two independent
+  reviewers both ACCEPT; it is not auto-merged and awaits the owner's review.
+- **The other V1-03 risky PR:** [#57 — V1-03c: keep Random deterministic,
+  repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) —
+  branch `driver/57-tumbler`, **PR #62**, labelled `needs-strong-review`, two
+  independent reviewers both ACCEPT (one correction round fixed a reserved-cursor
+  leak on `start()` and made the two-Undo and reconciliation tests
+  reserve-sensitive, plus two doc test counts).
+- **Next up:** the owner reviews and merges PR #61 and PR #62, then V1-04 (#26,
+  the neutral direct-move decision dock) starts. #55 (PR #59) and #58 (PR #60)
+  are already merged, so V1-03a (both named traversals) and V1-03d (AX5 starting
+  point) are done. The V1-02 milestone report was posted as issue #54.
 
 ### Note: the replacement confirmation
 
@@ -82,16 +91,18 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## Open PRs
 
-- None from this worker. #56's branch is ready for the driver to open a PR.
-  (#58 was merged as PR #60, commit `25e6418`.)
+- **#61** (#56) and **#62** (#57): open, `needs-strong-review`, awaiting the
+  owner's Codex review; both have two ACCEPT reviews. #56's branch was merged up
+  to the latest `main` (docs-only conflict).
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
-- **#60 — Fix AX5 starting-point reachability (#58)** (merged as commit
-  `25e6418`), which closed **#58**.
+- **#60 — Implement #58: make the starting point reachable at the largest text
+  size** ("Fix AX5 starting-point reachability", merged as commit `25e6418`),
+  which closed **#58**.
 - **#59 — Implement #55: offer both named traversals and finish without
   wrapping** (merged as commit `ddaba0f`), which closed **#55**.
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
@@ -110,8 +121,7 @@ ticket replaces it with the System / Light / Dark setting.
 
 ## What is next
 
-1. Open the PR for #56, wait for `checks`, and merge if the diff only touches
-   the ticket's files and every acceptance criterion is met.
-2. Run the last #29 (V1-03) sub-ticket (#57) through the worker/reviewer flow
-   from the roadmap order in `PROJECT-BRIEF.md`; keep
-   `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. Owner reviews and merges **PR #61** (#56) and **PR #62** (#57); both are
+   `needs-strong-review`, so the driver left them open.
+2. Start the next milestone, V1-04 (#26 — the neutral direct-move decision dock).
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
