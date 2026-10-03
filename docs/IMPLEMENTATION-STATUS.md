@@ -127,6 +127,8 @@
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
+>
+> **Strong-review note:** the owner approved PR #65 (the strong-review gate) and explicitly told the agent to add the `strong-review-passed` label to that PR so it could merge. Only the owner adds that label; this was a one-time instruction.
 
 ---
 

@@ -257,6 +257,82 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertFalse(store.loadState().allowsWrites)
     }
 
+    // MARK: - A damaged save file is kept, never replaced with empty progress
+
+    private func writeSessionFile(_ json: String, in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("session.json")
+        try Data(json.utf8).write(to: url)
+        return url
+    }
+
+    /// The file must read as unreadable, refuse writes, and stay byte-for-byte
+    /// as it was, so a damaged save is never overwritten with empty progress.
+    private func assertDamagedFileIsKept(
+        _ json: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try writeSessionFile(json, in: directory)
+        let before = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+
+        guard case .unreadable = store.loadState() else {
+            return XCTFail("expected unreadable, got \(store.loadState())", file: file, line: line)
+        }
+        XCTAssertFalse(store.loadState().allowsWrites, file: file, line: line)
+        XCTAssertEqual(
+            try Data(contentsOf: url),
+            before,
+            "the damaged file must be left byte-for-byte unchanged",
+            file: file,
+            line: line
+        )
+    }
+
+    func testMissingSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"marks":["a"],"session":null,"updatedAt":0}"#)
+    }
+
+    func testNullSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"schemaVersion":null,"marks":["a"]}"#)
+    }
+
+    func testStringSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"schemaVersion":"3","marks":["a"]}"#)
+    }
+
+    func testEmptyJSONObjectIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept("{}")
+    }
+
+    func testLegacyFileMigratesKeepsMarksAndLeavesABackup() async throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let legacy = #"{"currentAssetID":"c","queueIDs":["b"],"decidedIDs":["c"]}"#
+        let url = try writeSessionFile(legacy, in: directory)
+        let original = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let state) = store.loadState() else {
+            return XCTFail("a real legacy file must still migrate, got \(store.loadState())")
+        }
+        XCTAssertEqual(state.marks, ["b"], "legacy queueIDs become the durable deletion list")
+        XCTAssertEqual(state.session?.currentAssetID, "c")
+
+        try await store.saveState(state)
+        XCTAssertEqual(FileSessionStore(directory: directory).loadState(), .loaded(state))
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        let name = try XCTUnwrap(backups.first, "a pre-migration backup must be left next to the file")
+        let backup = try Data(contentsOf: directory.appendingPathComponent(name))
+        XCTAssertEqual(backup, original, "the backup must hold the original legacy bytes")
+    }
+
     func testWritesAreRefusedWhileUnreadableDataIsInTheWay() async throws {
         let directory = makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -386,15 +386,66 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
                 return .unreadable(reason: "the saved file is damaged")
             }
             if probe.schemaVersion < PersistedState.currentSchemaVersion {
+                guard backupBeforeMigration(at: url, fileManager: fileManager) else {
+                    return .unreadable(reason: "the saved file could not be backed up before migration")
+                }
                 return .migrated(migrate(state))
             }
             return .loaded(state)
         }
 
+        // No usable `schemaVersion`. A file is the old unversioned shape only
+        // when it carries at least one legacy-only key and none of the keys the
+        // versioned shape owns. Anything else is damaged, not legacy: reporting
+        // it as unreadable keeps it on disk instead of overwriting it with the
+        // empty state an all-optional legacy decode would produce.
+        let legacyOnlyKeys: Set<String> = [
+            "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries"
+        ]
+        let versionedKeys: Set<String> = ["schemaVersion", "marks", "session"]
+        guard let keys = topLevelKeys(in: data),
+              !keys.isDisjoint(with: legacyOnlyKeys),
+              keys.isDisjoint(with: versionedKeys) else {
+            return .unreadable(reason: "the saved file is not in a known format")
+        }
+
         guard let legacy = try? decoder.decode(LegacyPersistedSession.self, from: data) else {
             return .unreadable(reason: "the saved file is not in a known format")
         }
+        guard backupBeforeMigration(at: url, fileManager: fileManager) else {
+            return .unreadable(reason: "the saved file could not be backed up before migration")
+        }
         return .migrated(legacy.migrated(updatedAt: Date()))
+    }
+
+    /// The top-level keys of a JSON object, or `nil` when the data is not a JSON
+    /// object. Used to tell a real legacy file from damaged or unknown data.
+    private static func topLevelKeys(in data: Data) -> Set<String>? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+        return Set(dictionary.keys)
+    }
+
+    /// Copies the original file next to itself before a migration overwrites it,
+    /// and reports whether the copy succeeded. A failed copy stops the migration
+    /// so the original bytes are never lost.
+    private static func backupBeforeMigration(at url: URL, fileManager: FileManager) -> Bool {
+        let directory = url.deletingLastPathComponent()
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        var destination = directory.appendingPathComponent("session-premigration-\(stamp).json")
+        var suffix = 1
+        while fileManager.fileExists(atPath: destination.path) {
+            destination = directory.appendingPathComponent("session-premigration-\(stamp)-\(suffix).json")
+            suffix += 1
+        }
+        do {
+            try fileManager.copyItem(at: url, to: destination)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Brings older in-memory state up to the current schema version.
