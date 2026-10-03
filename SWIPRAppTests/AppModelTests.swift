@@ -1193,4 +1193,105 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentAsset?.id, "mixed-video")
         XCTAssertNotNil(model.engine)
     }
+
+    // MARK: - Random traversal (#57)
+
+    /// Random builds one persisted order. Navigation, termination and relaunch
+    /// all come back to the same order and the same position, and the walk
+    /// never serves a photo twice.
+    func testPersistedRandomOrderSurvivesNavigationAndRelaunch() async throws {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore()
+
+        // First launch: start Random, make one decision, then leave the viewer.
+        let first = await bootstrapped(library: library, store: store)
+        first.model.startTumbler()
+        await first.model.settle()
+        XCTAssertEqual(first.model.route, .viewer)
+        XCTAssertEqual(first.model.engine?.mode, .tumbler)
+        let seed = try XCTUnwrap(first.model.engine?.tumbler?.seed)
+        XCTAssertEqual(store.state?.session?.tumbler?.seed, seed, "the seed is saved once, at session start")
+
+        first.model.apply(.keep)
+        await first.model.settle()
+        let savedPosition = try XCTUnwrap(first.model.currentAsset?.id)
+        XCTAssertEqual(store.state?.session?.currentAssetID, savedPosition)
+        XCTAssertEqual(store.state?.session?.tumbler?.seed, seed, "a decision never reseeds the order")
+
+        // Navigation away and back keeps the same order and position.
+        first.model.closeViewer()
+        XCTAssertEqual(first.model.route, .entry)
+        first.model.resumeSession()
+        XCTAssertEqual(first.model.currentAsset?.id, savedPosition, "navigation restores the position")
+        XCTAssertEqual(first.model.engine?.tumbler?.seed, seed, "navigation keeps the same order")
+
+        // What the saved order still has to serve, in order.
+        var probe = try XCTUnwrap(first.model.engine)
+        var expected: [String] = []
+        while let id = probe.current?.id {
+            expected.append(id)
+            probe.apply(.keep)
+        }
+        XCTAssertEqual(expected.count, 5, "one decision left five photos to serve")
+        XCTAssertEqual(expected.count, Set(expected).count)
+
+        // Termination and relaunch: a fresh model over the same store and library.
+        let second = await bootstrapped(library: library, store: store)
+        XCTAssertEqual(second.model.resumableSession?.tumbler?.seed, seed, "the same order survives a relaunch")
+        second.model.resumeSession()
+        XCTAssertEqual(second.model.route, .viewer)
+        XCTAssertEqual(second.model.currentAsset?.id, savedPosition, "the position survives a relaunch")
+
+        var actual: [String] = []
+        while let id = second.model.currentAsset?.id {
+            actual.append(id)
+            second.model.apply(.keep)
+            await second.model.settle()
+        }
+        XCTAssertEqual(actual, expected, "the resumed Random order is exactly the saved one")
+        XCTAssertEqual(actual.count, Set(actual).count, "Random never serves a photo twice")
+    }
+
+    /// A saved Random session with a vanished current asset and a vanished mark
+    /// reconciles safely: the ghost members drop, the surviving mark stays,
+    /// nothing is deleted or counted, and the walk still never repeats.
+    func testReconcilingARandomSessionDropsVanishedMembersAndCreditsNoDeletion() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let ids = FakePhotoLibrary.demoDescriptors(count: 6).map(\.id)
+        let store = InMemorySessionStore(
+            content: .state(
+                PersistedState(
+                    marks: ["fake-0", "ghost-mark"],
+                    session: PersistedSession(
+                        currentAssetID: "ghost-current",
+                        direction: .older,
+                        mode: .tumbler,
+                        tumbler: TumblerPlan(assetIDs: ids, seed: 31),
+                        poolIDs: ids
+                    )
+                )
+            )
+        )
+        let (model, lib, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertEqual(model.markedIDs, ["fake-0"], "a vanished mark is dropped, never counted")
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0, "reconciliation deletes nothing")
+        XCTAssertEqual(model.statistics.currentSessionDeletedCount, 0)
+
+        model.resumeSession()
+        XCTAssertEqual(model.route, .viewer)
+
+        var seen: [String] = []
+        while let id = model.currentAsset?.id {
+            seen.append(id)
+            model.apply(.keep)
+            await model.settle()
+        }
+        XCTAssertEqual(seen.count, Set(seen).count, "Random never repeats a photo")
+        XCTAssertEqual(Set(seen).count, 5, "the marked photo is skipped and the vanished current is gone")
+        XCTAssertFalse(seen.contains("fake-0"))
+
+        let stillThere = await lib.existingAssetIDs(among: ids)
+        XCTAssertEqual(stillThere, Set(ids), "reconciliation never mutates the library")
+    }
 }

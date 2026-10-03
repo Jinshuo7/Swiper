@@ -92,8 +92,21 @@
 > case; a focused UI test walks both branches, and
 > `docs/screenshots/milestones/v1-03-starting-point/replace-session-light.png` /
 > `replace-session-dark.png` show the confirmation. The full simulator suite is
-> green (179 kit + 45 app + 64 UI, 0 failures) with the existing AX5 skip in
+> green (179 kit + 46 app + 64 UI, 0 failures) with the existing AX5 skip in
 > place.
+>
+> **#57 update (2026-10-03):** Random (the Tumbler) is now proved and hardened.
+> `TumblerPlan` gained `reserve(_:)`, and `SessionEngine` uses it whenever the
+> cursor is placed outside the plan's own `next()` — restoring a session, a
+> reconciled recovery, or a direct jump — so the plan can never serve the
+> current asset a second time. The persisted plan (`seed`, `remaining`,
+> `handled`) and the cursor already round-tripped; the new tests prove the same
+> seed and pool always produce the same order, the whole pool is walked without
+> repeats (plain, after Undo, after a jump, and after reconciliation), a
+> terminated-and-relaunched session resumes the exact saved order and position,
+> and reconciliation drops vanished members while crediting no deletion and
+> touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
+> tests, 0 failures. The AX5 `-skip-testing` line is untouched.
 
 ---
 
@@ -109,8 +122,9 @@
 | [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
 | [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | Yes (#53) |
 | [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
-| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | No (branch ready; PR pending driver) |
-| [#56 — V1-03c: Replace a saved session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 1 | No | No (branch ready; PR pending driver) |
+| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
+| [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
+| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
 
 ---
 
