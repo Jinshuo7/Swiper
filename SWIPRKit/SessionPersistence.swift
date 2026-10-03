@@ -395,37 +395,77 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         }
 
         // No usable `schemaVersion`. A file is the old unversioned shape only
-        // when it carries at least one legacy-only key and none of the keys the
-        // versioned shape owns. Anything else is damaged, not legacy: reporting
-        // it as unreadable keeps it on disk instead of overwriting it with the
-        // empty state an all-optional legacy decode would produce.
-        let legacyOnlyKeys: Set<String> = [
-            "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries"
-        ]
+        // when it carries at least one legacy-only key with the right value type
+        // and none of the keys the versioned shape owns. A legacy key that is
+        // present but null or the wrong type, or a legacy file with nothing to
+        // restore, is damaged: reporting it as unreadable keeps it on disk
+        // instead of overwriting it with the empty state an all-optional legacy
+        // decode would produce.
         let versionedKeys: Set<String> = ["schemaVersion", "marks", "session"]
-        guard let keys = topLevelKeys(in: data),
-              !keys.isDisjoint(with: legacyOnlyKeys),
-              keys.isDisjoint(with: versionedKeys) else {
+        guard let object = topLevelObject(in: data),
+              Set(object.keys).isDisjoint(with: versionedKeys),
+              isValidLegacyShape(object) else {
             return .unreadable(reason: "the saved file is not in a known format")
         }
 
         guard let legacy = try? decoder.decode(LegacyPersistedSession.self, from: data) else {
             return .unreadable(reason: "the saved file is not in a known format")
         }
+        let migrated = legacy.migrated(updatedAt: Date())
+        guard hasSomethingToRestore(migrated) else {
+            return .unreadable(reason: "the saved file has nothing to restore")
+        }
         guard backupBeforeMigration(at: url, fileManager: fileManager) else {
             return .unreadable(reason: "the saved file could not be backed up before migration")
         }
-        return .migrated(legacy.migrated(updatedAt: Date()))
+        return .migrated(migrated)
     }
 
-    /// The top-level keys of a JSON object, or `nil` when the data is not a JSON
-    /// object. Used to tell a real legacy file from damaged or unknown data.
-    private static func topLevelKeys(in data: Data) -> Set<String>? {
-        guard let object = try? JSONSerialization.jsonObject(with: data),
-              let dictionary = object as? [String: Any] else {
-            return nil
+    private static let legacyOnlyKeys: Set<String> = [
+        "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries"
+    ]
+
+    /// The top-level JSON object, or `nil` when the data is not a JSON object.
+    /// Used to tell a real legacy file from damaged or unknown data.
+    private static func topLevelObject(in data: Data) -> [String: Any]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return object as? [String: Any]
+    }
+
+    /// True when the object is the old unversioned shape: at least one
+    /// legacy-only key is present, and every legacy-only key it does have holds
+    /// a non-null value of the expected type. A present-but-null or wrong-typed
+    /// legacy key means the file is damaged, not legacy.
+    private static func isValidLegacyShape(_ object: [String: Any]) -> Bool {
+        var sawLegacyKey = false
+        for key in legacyOnlyKeys {
+            guard let value = object[key] else { continue }
+            sawLegacyKey = true
+            if value is NSNull { return false }
+            switch key {
+            case "queueIDs", "decidedIDs", "keptIDs":
+                guard let array = value as? [Any], array.allSatisfy({ $0 is String }) else {
+                    return false
+                }
+            case "currentAssetID":
+                guard value is String else { return false }
+            case "undoEntries":
+                guard value is [Any] else { return false }
+            default:
+                return false
+            }
         }
-        return Set(dictionary.keys)
+        return sawLegacyKey
+    }
+
+    /// Whether a migrated legacy state carries any work worth keeping: marks, a
+    /// current asset, decided IDs or undo entries.
+    private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
+        if !state.marks.isEmpty { return true }
+        guard let session = state.session else { return false }
+        return session.currentAssetID != nil
+            || !session.decidedIDs.isEmpty
+            || !session.undoEntries.isEmpty
     }
 
     /// Copies the original file next to itself before a migration overwrites it,

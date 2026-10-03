@@ -309,6 +309,22 @@ final class SessionPersistenceTests: XCTestCase {
         try assertDamagedFileIsKept("{}")
     }
 
+    func testNullLegacyKeyIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":null}"#)
+    }
+
+    func testWrongTypedLegacyKeyIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":"abc"}"#)
+    }
+
+    func testWrongTypedCurrentAssetIDIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":5}"#)
+    }
+
+    func testEmptyLegacyKeysWithNothingToRestoreAreUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":[]}"#)
+    }
+
     func testLegacyFileMigratesKeepsMarksAndLeavesABackup() async throws {
         let directory = makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
