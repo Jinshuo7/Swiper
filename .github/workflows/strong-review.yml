@@ -1,0 +1,102 @@
+name: Strong review
+
+# Runs on every pull_request event, never pull_request_target, so it has no
+# access to repository secrets. The only write scope it takes is the one it
+# needs: labelling the pull request.
+#
+# A same-repo PR runs its own modified copy of this workflow, so any PR that
+# changes this file or .github/risky-paths.txt must say so at the top of its PR
+# description, and agents must never weaken the gate.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# A newer event for the same pull request supersedes an older run.
+concurrency:
+  group: strong-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  strong-review-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether this pull request is risky
+        id: risky
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # --no-renames so both the old and the new path of a rename are checked.
+          git diff --name-only --no-renames "${BASE_SHA}...${HEAD_SHA}" > changed-files.txt
+          echo "Changed files:"
+          cat changed-files.txt
+
+          risky=false
+
+          # The list itself and every workflow can weaken this gate or the
+          # checks it guards, so they are always risky.
+          if grep -qx '.github/risky-paths.txt' changed-files.txt; then
+            risky=true
+          fi
+          if grep -q '^\.github/workflows/' changed-files.txt; then
+            risky=true
+          fi
+
+          while IFS= read -r line || [ -n "$line" ]; do
+            path="${line%%#*}"
+            path="$(printf '%s' "$path" | xargs)"
+            if [ -z "$path" ]; then
+              continue
+            fi
+            if [ "${path%/}" != "$path" ]; then
+              # A folder entry: anything under it counts.
+              if grep -q "^${path}" changed-files.txt; then
+                risky=true
+              fi
+            else
+              if grep -qx "$path" changed-files.txt; then
+                risky=true
+              fi
+            fi
+          done < .github/risky-paths.txt
+
+          echo "risky=${risky}"
+          echo "risky=${risky}" >> "$GITHUB_OUTPUT"
+
+      - name: Label a risky pull request
+        if: steps.risky.outputs.risky == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx 'needs-strong-review'; then
+            echo "needs-strong-review is already present."
+          else
+            gh pr edit "$PR" --add-label needs-strong-review
+          fi
+
+      - name: Fail until the owner marks the strong review passed
+        if: steps.risky.outputs.risky == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx 'strong-review-passed'; then
+            echo "strong-review-passed is present."
+          else
+            echo "::error::This pull request touches a risky path but does not have the strong-review-passed label. Only the owner adds that label, after the strong review."
+            exit 1
+          fi
