@@ -5,9 +5,11 @@
 
 ## Setup facts
 
-- **CI runner:** `xcode-27` is a **self-hosted** runner (not a GitHub-hosted
-  `macos-*` label). Branch protection on `main` requires the `checks` status,
-  strict (up to date with `main`), with force-push and deletion blocked.
+- **CI runner:** `xcode-27` is a **GitHub-hosted** runner using a custom
+  `xcode-27` label (jobs run in the "GitHub Actions" runner group;
+  `gh api repos/Jinshuo7/Swiper/actions/runners` returns `total_count 0`).
+  Branch protection on `main` requires the `checks` status, strict (up to date
+  with `main`), with force-push and deletion blocked.
 - **Driver mode:** the owner replaced Codex with this Pi driver session
   (deepseek-flash, effort high). See the Roles section of
   `docs/agents/OWNER-INSTRUCTIONS.md`.

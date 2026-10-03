@@ -126,6 +126,8 @@
 | [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
 
+> **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
+
 ---
 
 ## Legacy checkpoint (issues #11–#16, photo-only — as-built history)
