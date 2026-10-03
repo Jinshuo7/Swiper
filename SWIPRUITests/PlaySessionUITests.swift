@@ -165,12 +165,23 @@ final class PlaySessionUITests: XCTestCase {
         return newest
     }
 
+    /// Taps a starting-point control and, when an unfinished session makes the
+    /// replacement confirmation appear, chooses **Start new**. Tests that need to
+    /// inspect the confirmation itself drive it directly instead.
+    private func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
+        start.tap()
+        let confirm = app.buttons["replaceSession.startNew"]
+        if confirm.waitForExistence(timeout: 1) {
+            confirm.tap()
+        }
+    }
+
     /// Opens the Home media choice and starts the newest-first traversal.
     @discardableResult
     private func startViewer(_ app: XCUIApplication) -> XCUIElement {
         goHome(app)
         let newest = openChoosePhoto(app)
-        newest.tap()
+        beginSession(newest, in: app)
         let photo = element(app, "viewer.photo")
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         return photo
@@ -189,7 +200,7 @@ final class PlaySessionUITests: XCTestCase {
             scrolls += 1
         }
         XCTAssertTrue(cell.isHittable, "cell \(identifier) never came on screen")
-        cell.tap()
+        beginSession(cell, in: app)
         XCTAssertTrue(element(app, "viewer.photo").waitForExistence(timeout: 10))
     }
 
@@ -603,14 +614,14 @@ final class PlaySessionUITests: XCTestCase {
         let app = launchApp()
         goHome(app)
         let newest = openChoosePhoto(app)
-        newest.tap()
+        beginSession(newest, in: app)
         XCTAssertEqual(element(app, "viewer.photo").label, fixtureLabel(23), "Newest starts at the newest photo")
         goHome(app)
 
         _ = openChoosePhoto(app)
         let random = app.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 10))
-        random.tap()
+        beginSession(random, in: app)
         let randomPhoto = element(app, "viewer.photo")
         XCTAssertTrue(randomPhoto.waitForExistence(timeout: 10), "Random starts a Tumbler session")
         // The Tumbler seed is random, so the opening photo is any fixture, never a

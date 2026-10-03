@@ -17,21 +17,44 @@
 
 ## Current ticket
 
-- **Ticket:** none in progress. The V1-03 (#29) work is implemented up to two
-  risky PRs that now await the owner's Codex review and must **not** be
-  auto-merged:
-  - **#56 — V1-03b: replace an unfinished session only after confirmation** —
-    branch `driver/56-replace-session`, **PR #61**, labelled
-    `needs-strong-review`; two independent reviewers both said ACCEPT.
-  - **#57 — V1-03c: keep Random deterministic, repeat-free and reconciled** —
-    branch `driver/57-tumbler`, **PR #62**, labelled `needs-strong-review`; two
-    independent reviewers both said ACCEPT. One correction round fixed a
-    reserved-cursor leak on `start()` and made the two-Undo and reconciliation
-    tests reserve-sensitive, plus two doc test counts.
-- **Next up:** after the owner merges #61 and #62, start V1-04 (#26, the neutral
-  direct-move decision dock). #55 (PR #59) and #58 (PR #60) are already merged,
-  so V1-03a (both named traversals) and V1-03d (AX5 starting point) are done.
-- The V1-02 milestone report was posted as issue #54.
+- **Ticket:** [#56 — V1-03b: Replace an unfinished session only after
+  confirmation](https://github.com/Jinshuo7/Swiper/issues/56) — **implemented**
+  on branch `driver/56-replace-session`. A start while an unfinished session
+  exists (Newest, Oldest, Random, or a specific item) no longer replaces it
+  silently: `AppModel` parks a `PendingReplacement`, `ChoosePhotoView` shows the
+  `ReplacementConfirmationView` card, and only **Start new** discards the
+  position and session Undo. **Keep current** clears the request without writing
+  anything, and the durable deletion list is only ever read, never cleared, so
+  marked items stay marked and skipped. The gate is `resumableSession != nil`,
+  matching the Home **Continue sorting** offer; a first start still happens with
+  no confirmation. The full simulator suite is green (179 kit + 46 app + 64 UI,
+  0 failures) with the existing AX5 skip in place, and
+  `docs/screenshots/milestones/v1-03-starting-point/replace-session-light.png` /
+  `replace-session-dark.png` show the confirmation in both appearances.
+  **PR #61 is open**, labelled `needs-strong-review`, with two independent
+  reviewers both ACCEPT; it is not auto-merged and awaits the owner's review.
+- **The other V1-03 risky PR:** [#57 — V1-03c: keep Random deterministic,
+  repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) —
+  branch `driver/57-tumbler`, **PR #62**, labelled `needs-strong-review`, two
+  independent reviewers both ACCEPT (one correction round fixed a reserved-cursor
+  leak on `start()` and made the two-Undo and reconciliation tests
+  reserve-sensitive, plus two doc test counts).
+- **Next up:** the owner reviews and merges PR #61 and PR #62, then V1-04 (#26,
+  the neutral direct-move decision dock) starts. #55 (PR #59) and #58 (PR #60)
+  are already merged, so V1-03a (both named traversals) and V1-03d (AX5 starting
+  point) are done. The V1-02 milestone report was posted as issue #54.
+
+### Note: the replacement confirmation
+
+The gate lives in `AppModel.requestSession`: when `hasUnfinishedSession` is
+false the start runs immediately, otherwise the request is parked as a
+`PendingReplacement` and the overlay explains that position and Undo history are
+replaced while marked items stay in Review. `startFrom` still refuses a marked
+item before any of this, so tapping a marked cell cannot become a replacement
+request. The confirmation is a purpose-built card (not a system alert) so the
+explanation and both actions stay legible in light and dark and at large text
+sizes; the light/dark captures go through the existing `-uiTestingForceLight` /
+`-uiTestingForceDark` seam.
 
 ### Note: the AX5 skip belongs to #32
 
@@ -69,7 +92,8 @@ ticket replaces it with the System / Light / Dark setting.
 ## Open PRs
 
 - **#61** (#56) and **#62** (#57): open, `needs-strong-review`, awaiting the
-  owner's Codex review; both have two ACCEPT reviews.
+  owner's Codex review; both have two ACCEPT reviews. #56's branch was merged up
+  to the latest `main` (docs-only conflict).
 - **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -77,7 +101,8 @@ ticket replaces it with the System / Light / Dark setting.
 ## Recently merged
 
 - **#60 — Implement #58: make the starting point reachable at the largest text
-  size** (merged as commit `25e6418`), which closed **#58**.
+  size** ("Fix AX5 starting-point reachability", merged as commit `25e6418`),
+  which closed **#58**.
 - **#59 — Implement #55: offer both named traversals and finish without
   wrapping** (merged as commit `ddaba0f`), which closed **#55**.
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**

@@ -360,13 +360,181 @@ final class AppModelTests: XCTestCase {
         await model.settle()
         XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
 
-        // Switching to Tumbler replaces the session but never the marks.
+        // Switching to Tumbler replaces the session but never the marks. It is a
+        // replacement, so it asks first; asking must change nothing.
         model.startTumbler()
         await model.settle()
+        XCTAssertNotNil(model.pendingReplacement, "switching modes while a session exists must ask first")
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 }, "asking changes nothing")
 
+        model.confirmReplacement()
+        await model.settle()
+
+        XCTAssertNil(model.pendingReplacement)
         XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
         XCTAssertEqual(store.state?.marks, [marked].compactMap { $0 })
         XCTAssertNotEqual(model.currentAsset?.id, marked, "a marked photo is skipped while sorting")
+    }
+
+    // MARK: - Replacement confirmation (#56)
+
+    /// Requesting a start while a session waits asks first and touches nothing;
+    /// **Keep current** leaves the saved session and Undo exactly as they were.
+    func testKeepCurrentLeavesTheUnfinishedSessionUntouched() async {
+        let (model, library, store) = await bootstrapped()
+        model.startNewest()
+        await model.settle()
+        model.apply(.queueDeletion)
+        await model.settle()
+        model.apply(.keep)
+        await model.settle()
+
+        let engineBefore = model.engine
+        let resumableBefore = model.resumableSession
+        let savedBefore = store.state
+        let savesBefore = store.savedStates.count
+
+        model.startTumbler()
+        await model.settle()
+
+        XCTAssertNotNil(model.pendingReplacement, "a replacement start must ask before it discards work")
+        XCTAssertEqual(model.engine, engineBefore, "asking replaces nothing")
+        XCTAssertEqual(model.resumableSession, resumableBefore)
+        XCTAssertEqual(store.state, savedBefore)
+        XCTAssertEqual(store.savedStates.count, savesBefore, "asking writes nothing")
+
+        model.keepCurrentSession()
+        await model.settle()
+
+        XCTAssertNil(model.pendingReplacement)
+        XCTAssertEqual(model.engine, engineBefore, "Keep current must leave the session byte-for-byte unchanged")
+        XCTAssertEqual(model.resumableSession, resumableBefore)
+        XCTAssertEqual(model.currentAsset?.id, engineBefore?.current?.id)
+        XCTAssertEqual(store.state, savedBefore)
+        XCTAssertEqual(store.savedStates.count, savesBefore)
+
+        // And nothing was deleted while the confirmation was on screen.
+        let allIDs = FakePhotoLibrary.demoDescriptors(count: 8).map(\.id)
+        let stillThere = await library.existingAssetIDs(among: allIDs)
+        XCTAssertEqual(stillThere, Set(allIDs), "the confirmation deletes nothing")
+    }
+
+    /// **Start new** replaces the position and session Undo, never the durable
+    /// deletion list: every mark stays marked and the new traversal skips it.
+    func testStartNewReplacesPositionAndUndoButKeepsEveryMark() async {
+        let (model, library, store) = await bootstrapped()
+        model.startNewest()
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+        model.apply(.keep)
+        await model.settle()
+        XCTAssertTrue(model.engine?.undoStack.canUndo ?? false, "the old session has Undo history")
+
+        model.startTumbler()
+        await model.settle()
+        XCTAssertNotNil(model.pendingReplacement)
+
+        model.confirmReplacement()
+        await model.settle()
+
+        XCTAssertNil(model.pendingReplacement)
+        XCTAssertEqual(model.engine?.mode, .tumbler)
+        XCTAssertFalse(model.engine?.undoStack.canUndo ?? true, "session Undo is replaced")
+        XCTAssertTrue(model.engine?.decidedIDs.isEmpty ?? false, "traversal is reset")
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 }, "the deletion list is untouched")
+        XCTAssertEqual(store.state?.marks, [marked].compactMap { $0 })
+        XCTAssertNotEqual(model.currentAsset?.id, marked, "a marked photo stays skipped")
+
+        // A replacement deletes nothing; only an explicit review commit can.
+        let allIDs = FakePhotoLibrary.demoDescriptors(count: 8).map(\.id)
+        let stillThere = await library.existingAssetIDs(among: allIDs)
+        XCTAssertEqual(stillThere, Set(allIDs), "replacing a session deletes nothing")
+    }
+
+    /// A replacement can also start at one specific item; it asks first and,
+    /// once confirmed, keeps the deletion list while moving the position.
+    func testStartingAtASpecificItemAsksBeforeReplacingTheSession() async {
+        let (model, _, store) = await bootstrapped()
+        model.startNewest()
+        await model.settle()
+        model.apply(.keep)
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+        let positionBeforeRequest = model.currentAsset?.id
+        let target = "fake-0"
+
+        model.startFrom(assetID: target)
+        await model.settle()
+
+        XCTAssertNotNil(model.pendingReplacement, "starting at a specific item is a replacement too")
+        XCTAssertEqual(model.currentAsset?.id, positionBeforeRequest, "requesting moves nothing")
+        XCTAssertNotEqual(positionBeforeRequest, marked)
+
+        model.confirmReplacement()
+        await model.settle()
+
+        XCTAssertEqual(model.currentAsset?.id, target)
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
+        XCTAssertEqual(store.state?.marks, [marked].compactMap { $0 })
+    }
+
+    /// With no unfinished session there is nothing to replace, so the first start
+    /// must happen without a confirmation.
+    func testNoConfirmationWithoutAnUnfinishedSession() async {
+        let (model, _, _) = await bootstrapped()
+        XCTAssertFalse(model.hasUnfinishedSession)
+
+        model.startNewest()
+        await model.settle()
+
+        XCTAssertNil(model.pendingReplacement, "a first start has nothing to replace")
+        XCTAssertEqual(model.route, .viewer)
+    }
+
+    /// Every kind of replacement start — Newest, Oldest, Random and a specific
+    /// item — asks before it discards the unfinished session.
+    func testEveryReplacementEntryPointAsksFirst() async {
+        func assertAsks(_ start: (AppModel) -> Void) async {
+            let (model, _, _) = await bootstrapped()
+            model.startNewest()
+            await model.settle()
+            XCTAssertNil(model.pendingReplacement, "the first start has nothing to replace")
+
+            start(model)
+            await model.settle()
+            XCTAssertNotNil(model.pendingReplacement, "this start must ask before it replaces")
+
+            model.keepCurrentSession()
+            await model.settle()
+            XCTAssertNil(model.pendingReplacement)
+        }
+
+        await assertAsks { $0.startNewest() }
+        await assertAsks { $0.startOldest() }
+        await assertAsks { $0.startTumbler() }
+        await assertAsks { $0.startFrom(assetID: "fake-0") }
+    }
+
+    /// A marked item cannot start a session at all, so it is refused rather than
+    /// becoming a replacement request.
+    func testStartingAtAMarkedItemIsRefusedWithoutAConfirmation() async {
+        let (model, _, _) = await bootstrapped()
+        model.startNewest()
+        await model.settle()
+        let marked = model.currentAsset?.id
+        model.apply(.queueDeletion)
+        await model.settle()
+
+        model.startFrom(assetID: marked ?? "")
+        await model.settle()
+
+        XCTAssertNil(model.pendingReplacement, "a marked item cannot start a session, so there is nothing to confirm")
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertEqual(model.markedIDs, [marked].compactMap { $0 })
     }
 
     func testMarkedPhotosAreSkippedAfterRestart() async {
@@ -709,8 +877,12 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4", "fake-2"])
         XCTAssertEqual(model.currentAsset?.id, "fake-1")
 
-        // 4. Switching mode resets traversal and Undo, never the marks.
+        // 4. Switching mode resets traversal and Undo, never the marks. It is a
+        //    replacement, so it is confirmed first.
         model.startTumbler()
+        await model.settle()
+        XCTAssertNotNil(model.pendingReplacement)
+        model.confirmReplacement()
         await model.settle()
         XCTAssertEqual(model.markedIDs, ["fake-0", "fake-4", "fake-2"])
         XCTAssertTrue(model.engine?.decidedIDs.isEmpty ?? false)

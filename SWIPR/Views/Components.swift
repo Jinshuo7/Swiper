@@ -122,6 +122,82 @@ struct WellBackground: View {
     }
 }
 
+/// The confirmation between the user and discarding an unfinished session.
+///
+/// It states the one consequence that matters — the current position and Undo
+/// history are replaced while marked items stay in Review — and offers the two
+/// ways out. It is a plain card rather than a system alert so the explanation and
+/// both actions stay legible at every text size and in both appearances.
+struct ReplacementConfirmationView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let onKeepCurrent: () -> Void
+    let onStartNew: () -> Void
+
+    private var palette: PorcelainPalette { .forScheme(colorScheme) }
+
+    var body: some View {
+        ZStack {
+            // Tapping the dimmed backdrop is the safe choice: it keeps the
+            // session rather than replacing it.
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onKeepCurrent)
+
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(palette.accent)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Start a new session?")
+                            .font(.headline)
+                            .foregroundStyle(palette.foreground)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Starting a new session replaces your current position and Undo history. Photos you marked for deletion stay in Review.")
+                            .font(.footnote)
+                            .foregroundStyle(palette.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                VStack(spacing: 10) {
+                    Button("Keep current", action: onKeepCurrent)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(palette.elevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .foregroundStyle(palette.foreground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(palette.border, lineWidth: 1)
+                        )
+                        .accessibilityIdentifier("replaceSession.keep")
+
+                    Button("Start new", action: onStartNew)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(palette.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .foregroundStyle(palette.onAccent)
+                        .accessibilityIdentifier("replaceSession.startNew")
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 420)
+            .background(palette.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(palette.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
+            .padding(24)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("replaceSession.confirmation")
+    }
+}
+
 /// A card that tells the user, in plain words, that something they did was not
 /// saved — and gives them the one action that can fix it. Never used to imply
 /// that unsaved work was accepted.

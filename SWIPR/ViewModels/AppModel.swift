@@ -38,6 +38,15 @@ final class AppModel: ObservableObject {
         var message: String
     }
 
+    /// A start request that would discard an unfinished session. It is held until
+    /// the user chooses **Start new**; choosing **Keep current** drops it without
+    /// touching any saved work.
+    struct PendingReplacement: Equatable {
+        var mode: SessionMode
+        var cursorID: String?
+        var direction: TraversalDirection?
+    }
+
     @Published var route: Route = .loading
     @Published private(set) var authorization: LibraryAuthorization = .notDetermined
     @Published private(set) var order: LibraryOrder = .empty
@@ -45,6 +54,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var preferences: ControlPreferences
     @Published private(set) var statistics: SessionStatistics
     @Published private(set) var resumableSession: PersistedSession?
+    /// The start request waiting for the replace-session confirmation, or `nil`
+    /// when no unfinished session would be discarded.
+    @Published private(set) var pendingReplacement: PendingReplacement?
     /// The media categories chosen for the next session. Editing starts from a
     /// Home preset, so a previous session's exclusions are never silently
     /// reused; Continue sorting restores its own saved filters instead.
@@ -116,6 +128,11 @@ final class AppModel: ObservableObject {
     /// Decision input is refused while a save is in flight or a failed save is
     /// waiting to be retried.
     var isDecisionInputBlocked: Bool { isDecisionInFlight || pendingDecision != nil }
+
+    /// Whether a saved session is waiting to be continued. Starting a new one now
+    /// would replace its position and session Undo, so it is gated behind an
+    /// explicit confirmation instead of happening silently.
+    var hasUnfinishedSession: Bool { resumableSession != nil }
 
     // MARK: - Serialisation
 
@@ -311,26 +328,64 @@ final class AppModel: ObservableObject {
     /// never taken from the preference, so the button always does what its
     /// label says.
     func startNewest() {
-        enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .older) }
+        requestSession(mode: .sequential, cursorID: nil, direction: .older)
     }
 
     /// Starts at the oldest asset and walks newer, mirroring ``startNewest()``.
     func startOldest() {
-        enqueue { await self.startSession(mode: .sequential, cursorID: nil, direction: .newer) }
+        requestSession(mode: .sequential, cursorID: nil, direction: .newer)
     }
 
     func startTumbler() {
-        enqueue { await self.startSession(mode: .tumbler, cursorID: nil) }
+        requestSession(mode: .tumbler, cursorID: nil)
     }
 
     func startFrom(assetID: String) {
-        enqueue {
-            guard !self.marks.contains(assetID) else {
-                self.errorMessage = "That photo is marked for deletion, so it is skipped while sorting. Open Review to restore it."
-                return
-            }
-            await self.startSession(mode: .sequential, cursorID: assetID)
+        // A marked photo is waiting in Review, not for a decision, so it never
+        // starts a session and never reaches the replacement confirmation.
+        guard !marks.contains(assetID) else {
+            errorMessage = "That photo is marked for deletion, so it is skipped while sorting. Open Review to restore it."
+            return
         }
+        requestSession(mode: .sequential, cursorID: assetID)
+    }
+
+    /// Routes a start through the replacement confirmation when an unfinished
+    /// session would be discarded, and starts immediately when there is none.
+    ///
+    /// Requesting writes nothing: the saved session is only replaced once the
+    /// user chooses **Start new**, so **Keep current** leaves it untouched.
+    private func requestSession(
+        mode: SessionMode,
+        cursorID: String?,
+        direction: TraversalDirection? = nil
+    ) {
+        guard hasUnfinishedSession else {
+            enqueue { await self.startSession(mode: mode, cursorID: cursorID, direction: direction) }
+            return
+        }
+        pendingReplacement = PendingReplacement(mode: mode, cursorID: cursorID, direction: direction)
+    }
+
+    /// Confirms the waiting replacement. The position and session Undo are
+    /// replaced while the durable deletion list is untouched, so marked items
+    /// stay marked and are skipped by the new traversal.
+    func confirmReplacement() {
+        guard let request = pendingReplacement else { return }
+        pendingReplacement = nil
+        enqueue {
+            await self.startSession(
+                mode: request.mode,
+                cursorID: request.cursorID,
+                direction: request.direction
+            )
+        }
+    }
+
+    /// Keeps the unfinished session exactly as it was and dismisses the
+    /// confirmation. Nothing changed while the confirmation was visible.
+    func keepCurrentSession() {
+        pendingReplacement = nil
     }
 
     /// Opens the editable filters for one Home media choice. The preset is
