@@ -1,0 +1,11 @@
+SWIPR/PhotoLibrary/PhotoKitLibrary.swift       # photo deletion: the only real PhotoKit delete and its confirmed-result read-back
+SWIPR/PhotoLibrary/FakePhotoLibrary.swift      # photo deletion: the fake-library delete every safety test runs against
+SWIPRKit/PhotoLibraryProviding.swift           # photo deletion: the library protocol, including deleteAssets/existingAssetIDs
+SWIPR/Views/DeletionReviewView.swift           # the deletion list: the review screen's Restore and final Delete actions
+SWIPRKit/DeletionQueue.swift                   # the deletion list: the durable list that outlives sorting sessions
+SWIPRKit/SessionEngine.swift                   # the deletion list and saved sessions: decisions, the marks queue, commitDeletion
+SWIPRKit/SessionPersistence.swift              # saved sessions/progress and data migration: PersistedSession/PersistedState, schema version, stores
+SWIPR/ViewModels/AppModel.swift                # saved sessions/progress and photo deletion: save-before-acknowledge, resume, commit, reconciliation, recovery
+SWIPR/App/SWIPRApp.swift                       # saved sessions/progress: which session store the app opens at launch
+SWIPRKit/AssetReconciler.swift                 # reconciliation: drops vanished marks and session members against the live library
+SWIPRKit/SessionStatistics.swift               # photo deletion: lifetime counts that must reflect only confirmed deletions

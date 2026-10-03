@@ -90,6 +90,9 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
   `FakePhotoLibrary`.
 - Do not add private APIs or Key-Value Coding file-size tricks. Storage is an
   estimate; see `SWIPRKit/StorageEstimate.swift` and `docs/adr/0002`.
+- Agents must never add the `strong-review-passed` label or remove the
+  `needs-strong-review` label; only the owner does. The `strong-review` workflow
+  flags any PR that touches a path in `.github/risky-paths.txt`.
 
 ## Localisation
 

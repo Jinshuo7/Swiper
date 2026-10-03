@@ -99,6 +99,10 @@ DeepSeek must add fake-library tests proving that nothing is deleted without the
 step and that saved progress survives. Codex does one extra review focused only on that risky
 part. List it under "Risky changes" in the next milestone report.
 
+Agents must never add the `strong-review-passed` label or remove the `needs-strong-review`
+label; only the owner does. The `strong-review` workflow labels any PR that touches a path in
+`.github/risky-paths.txt` and fails until the owner adds `strong-review-passed`.
+
 ### Decisions the docs don't settle
 File a `needs-owner` issue with one plain question, your recommended answer, and screenshots if
 visual. Skip to work that doesn't depend on it. If everything left depends on parked questions,
