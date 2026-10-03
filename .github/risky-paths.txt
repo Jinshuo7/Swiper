@@ -9,3 +9,13 @@ SWIPR/ViewModels/AppModel.swift                # saved sessions/progress and pho
 SWIPR/App/SWIPRApp.swift                       # saved sessions/progress: which session store the app opens at launch
 SWIPRKit/AssetReconciler.swift                 # reconciliation: drops vanished marks and session members against the live library
 SWIPRKit/SessionStatistics.swift               # photo deletion: lifetime counts that must reflect only confirmed deletions
+SWIPRKit/UndoStack.swift                       # the deletion list and saved sessions: session Undo, which can unmark a just-decided item
+SWIPRKit/TumblerPlan.swift                     # saved sessions/progress: the persisted repeat-free Random order
+SWIPRKit/LibraryOrder.swift                    # saved sessions/progress: the fixed traversal order the session pool is built from
+SWIPRKit/Models.swift                          # saved sessions/progress and data migration: the shared model and decision types persisted in state
+SWIPR/Views/ViewerView.swift                   # photo deletion: the viewer where swipe / Delete / Keep / Undo decisions are made
+SWIPR/Views/RootView.swift                     # saved sessions: routing, including whether the replacement confirmation is shown
+SWIPR/Views/EntryView.swift                    # saved sessions: Home's Continue sorting and Review marked items entries
+SWIPR/Views/ChoosePhotoView.swift              # saved sessions: the starting point and the replacement confirmation overlay
+SWIPR/Views/Components.swift                   # saved sessions: shared views, including the replacement confirmation card
+SWIPR/Views/SettingsView.swift                 # photo deletion and saved sessions: confirmed-deletion statistics and the Undo / preference settings

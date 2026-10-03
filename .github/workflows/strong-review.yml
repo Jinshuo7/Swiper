@@ -3,6 +3,10 @@ name: Strong review
 # Runs on every pull_request event, never pull_request_target, so it has no
 # access to repository secrets. The only write scope it takes is the one it
 # needs: labelling the pull request.
+#
+# A same-repo PR runs its own modified copy of this workflow, so any PR that
+# changes this file or .github/risky-paths.txt must say so at the top of its PR
+# description, and agents must never weaken the gate.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -33,7 +37,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > changed-files.txt
+          # --no-renames so both the old and the new path of a rename are checked.
+          git diff --name-only --no-renames "${BASE_SHA}...${HEAD_SHA}" > changed-files.txt
           echo "Changed files:"
           cat changed-files.txt
 

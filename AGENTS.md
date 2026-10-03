@@ -93,6 +93,9 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
 - Agents must never add the `strong-review-passed` label or remove the
   `needs-strong-review` label; only the owner does. The `strong-review` workflow
   flags any PR that touches a path in `.github/risky-paths.txt`.
+- Agents must never weaken `.github/workflows/strong-review.yml`. Any PR that
+  changes that file or `.github/risky-paths.txt` must say so at the top of its
+  pull-request description.
 
 ## Localisation
 

@@ -103,6 +103,10 @@ Agents must never add the `strong-review-passed` label or remove the `needs-stro
 label; only the owner does. The `strong-review` workflow labels any PR that touches a path in
 `.github/risky-paths.txt` and fails until the owner adds `strong-review-passed`.
 
+Agents must never weaken the gate. Any PR that changes `.github/workflows/strong-review.yml` or
+`.github/risky-paths.txt` must say so at the top of its PR description, because a same-repo PR
+runs its own modified copy of that workflow.
+
 ### Decisions the docs don't settle
 File a `needs-owner` issue with one plain question, your recommended answer, and screenshots if
 visual. Skip to work that doesn't depend on it. If everything left depends on parked questions,
