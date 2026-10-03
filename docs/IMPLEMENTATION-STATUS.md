@@ -77,6 +77,24 @@
 > `docs/screenshots/milestones/v1-03-starting-point/choose-photo-ax5.png` shows
 > the explanation and both traversal actions whole at AX5.
 >
+> **#56 update (2026-10-03):** starting a replacement session while an
+> unfinished one exists now asks first. `AppModel.requestSession` parks a
+> `PendingReplacement` when `resumableSession != nil`, and `ChoosePhotoView`
+> shows the new `ReplacementConfirmationView`, which explains that position and
+> Undo history are replaced while marked items stay in Review. **Keep current**
+> clears the request without writing anything; **Start new** runs the original
+> start, which reads — never clears — the durable deletion list, so marks
+> survive and the new traversal skips them. `startFrom` still refuses a marked
+> item before the confirmation, and a first start (no unfinished session) still
+> happens immediately with no confirmation. Focused `SWIPRAppTests` cover Keep
+> current (engine, session and store byte-for-byte unchanged), Start new
+> (position and Undo replaced, marks and library intact) and the no-session
+> case; a focused UI test walks both branches, and
+> `docs/screenshots/milestones/v1-03-starting-point/replace-session-light.png` /
+> `replace-session-dark.png` show the confirmation. The full simulator suite is
+> green (179 kit + 46 app + 64 UI, 0 failures) with the existing AX5 skip in
+> place.
+>
 > **#57 update (2026-10-03):** Random (the Tumbler) is now proved and hardened.
 > `TumblerPlan` gained `reserve(_:)`, and `SessionEngine` uses it whenever the
 > cursor is placed outside the plan's own `next()` — restoring a session, a
@@ -104,8 +122,9 @@
 | [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
 | [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | Yes (#53) |
 | [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
-| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | No (branch ready; PR pending driver) |
-| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (branch ready; PR pending driver) |
+| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
+| [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
+| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
 
 ---
 
