@@ -325,6 +325,22 @@ final class SessionPersistenceTests: XCTestCase {
         try assertDamagedFileIsKept(#"{"queueIDs":[]}"#)
     }
 
+    func testEmptyCurrentAssetIDWithNothingElseToRestoreIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":"","queueIDs":[]}"#)
+    }
+
+    func testWhitespaceCurrentAssetIDWithNothingElseToRestoreIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":"   ","queueIDs":[]}"#)
+    }
+
+    func testEmptyIdentifierInLegacyQueueIDsIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":[""]}"#)
+    }
+
+    func testWhitespaceIdentifierInALegacyIDArrayIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"decidedIDs":["  "],"keptIDs":["a"]}"#)
+    }
+
     func testLegacyFileMigratesKeepsMarksAndLeavesABackup() async throws {
         let directory = makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -347,6 +363,69 @@ final class SessionPersistenceTests: XCTestCase {
         let name = try XCTUnwrap(backups.first, "a pre-migration backup must be left next to the file")
         let backup = try Data(contentsOf: directory.appendingPathComponent(name))
         XCTAssertEqual(backup, original, "the backup must hold the original legacy bytes")
+    }
+
+    /// A real legacy file must still migrate, keep every kind of progress, write
+    /// only after the upgrade succeeds, and leave a backup of the original bytes.
+    private func assertLegacyFileMigratesAndLeavesABackup(
+        _ json: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        assertProgress: (PersistedState) -> Void = { _ in }
+    ) async throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try writeSessionFile(json, in: directory)
+        let original = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+        let result = store.loadState()
+        guard case .migrated(let state) = result else {
+            return XCTFail("expected a migration, got \(result)", file: file, line: line)
+        }
+        assertProgress(state)
+
+        try await store.saveState(state)
+        XCTAssertEqual(
+            FileSessionStore(directory: directory).loadState(),
+            .loaded(state),
+            file: file,
+            line: line
+        )
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        let name = try XCTUnwrap(
+            backups.first,
+            "a pre-migration backup must be left next to the file",
+            file: file,
+            line: line
+        )
+        let backup = try Data(contentsOf: directory.appendingPathComponent(name))
+        XCTAssertEqual(
+            backup,
+            original,
+            "the backup must hold the original legacy bytes",
+            file: file,
+            line: line
+        )
+    }
+
+    func testLegacyFileWithOnlyKeptIDsMigratesAndLeavesABackup() async throws {
+        try await assertLegacyFileMigratesAndLeavesABackup(#"{"keptIDs":["a"]}"#) { state in
+            XCTAssertEqual(state.session?.keptIDs, ["a"], "non-empty keptIDs count as real progress")
+        }
+    }
+
+    func testLegacyFileWithOnlyAPendingTumblerPlanMigratesAndLeavesABackup() async throws {
+        let legacy = #"{"tumbler":{"seed":7,"remaining":["a","b"],"handled":[]}}"#
+        try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
+            XCTAssertEqual(
+                state.session?.tumbler?.remaining,
+                ["a", "b"],
+                "a pending Tumbler plan with assets left counts as real progress"
+            )
+        }
     }
 
     func testWritesAreRefusedWhileUnreadableDataIsInTheWay() async throws {

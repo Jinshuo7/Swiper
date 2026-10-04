@@ -341,8 +341,12 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         var isFinished: Bool?
 
         func migrated(updatedAt now: Date) -> PersistedState {
+            // An empty or whitespace-only cursor is not a position: treat it as
+            // absent so a file with no other progress is reported as having
+            // nothing to restore rather than resuming an empty identifier.
+            let current = currentAssetID.flatMap { $0.isBlankIdentifier ? nil : $0 }
             let session = PersistedSession(
-                currentAssetID: currentAssetID,
+                currentAssetID: current,
                 currentAssetDate: currentAssetDate,
                 direction: direction ?? .older,
                 mode: mode ?? .sequential,
@@ -422,7 +426,7 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
     }
 
     private static let legacyOnlyKeys: Set<String> = [
-        "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries"
+        "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries", "tumbler"
     ]
 
     /// The top-level JSON object, or `nil` when the data is not a JSON object.
@@ -434,8 +438,11 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
 
     /// True when the object is the old unversioned shape: at least one
     /// legacy-only key is present, and every legacy-only key it does have holds
-    /// a non-null value of the expected type. A present-but-null or wrong-typed
-    /// legacy key means the file is damaged, not legacy.
+    /// a non-null value of the expected type. A present-but-null, wrong-typed or
+    /// blank-identifier value means the file is damaged, not legacy. (An empty
+    /// `currentAssetID` is the one exception: it is a valid string that counts
+    /// as an absent cursor, so the shape stays legacy and the progress check
+    /// below decides.)
     private static func isValidLegacyShape(_ object: [String: Any]) -> Bool {
         var sawLegacyKey = false
         for key in legacyOnlyKeys {
@@ -444,13 +451,19 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
             if value is NSNull { return false }
             switch key {
             case "queueIDs", "decidedIDs", "keptIDs":
-                guard let array = value as? [Any], array.allSatisfy({ $0 is String }) else {
+                guard let array = value as? [Any],
+                      array.allSatisfy({ element in
+                          guard let id = element as? String else { return false }
+                          return !id.isBlankIdentifier
+                      }) else {
                     return false
                 }
             case "currentAssetID":
                 guard value is String else { return false }
             case "undoEntries":
                 guard value is [Any] else { return false }
+            case "tumbler":
+                guard value is [String: Any] else { return false }
             default:
                 return false
             }
@@ -458,14 +471,22 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         return sawLegacyKey
     }
 
-    /// Whether a migrated legacy state carries any work worth keeping: marks, a
-    /// current asset, decided IDs or undo entries.
+    /// Whether a migrated legacy state carries any work worth keeping: a mark,
+    /// a current asset, decided or kept IDs, undo entries, or a pending Tumbler
+    /// plan with assets left. Only a valid non-empty identifier counts, so a
+    /// file that is all empty arrays and blank IDs is damaged, not progress.
     private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
-        if !state.marks.isEmpty { return true }
+        if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
         guard let session = state.session else { return false }
-        return session.currentAssetID != nil
-            || !session.decidedIDs.isEmpty
-            || !session.undoEntries.isEmpty
+        if let current = session.currentAssetID, !current.isBlankIdentifier { return true }
+        if session.decidedIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
+        if session.keptIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
+        if session.undoEntries.contains(where: { !$0.assetID.isBlankIdentifier }) { return true }
+        if let tumbler = session.tumbler,
+           tumbler.remaining.contains(where: { !$0.isBlankIdentifier }) {
+            return true
+        }
+        return false
     }
 
     /// Copies the original file next to itself before a migration overwrites it,
@@ -493,6 +514,13 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         var migrated = state
         migrated.schemaVersion = PersistedState.currentSchemaVersion
         return migrated
+    }
+}
+
+private extension String {
+    /// An identifier that carries no information: empty or only whitespace.
+    var isBlankIdentifier: Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
