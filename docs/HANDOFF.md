@@ -85,12 +85,13 @@
    dock)**, split into subtickets.
 4. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
-### Note: the AX5 skip belongs to #32 / #69
+### Note: the AX5 skip is gone (#69)
 
 The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
-#58 fixed the scroll; ticket **#69** removes the line, in PR **#72** (risky
-because it edits `.github/workflows/ci.yml`).
+#58 fixed the scroll and **#69** removed the line in **PR #72** (risky because
+it edits `.github/workflows/ci.yml`, so it waits for the owner's approval). The
+AX5 case now runs on every PR.
 
 ### Note: the two named traversals never wrap
 
