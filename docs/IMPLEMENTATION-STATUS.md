@@ -20,10 +20,11 @@
 >
 > **Known status for the v1 baseline:** the former
 > largest-accessibility-text ("AX5") reachability failure was fixed by #58, and
-> #69 removed its CI skip in PR #72. On that PR's commit the simulator suite ran
-> every UI test, including the AX5 case, with 0 failures (`** TEST SUCCEEDED **`).
-> No known crash, data-loss, deletion-safety or accessibility block remains in
-> the tested baseline.
+> #69 removed its CI skip in PR #72; on that PR's commit the simulator suite ran
+> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). One
+> saved-progress fix is still open and unmerged: PR #66 keeps a damaged save file
+> from being replaced with empty progress. Do not clear the saved-data gate until
+> #66 merges.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -126,7 +127,7 @@
 | [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
 | [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
-| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 1 | 1 | — | Yes — round-1 Codex review asked to refresh `docs/HANDOFF.md` and add this ticket row; both are in PR #72 | No (PR #72 open; needs-strong-review) |
+| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | No (PR #72 open; needs-strong-review) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | No (PR #66 open; needs-strong-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.

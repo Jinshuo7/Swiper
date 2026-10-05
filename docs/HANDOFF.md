@@ -77,13 +77,13 @@
 
 ## What is next
 
-1. Finish the owner's decisions on the risky PRs: **#66** (conditional
-   approval round found problems, now fixed on `8d965fb`) and **#72** (AX5
-   re-enable; needs approval because it edits a workflow).
-2. Land **#68** (this handoff), then implement **#70** (Limited Photos marks).
-3. Start the next milestone, **V1-04 (#26 — the neutral direct-move decision
-   dock)**, split into subtickets.
-4. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. Finish the owner's decisions on the risky PRs: **#66** (the final Codex
+   round found problems, fixed on `8d965fb`; awaiting a fresh owner approval)
+   and **#72** (AX5 re-enable; needs approval because it edits a workflow).
+2. Implement **#70** (Limited Photos marks), then start the next milestone,
+   **V1-04 (#26 — the neutral direct-move decision dock)**, split into
+   subtickets.
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the AX5 skip is gone (#69)
 
