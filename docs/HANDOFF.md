@@ -66,14 +66,14 @@
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
   (merge commit `907f12a`), which closed **#46**.
 
-## Queue (owner-requested, created 2026-10-05)
+## Queue (owner-requested, 2026-10-05)
 
-- **#68 — Ops: Sync docs/HANDOFF.md to the current state** (`ready-for-agent`).
-- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test**
-  (`ready-for-agent`); removes the `-skip-testing` line in
-  `.github/workflows/ci.yml`.
+- **#68 — Ops: Sync docs/HANDOFF.md to the current state** — done (PR #71,
+  merged as `67967ad`).
+- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done in
+  **PR #72**, which waits for the owner because it edits a workflow.
 - **#70 — V1-06a: Keep marked photos through Limited Photos access**
-  (`ready-for-agent`).
+  (`ready-for-agent`). Not started yet.
 
 ## What is next
 

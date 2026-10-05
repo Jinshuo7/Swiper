@@ -18,11 +18,12 @@
 > substance is preserved by v1; its mutable product surface (single-entry flow,
 > grip cluster, photo-only scope) is superseded.
 >
-> **Known status for the v1 baseline:** the existing test baseline is not yet
-> all-green — the largest-accessibility-text ("AX5") reachability failure is
-> outstanding and is release-blocking (no known crash, data-loss,
-> deletion-safety or accessibility block may ship). Do not claim a green suite
-> until that is fixed and re-run on a named commit.
+> **Known status for the v1 baseline:** the former
+> largest-accessibility-text ("AX5") reachability failure was fixed by #58, and
+> #69 removed its CI skip in PR #72. On that PR's commit the simulator suite ran
+> every UI test, including the AX5 case, with 0 failures (`** TEST SUCCEEDED **`).
+> No known crash, data-loss, deletion-safety or accessibility block remains in
+> the tested baseline.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
