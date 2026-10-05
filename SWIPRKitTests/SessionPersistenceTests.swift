@@ -440,9 +440,14 @@ final class SessionPersistenceTests: XCTestCase {
         let legacy = #"{"tumbler":{"seed":7,"remaining":["a","b"],"handled":[]}}"#
         try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
             XCTAssertEqual(
+                state.session?.currentAssetID,
+                "b",
+                "a plan-only save seeds the cursor from the plan's own next identifier"
+            )
+            XCTAssertEqual(
                 state.session?.tumbler?.remaining,
-                ["a", "b"],
-                "a pending Tumbler plan with assets left counts as real progress"
+                ["a"],
+                "the rest of the pending random order is preserved"
             )
             XCTAssertEqual(
                 state.session?.mode,
@@ -450,6 +455,37 @@ final class SessionPersistenceTests: XCTestCase {
                 "a persisted Tumbler plan means a Random session, so the plan is not ignored"
             )
         }
+    }
+
+    /// The plan-only cursor must survive reconciliation. Without it, the
+    /// reconciler would pick the newest photo chronologically and the engine
+    /// would reserve that instead of the plan's next, reordering the walk.
+    func testPlanOnlyTumblerMigrationKeepsThePlanOrderThroughReconciliation() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // `next()` pops the last entry, so "a" is the plan's intended first
+        // photo; chronological reconciliation would choose the newest, "e".
+        let legacy = #"{"tumbler":{"seed":7,"remaining":["e","a"],"handled":[]}}"#
+        _ = try writeSessionFile(legacy, in: directory)
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let migrated) = store.loadState() else {
+            return XCTFail("expected a migration, got \(store.loadState())")
+        }
+        XCTAssertEqual(migrated.session?.currentAssetID, "a", "the cursor comes from the plan, not the clock")
+
+        let order = TestLibrary.order()
+        let reconciled = AssetReconciler.reconcile(migrated, order: order)
+        XCTAssertEqual(
+            reconciled.state.session?.currentAssetID,
+            "a",
+            "reconciliation must keep the plan's cursor, not pick the newest asset"
+        )
+        XCTAssertEqual(reconciled.state.session?.tumbler?.remaining, ["e"])
+
+        let engine = SessionEngine.restored(from: try XCTUnwrap(reconciled.state.session), order: order)
+        XCTAssertEqual(engine.current?.id, "a")
+        XCTAssertEqual(engine.tumbler?.remaining, ["e"], "the rest of the random order survives")
     }
 
     /// A migration whose upgrade write keeps failing must reuse the backup it

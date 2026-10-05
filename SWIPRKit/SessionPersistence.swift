@@ -350,15 +350,24 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
             // contradicts it; otherwise the plan would be ignored and the
             // user's remaining random order silently rewritten.
             let resolvedMode: SessionMode = tumbler == nil ? (mode ?? .sequential) : .tumbler
+            // A plan-only save lost its cursor. Reconstruct it from the plan's
+            // own next identifier so reconciliation cannot fill it
+            // chronologically and silently reorder the saved random traversal.
+            var resolvedTumbler = tumbler
+            var resolvedCurrent = current
+            if resolvedCurrent == nil, var plan = resolvedTumbler {
+                resolvedCurrent = plan.next()
+                resolvedTumbler = plan
+            }
             let session = PersistedSession(
-                currentAssetID: current,
+                currentAssetID: resolvedCurrent,
                 currentAssetDate: currentAssetDate,
                 direction: direction ?? .older,
                 mode: resolvedMode,
                 decidedIDs: decidedIDs ?? [],
                 keptIDs: keptIDs ?? [],
                 undoEntries: undoEntries ?? [],
-                tumbler: tumbler,
+                tumbler: resolvedTumbler,
                 updatedAt: updatedAt ?? now,
                 isFinished: isFinished ?? false
             )
