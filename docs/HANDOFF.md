@@ -16,63 +16,81 @@
 - **Agent base repo:** `/Users/beastmini/GitHub/Jinshuo7/SWIPR-agent`; ticket
   worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
   Never touch the owner's folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`.
+- **Risky-PR review workflow:** any PR labelled `needs-strong-review` gets up to
+  3 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). Leave
+  it open for the owner; never add `strong-review-passed` and never merge it
+  unless the owner approves it by number.
 
 ## Current ticket
 
-- **Ticket:** [#57 — V1-03c: Keep Random deterministic, repeat-free and
-  reconciled](https://github.com/Jinshuo7/Swiper/issues/57) — **implemented** on
-  branch `driver/57-tumbler` by the worker. `TumblerPlan` gained `reserve(_:)`
-  and `SessionEngine` now reserves the cursor whenever it is placed outside the
-  plan's own `next()` (restore, reconciled recovery, direct jump), closing the
-  one latent repeat path. The new kit tests prove a fixed seed and pool always
-  produce the same order, the whole pool is walked without repeats (plain, after
-  Undo, after a jump, and after reconciliation), a terminated-and-relaunched
-  session resumes the exact saved order and position, and reconciliation drops
-  vanished members while crediting no deletion and touching no photo. Kit maths
-  is 188 tests with 0 failures; `SWIPRAppTests` is 42 tests with 0 failures. The
-  CI AX5 `-skip-testing` line is untouched. **PR #62 is open** and awaits the
-  owner's review (`needs-strong-review`); it has two independent ACCEPT reviews.
-- **Just merged:** [#56 — V1-03b: Replace an unfinished session only after
-  confirmation](https://github.com/Jinshuo7/Swiper/issues/56) — merged as
-  **PR #61** (merge commit `286ec04`). A start while an unfinished session
-  exists (Newest, Oldest, Random, or a specific item) no longer replaces it
-  silently: `AppModel` parks a `PendingReplacement`, `ChoosePhotoView` shows the
-  `ReplacementConfirmationView` card, and only **Start new** discards the
-  position and session Undo. **Keep current** clears the request without writing
-  anything, and the durable deletion list is only ever read, never cleared, so
-  marked items stay marked and skipped. The gate is `resumableSession != nil`,
-  matching the Home **Continue sorting** offer; a first start still happens with
-  no confirmation. The screenshots `replace-session-light.png` /
-  `replace-session-dark.png` show the confirmation in both appearances.
-- **Next up:** the owner merges PR #62, then V1-04 (#26, the neutral direct-move
-  decision dock) starts. #55 (PR #59) and #58 (PR #60) are already merged, so
-  V1-03a (both named traversals) and V1-03d (AX5 starting point) are done. The
-  V1-02 milestone report was posted as issue #54.
+- **None in progress.** The V1-03 milestone is merged (PRs #59–#62) and the
+  strong-review gate is in place (#65, docs #67). The next milestone is
+  **V1-04 (#26, the neutral direct-move decision dock)**, unblocked (#25 is
+  closed). Break it into subtickets before implementing.
 
-### Note: the replacement confirmation
+## Open PRs
 
-The gate lives in `AppModel.requestSession`: when `hasUnfinishedSession` is
-false the start runs immediately, otherwise the request is parked as a
-`PendingReplacement` and the overlay explains that position and Undo history are
-replaced while marked items stay in Review. `startFrom` still refuses a marked
-item before any of this, so tapping a marked cell cannot become a replacement
-request. The confirmation is a purpose-built card (not a system alert) so the
-explanation and both actions stay legible in light and dark and at large text
-sizes; the light/dark captures go through the existing `-uiTestingForceLight` /
-`-uiTestingForceDark` seam.
+- **#66 — fix: keep a damaged save file instead of replacing it with empty
+  progress** (`driver/damaged-save`, head `8d965fb`). Risky
+  (`SWIPRKit/SessionPersistence.swift`), `needs-strong-review`, open, **waiting
+  for the owner**. The owner gave conditional approval and asked for one final
+  `@codex review` on `8f9f608`; that round found two more problems (a mark
+  bypassed the Tumbler-mode consistency check, and blank IDs inside a Tumbler
+  plan's `remaining`/`handled` were accepted), both fixed on `8d965fb`. No
+  further review round was requested and no merge happened. **Do not add
+  `strong-review-passed` without a fresh owner approval.**
+- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)**
+  (`driver/69-ax5-reenable`). Risky because it edits
+  `.github/workflows/ci.yml` (every workflow file is risky), so the owner must
+  approve it; labelled `needs-strong-review`.
+- **#37 — Add deterministic ticket controller** (author Jinshuo7):
+  **prohibited — do not use, merge, or base work on it** (owner rule 8:
+  `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
-### Note: the AX5 skip belongs to #32
+## Recently merged
 
-The CI job still carries
+- **#67 — docs: record the risky-PR Codex review workflow and Code Review
+  Rules** (merge commit `881aff7`), which added the standing workflow to
+  `AGENTS.md` and `docs/agents/OWNER-INSTRUCTIONS.md`.
+- **#65 — ci: add the strong-review gate for risky paths** (merge commit
+  `251b6a6`), which labels risky PRs `needs-strong-review` and fails until the
+  owner adds `strong-review-passed`.
+- **#64 — docs: correct the CI runner label and note the #50 review gap**
+  (merge commit `46e593b`).
+- **#61 — Implement #56: replace an unfinished session only after
+  confirmation** (merge commit `286ec04`), which closed **#56**.
+- **#60 — Implement #58: make the starting point reachable at the largest text
+  size** (merge commit `25e6418`), which closed **#58**.
+- **#59 — Implement #55: offer both named traversals and finish without
+  wrapping** (merge commit `ddaba0f`), which closed **#55**.
+- **#52 — Implement #46: wire Home and editable filters into a fixed session**
+  (merge commit `907f12a`), which closed **#46**.
+
+## Queue (owner-requested, created 2026-10-05)
+
+- **#68 — Ops: Sync docs/HANDOFF.md to the current state** (`ready-for-agent`).
+- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test**
+  (`ready-for-agent`); removes the `-skip-testing` line in
+  `.github/workflows/ci.yml`.
+- **#70 — V1-06a: Keep marked photos through Limited Photos access**
+  (`ready-for-agent`).
+
+## What is next
+
+1. Finish the owner's decisions on the risky PRs: **#66** (conditional
+   approval round found problems, now fixed on `8d965fb`) and **#72** (AX5
+   re-enable; needs approval because it edits a workflow).
+2. Land **#68** (this handoff), then implement **#70** (Limited Photos marks).
+3. Start the next milestone, **V1-04 (#26 — the neutral direct-move decision
+   dock)**, split into subtickets.
+4. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+
+### Note: the AX5 skip belongs to #32 / #69
+
+The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
-#58 does not touch it; removing that line is ticket #32's job now that the case
-passes locally.
-
-### Note: #58 shipped the AX5 starting-point fix
-
-[#58](https://github.com/Jinshuo7/Swiper/issues/58) was merged as **PR #60**
-(commit `25e6418`). Its `assertReachable` traversal now walks the starting point
-top-down, so the AX5 case passes locally; the CI skip stays until #32.
+#58 fixed the scroll; ticket **#69** removes the line, in PR **#72** (risky
+because it edits `.github/workflows/ci.yml`).
 
 ### Note: the two named traversals never wrap
 
@@ -94,47 +112,20 @@ left untouched.
 ### Note: appearance seam for the Home and filter screens
 
 The app is still pinned to dark in `SWIPRApp.swift` (a viewer-era choice outside
-this ticket's file list). `RootView` therefore reads two UI-test launch
-arguments, `-uiTestingForceLight` / `-uiTestingForceDark`, which override the
-`colorScheme` environment for the porcelain Home and filter screens only. The
-light milestone screenshots were captured through that seam. A later appearance
-ticket replaces it with the System / Light / Dark setting.
+the V1-03 file list). `RootView` therefore reads two UI-test launch arguments,
+`-uiTestingForceLight` / `-uiTestingForceDark`, which override the `colorScheme`
+environment for the porcelain Home and filter screens only. The light milestone
+screenshots were captured through that seam. A later appearance ticket replaces
+it with the System / Light / Dark setting.
 
-## Open PRs
+### Note: the replacement confirmation
 
-- **#62** (#57): open, `needs-strong-review`, awaiting the owner's Codex review;
-  two ACCEPT reviews. The branch was merged up to the latest `main` (docs-only
-  conflicts).
-- **#37 — Add deterministic ticket controller** (open, author Jinshuo7):
-  **prohibited — do not use, merge, or base work on it** (owner rule 8:
-  `Scripts/ticket_controller.py` and PR #37 are off-limits).
-
-## Recently merged
-
-- **#61 — Implement #56: replace an unfinished session only after confirmation**
-  (merged as merge commit `286ec04`), which closed **#56**.
-- **#60 — Implement #58: make the starting point reachable at the largest text
-  size** ("Fix AX5 starting-point reachability", merged as commit `25e6418`),
-  which closed **#58**.
-- **#59 — Implement #55: offer both named traversals and finish without
-  wrapping** (merged as commit `ddaba0f`), which closed **#55**.
-- **#52 — Implement #46: wire Home and editable filters into a fixed session**
-  (merged as commit `907f12a`), which closed **#46**.
-- **#51 — Driver bootstrap** (Roles section in `OWNER-INSTRUCTIONS.md` + this
-  HANDOFF update) — merged as commit `4188fa3`.
-- **#50 — Implement #45: persist and reconcile the fixed filtered session pool**
-  (merged), which closed **#45**.
-- **#49 — Implement #44: filter a mixed-media pool with pure domain logic**
-  (merged), which closed **#44**.
-- **#48 — Implement #43: expose mixed-media metadata through public APIs**
-  (merged), which closed **#43**.
-- **#42 — Setup #41: persist owner workflow and compact project brief**
-  (merged as commit `4c775bd`), which added the guardrails and the ticket
-  accounting log.
-
-## What is next
-
-1. Owner reviews and merges **PR #62** (#57); it is `needs-strong-review`, so the
-   driver left it open.
-2. Start the next milestone, V1-04 (#26 — the neutral direct-move decision dock).
-3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+The gate lives in `AppModel.requestSession`: when `hasUnfinishedSession` is
+false the start runs immediately, otherwise the request is parked as a
+`PendingReplacement` and the overlay explains that position and Undo history are
+replaced while marked items stay in Review. `startFrom` still refuses a marked
+item before any of this, so tapping a marked cell cannot become a replacement
+request. The confirmation is a purpose-built card (not a system alert) so the
+explanation and both actions stay legible in light and dark and at large text
+sizes; the light/dark captures go through the existing `-uiTestingForceLight` /
+`-uiTestingForceDark` seam.
