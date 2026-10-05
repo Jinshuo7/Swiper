@@ -103,6 +103,29 @@ Agents must never add the `strong-review-passed` label or remove the `needs-stro
 label; only the owner does. The `strong-review` workflow labels any PR that touches a path in
 `.github/risky-paths.txt` and fails until the owner adds `strong-review-passed`.
 
+### Risky PR review rounds (Codex)
+
+This is the standing workflow for any PR labeled `needs-strong-review`.
+
+1. When its checks are green, comment exactly `@codex review` using `gh pr comment`.
+2. Wait for Codex's review to appear. Check every 5 minutes with
+   `gh pr view <n> --comments`, `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and
+   `gh api repos/Jinshuo7/Swiper/issues/<n>/comments`. Give up after 60 minutes and tell the
+   owner.
+3. If Codex reports problems, fix them in the same PR, push without force, wait for green
+   checks, and comment `@codex review` again.
+4. Stop after 3 review rounds, or as soon as Codex reports no problems. Then post the owner a
+   short summary: what changed, what Codex found, and what you fixed.
+5. Never add `strong-review-passed` and never merge a risky PR. The owner says "approve #N"
+   when ready.
+6. Never comment `@codex` with anything other than `review`. Only DeepSeek writes code.
+
+Codex reviews must flag, as blocking: anything that can delete a photo without the explicit
+user confirmation step; anything that can add an unmarked photo to, or drop a marked photo
+from, the deletion list; anything that can lose or overwrite saved progress, marks, Undo, or
+Tumbler state; unsafe save-format migration; and any test that is removed, skipped, loosened,
+or otherwise weakened. (Also recorded as "Code Review Rules" in `AGENTS.md`.)
+
 Agents must never weaken the gate. Any PR that changes `.github/workflows/strong-review.yml` or
 `.github/risky-paths.txt` must say so at the top of its PR description, because a same-repo PR
 runs its own modified copy of that workflow.
