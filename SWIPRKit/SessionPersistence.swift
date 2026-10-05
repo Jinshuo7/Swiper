@@ -477,12 +477,31 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
             case "undoEntries":
                 guard value is [Any] else { return false }
             case "tumbler":
-                guard value is [String: Any] else { return false }
+                guard let plan = value as? [String: Any], isValidTumblerPlanShape(plan) else {
+                    return false
+                }
             default:
                 return false
             }
         }
         return sawLegacyKey
+    }
+
+    /// A Tumbler plan's identifiers must be non-blank everywhere, exactly like
+    /// the top-level ID arrays. A plan whose `remaining` or `handled` hides a
+    /// blank string would otherwise migrate with a blank cursor that
+    /// reconciliation replaces chronologically, reordering the random walk.
+    private static func isValidTumblerPlanShape(_ plan: [String: Any]) -> Bool {
+        for key in ["remaining", "handled"] {
+            guard let array = plan[key] as? [Any],
+                  array.allSatisfy({ element in
+                      guard let id = element as? String else { return false }
+                      return !id.isBlankIdentifier
+                  }) else {
+                return false
+            }
+        }
+        return true
     }
 
     /// Whether a migrated legacy state carries work the app can actually use:
@@ -494,12 +513,16 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
     /// so its state would never be exposed and the next session would silently
     /// replace it; reporting it unreadable keeps the bytes on disk instead.
     private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
-        if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
-        guard let session = state.session else { return false }
         // Tumbler mode without its plan cannot be resumed faithfully:
         // ``SessionEngine`` would generate a fresh random order while the app
         // claimed to have upgraded the file, silently replacing the saved one.
-        if session.mode == .tumbler, session.tumbler == nil { return false }
+        // This is checked before the marks shortcut: a durable mark does not
+        // make an inconsistent session safe to migrate.
+        if let session = state.session, session.mode == .tumbler, session.tumbler == nil {
+            return false
+        }
+        if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
+        guard let session = state.session else { return false }
         if let current = session.currentAssetID, !current.isBlankIdentifier { return true }
         if session.decidedIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
         if let tumbler = session.tumbler,

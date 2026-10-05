@@ -430,6 +430,26 @@ final class SessionPersistenceTests: XCTestCase {
         try assertDamagedFileIsKept(#"{"currentAssetID":"c","mode":"tumbler"}"#)
     }
 
+    func testLegacyTumblerModeWithoutAPlanIsUnreadableEvenWithAMark() throws {
+        // A durable mark must not bypass the Tumbler consistency check and let
+        // restoration invent a replacement random order.
+        try assertDamagedFileIsKept(
+            #"{"currentAssetID":"c","mode":"tumbler","queueIDs":["b"]}"#
+        )
+    }
+
+    func testBlankIdentifierInsideATumblerPlansRemainingIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"tumbler":{"seed":7,"remaining":["a",""],"handled":[]}}"#
+        )
+    }
+
+    func testBlankIdentifierInsideATumblerPlansHandledIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"tumbler":{"seed":7,"remaining":["a"],"handled":["  "]}}"#
+        )
+    }
+
     func testLegacyFileWithKeptIDsAndAResumableCursorKeepsTheKeptIDs() async throws {
         let legacy = #"{"currentAssetID":"c","keptIDs":["a","b"]}"#
         try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
