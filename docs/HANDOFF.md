@@ -31,14 +31,18 @@
 ## Open PRs
 
 - **#66 — fix: keep a damaged save file instead of replacing it with empty
-  progress** (`driver/damaged-save`, head `8f9f608`). Risky
-  (`SWIPRKit/SessionPersistence.swift`), `needs-strong-review`, **MERGEABLE**,
-  `checks` green. Three Codex rounds completed and fixed (backup reuse;
-  non-resumable fragments unreadable; Tumbler mode preserved; plan-only cursor
-  seeded from the plan; plan-less Tumbler mode unreadable). The owner gave
-  **conditional approval**: one final `@codex review` on `8f9f608`; if Codex
-  reports no new problems, add `strong-review-passed` and merge with
-  `--match-head-commit 8f9f608634d3195e0fbd118a2c349a5d83993534`.
+  progress** (`driver/damaged-save`, head `8d965fb`). Risky
+  (`SWIPRKit/SessionPersistence.swift`), `needs-strong-review`, open, **waiting
+  for the owner**. The owner gave conditional approval and asked for one final
+  `@codex review` on `8f9f608`; that round found two more problems (a mark
+  bypassed the Tumbler-mode consistency check, and blank IDs inside a Tumbler
+  plan's `remaining`/`handled` were accepted), both fixed on `8d965fb`. No
+  further review round was requested and no merge happened. **Do not add
+  `strong-review-passed` without a fresh owner approval.**
+- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)**
+  (`driver/69-ax5-reenable`). Risky because it edits
+  `.github/workflows/ci.yml` (every workflow file is risky), so the owner must
+  approve it; labelled `needs-strong-review`.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -73,19 +77,20 @@
 
 ## What is next
 
-1. Finish the conditional approval on **PR #66** (final Codex review; merge only
-   if clean).
-2. Land **#68** (this handoff), **#69**, then **#70**.
+1. Finish the owner's decisions on the risky PRs: **#66** (conditional
+   approval round found problems, now fixed on `8d965fb`) and **#72** (AX5
+   re-enable; needs approval because it edits a workflow).
+2. Land **#68** (this handoff), then implement **#70** (Limited Photos marks).
 3. Start the next milestone, **V1-04 (#26 — the neutral direct-move decision
    dock)**, split into subtickets.
 4. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the AX5 skip belongs to #32 / #69
 
-The CI job still carries
+The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
-#58 does not touch it; removing that line is ticket **#69**'s job now that the
-case passes locally.
+#58 fixed the scroll; ticket **#69** removes the line, in PR **#72** (risky
+because it edits `.github/workflows/ci.yml`).
 
 ### Note: the two named traversals never wrap
 
