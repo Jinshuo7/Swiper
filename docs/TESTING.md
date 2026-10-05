@@ -12,10 +12,12 @@ integration seam against fakes; extend fixtures to mixed photo/video, unavailabl
 previews, Skip and playback transitions; cover dock gesture arbitration, EN/zh-Hans
 catalogues, and Dynamic Type through the largest accessibility category.
 
-* **Known baseline failure:** the largest-accessibility-text ("AX5") reachability
-  case `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize`
-  cannot scroll `choosePhoto.newest` at AX5. It is **release-blocking**. Do not
-  claim an all-green suite until it is fixed and re-run on a named commit.
+* **Former baseline failure, now fixed:** the largest-accessibility-text
+  ("AX5") reachability case
+  `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize`
+  could not scroll `choosePhoto.newest` at AX5. #58 fixed the traversal order in
+  `assertReachable`, and #69 removed the CI `-skip-testing` exclusion, so the
+  case runs on every PR and an all-green suite is now meaningful.
 * **Legacy photo-only build.** Everything below records the as-built build from
   issues #10–#16. Its **grip/single-entry narrative is historical, not
   normative**: production v1 replaces the grip with direct whole-dock movement
@@ -41,11 +43,12 @@ derived-data path, runs exactly:
    (kit, app and UI targets) against the fake library (`-uiTestingFakeLibrary`),
    never a real photo library.
 
-**Skipped in CI — one exact case.** The release-blocking AX5 reachability case
+**Nothing is skipped in CI.** The AX5 reachability case
 `SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`
-is excluded with `-skip-testing:` because it cannot scroll `choosePhoto.newest`
-at the largest accessibility text size. Nothing else is skipped or weakened;
-the next AX5 ticket must remove that exclusion and re-enable the case.
+used to be excluded with `-skip-testing:` while it could not scroll
+`choosePhoto.newest` at the largest accessibility text size. #58 fixed the
+scroll and #69 removed the exclusion; the case now runs on every PR. No other
+test is skipped or weakened.
 
 **Gates GitHub cannot replace.** CI has no dedicated `SWIPR iPhone 11 Pro`
 simulator, no connected iPhone, and no human eye. The owner's Mac still owns:
@@ -134,7 +137,9 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
 - The one failure reproduces by itself:
   `PlaySessionUITests.testPlayEveryScreenAtTheLargestAccessibilityTextSize`
   cannot scroll `choosePhoto.newest` back from an offscreen frame at AX5. This
-  is a test/app scrolling issue, not a simulator setup failure.
+  is a test/app scrolling issue, not a simulator setup failure. **Fixed by
+  #58** (`assertReachable` now walks the starting point top-down); **#69**
+  removed the CI skip, so the case runs on every PR again.
 - Simulator tests use local ad-hoc signing and do not need an Apple account,
   provisioning profile, connected phone or unlocked device.
 - For a visible device window, open

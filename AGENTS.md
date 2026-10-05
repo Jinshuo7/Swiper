@@ -20,9 +20,10 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
 - Verified working 2026-09-27: Xcode 27.0 with the iOS 27.0 arm64 Simulator
   runtime. The dedicated `SWIPR iPhone 11 Pro` simulator has UDID
   `71EAC83D-54D4-451A-AB32-74A8878C7869`. The full simulator run executes all
-  targets without signing or a phone; 215 of 216 tests pass. The reproducible
-  exception is the AX5 Choose a photo scroll in
-  `testPlayEveryScreenAtTheLargestAccessibilityTextSize`. See
+  targets without signing or a phone.
+  The former AX5 Choose a photo scroll in
+  `testPlayEveryScreenAtTheLargestAccessibilityTextSize` was fixed by #58 and is
+  no longer skipped in CI (#69). See
   `docs/TESTING.md` for the command and result bundle.
 - Xcode 27 shows simulators in `Device Hub`, not a standalone `Simulator.app`.
   Open `/Applications/Xcode.app/Contents/Applications/DeviceHub.app` and select

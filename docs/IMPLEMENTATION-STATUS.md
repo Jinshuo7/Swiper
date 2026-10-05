@@ -71,7 +71,7 @@
 > **Newest first**, **Oldest first**, **Random**, **Jump to month**, the order
 > toggle and a grid cell (`choosePhoto.cell.fake-22`). The view itself is
 > unchanged — it already scrolls its chrome with the grid at accessibility
-> sizes — and the CI `-skip-testing` line is untouched for #32. The AX5 case is
+> sizes — and #69 later removed the CI `-skip-testing` line. The AX5 case is
 > green (1 test, 0 failures), the rest of `PlaySessionUITests` stays green with
 > the skip in place (16 tests, 0 failures), and
 > `docs/screenshots/milestones/v1-03-starting-point/choose-photo-ax5.png` shows
