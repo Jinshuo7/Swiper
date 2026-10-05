@@ -496,6 +496,10 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
     private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
         if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
         guard let session = state.session else { return false }
+        // Tumbler mode without its plan cannot be resumed faithfully:
+        // ``SessionEngine`` would generate a fresh random order while the app
+        // claimed to have upgraded the file, silently replacing the saved one.
+        if session.mode == .tumbler, session.tumbler == nil { return false }
         if let current = session.currentAssetID, !current.isBlankIdentifier { return true }
         if session.decidedIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
         if let tumbler = session.tumbler,

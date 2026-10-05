@@ -424,6 +424,12 @@ final class SessionPersistenceTests: XCTestCase {
         )
     }
 
+    func testLegacyTumblerModeWithoutAPlanIsUnreadableAndKept() throws {
+        // Without the plan, restoration would invent a fresh random order while
+        // reporting a successful upgrade. Keep the bytes instead.
+        try assertDamagedFileIsKept(#"{"currentAssetID":"c","mode":"tumbler"}"#)
+    }
+
     func testLegacyFileWithKeptIDsAndAResumableCursorKeepsTheKeptIDs() async throws {
         let legacy = #"{"currentAssetID":"c","keptIDs":["a","b"]}"#
         try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
