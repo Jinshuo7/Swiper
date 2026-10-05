@@ -345,11 +345,16 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
             // absent so a file with no other progress is reported as having
             // nothing to restore rather than resuming an empty identifier.
             let current = currentAssetID.flatMap { $0.isBlankIdentifier ? nil : $0 }
+            // A persisted Tumbler plan only exists for a Random session, so a
+            // plan means `.tumbler` even when the legacy `mode` is missing or
+            // contradicts it; otherwise the plan would be ignored and the
+            // user's remaining random order silently rewritten.
+            let resolvedMode: SessionMode = tumbler == nil ? (mode ?? .sequential) : .tumbler
             let session = PersistedSession(
                 currentAssetID: current,
                 currentAssetDate: currentAssetDate,
                 direction: direction ?? .older,
-                mode: mode ?? .sequential,
+                mode: resolvedMode,
                 decidedIDs: decidedIDs ?? [],
                 keptIDs: keptIDs ?? [],
                 undoEntries: undoEntries ?? [],
@@ -471,17 +476,19 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         return sawLegacyKey
     }
 
-    /// Whether a migrated legacy state carries any work worth keeping: a mark,
-    /// a current asset, decided or kept IDs, undo entries, or a pending Tumbler
-    /// plan with assets left. Only a valid non-empty identifier counts, so a
-    /// file that is all empty arrays and blank IDs is damaged, not progress.
+    /// Whether a migrated legacy state carries work the app can actually use:
+    /// a mark, a resumable session (a current asset, decided IDs, or a pending
+    /// Tumbler plan with assets left). Only a valid non-empty identifier counts.
+    ///
+    /// A keptIDs- or undoEntries-only fragment is deliberately not enough. Such
+    /// a session is not resumable (``PersistedSession/isResumable`` is false),
+    /// so its state would never be exposed and the next session would silently
+    /// replace it; reporting it unreadable keeps the bytes on disk instead.
     private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
         if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
         guard let session = state.session else { return false }
         if let current = session.currentAssetID, !current.isBlankIdentifier { return true }
         if session.decidedIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
-        if session.keptIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
-        if session.undoEntries.contains(where: { !$0.assetID.isBlankIdentifier }) { return true }
         if let tumbler = session.tumbler,
            tumbler.remaining.contains(where: { !$0.isBlankIdentifier }) {
             return true
@@ -494,6 +501,20 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
     /// so the original bytes are never lost.
     private static func backupBeforeMigration(at url: URL, fileManager: FileManager) -> Bool {
         let directory = url.deletingLastPathComponent()
+        guard let original = try? Data(contentsOf: url) else { return false }
+        // Reuse a backup that already holds these exact bytes. When a migration
+        // copy succeeds but the upgrade write later fails, the source keeps its
+        // old bytes, so a retrying launch must not pile up another full copy of
+        // the same file (which could fill the disk and make a readable save
+        // report as unreadable).
+        let existing = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        if existing.contains(where: { candidate in
+            candidate.lastPathComponent.hasPrefix("session-premigration-")
+                && candidate.pathExtension == "json"
+                && (try? Data(contentsOf: candidate)) == original
+        }) {
+            return true
+        }
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         var destination = directory.appendingPathComponent("session-premigration-\(stamp).json")
         var suffix = 1

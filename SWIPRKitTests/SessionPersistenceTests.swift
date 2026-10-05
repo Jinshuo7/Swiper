@@ -411,9 +411,28 @@ final class SessionPersistenceTests: XCTestCase {
         )
     }
 
-    func testLegacyFileWithOnlyKeptIDsMigratesAndLeavesABackup() async throws {
-        try await assertLegacyFileMigratesAndLeavesABackup(#"{"keptIDs":["a"]}"#) { state in
-            XCTAssertEqual(state.session?.keptIDs, ["a"], "non-empty keptIDs count as real progress")
+    func testLegacyFileWithOnlyKeptIDsIsUnreadableAndKept() throws {
+        // keptIDs without a cursor or decided IDs is an inconsistent fragment:
+        // the app cannot resume it, so migrating it would let the next session
+        // silently replace it. Keep the bytes instead.
+        try assertDamagedFileIsKept(#"{"keptIDs":["a"]}"#)
+    }
+
+    func testLegacyFileWithOnlyUndoEntriesIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"undoEntries":[{"assetID":"a","effect":{"kept":{}},"displacedAssetID":null}]}"#
+        )
+    }
+
+    func testLegacyFileWithKeptIDsAndAResumableCursorKeepsTheKeptIDs() async throws {
+        let legacy = #"{"currentAssetID":"c","keptIDs":["a","b"]}"#
+        try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
+            XCTAssertEqual(state.session?.currentAssetID, "c")
+            XCTAssertEqual(
+                state.session?.keptIDs,
+                ["a", "b"],
+                "keptIDs are kept when the session is otherwise resumable"
+            )
         }
     }
 
@@ -425,7 +444,36 @@ final class SessionPersistenceTests: XCTestCase {
                 ["a", "b"],
                 "a pending Tumbler plan with assets left counts as real progress"
             )
+            XCTAssertEqual(
+                state.session?.mode,
+                .tumbler,
+                "a persisted Tumbler plan means a Random session, so the plan is not ignored"
+            )
         }
+    }
+
+    /// A migration whose upgrade write keeps failing must reuse the backup it
+    /// already made, not pile up a full copy on every launch.
+    func testRepeatedMigrationAttemptsReuseTheExistingBackup() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let legacy = #"{"currentAssetID":"c","queueIDs":["b"]}"#
+        _ = try writeSessionFile(legacy, in: directory)
+
+        // Each store reads the still-unmigrated file, as if the previous
+        // migration write had failed and the next launch retried it.
+        for _ in 0..<3 {
+            let store = FileSessionStore(directory: directory)
+            guard case .migrated = store.loadState() else {
+                return XCTFail("expected a migration, got \(store.loadState())")
+            }
+        }
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        XCTAssertEqual(backups.count, 1, "a retrying migration must reuse its backup")
+        let backup = try Data(contentsOf: directory.appendingPathComponent(try XCTUnwrap(backups.first)))
+        XCTAssertEqual(backup, Data(legacy.utf8), "the backup holds the original legacy bytes")
     }
 
     func testWritesAreRefusedWhileUnreadableDataIsInTheWay() async throws {
