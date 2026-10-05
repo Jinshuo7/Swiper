@@ -124,7 +124,9 @@
 | [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
 | [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
 | [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
-| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
+| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
+| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 1 | 1 | — | Yes — round-1 Codex review asked to refresh `docs/HANDOFF.md` and add this ticket row; both are in PR #72 | No (PR #72 open; needs-strong-review) |
+| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | No (PR #66 open; needs-strong-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 
