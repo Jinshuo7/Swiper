@@ -20,9 +20,10 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
 - Verified working 2026-09-27: Xcode 27.0 with the iOS 27.0 arm64 Simulator
   runtime. The dedicated `SWIPR iPhone 11 Pro` simulator has UDID
   `71EAC83D-54D4-451A-AB32-74A8878C7869`. The full simulator run executes all
-  targets without signing or a phone; 215 of 216 tests pass. The reproducible
-  exception is the AX5 Choose a photo scroll in
-  `testPlayEveryScreenAtTheLargestAccessibilityTextSize`. See
+  targets without signing or a phone.
+  The former AX5 Choose a photo scroll in
+  `testPlayEveryScreenAtTheLargestAccessibilityTextSize` was fixed by #58 and is
+  no longer skipped in CI (#69). See
   `docs/TESTING.md` for the command and result bundle.
 - Xcode 27 shows simulators in `Device Hub`, not a standalone `Simulator.app`.
   Open `/Applications/Xcode.app/Contents/Applications/DeviceHub.app` and select
@@ -96,6 +97,36 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
 - Agents must never weaken `.github/workflows/strong-review.yml`. Any PR that
   changes that file or `.github/risky-paths.txt` must say so at the top of its
   pull-request description.
+
+## Risky PR review workflow (`needs-strong-review`)
+
+Applies to any PR the strong-review gate labels `needs-strong-review`.
+
+1. When its checks are green, comment exactly `@codex review` with
+   `gh pr comment`.
+2. Wait for Codex's review: poll every 5 minutes with `gh pr view --comments`,
+   `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and `.../comments`. Give up
+   after 60 minutes and tell the owner.
+3. If Codex reports problems, fix them in the same PR, push without force, wait
+   for green checks, then comment `@codex review` again.
+4. Stop after 3 review rounds, or when Codex reports no problems. Then post the
+   owner a short summary: what changed, what Codex found, and what was fixed.
+5. Never add `strong-review-passed` and never merge a risky PR. Only the owner
+   says "approve #N".
+6. Never comment `@codex` with anything other than `review`. Only the agent
+   writes code.
+
+## Code Review Rules
+
+Codex reviews must flag, as blocking:
+
+- anything that can delete a photo without the explicit user confirmation step;
+- anything that can add an unmarked photo to, or drop a marked photo from, the
+  deletion list;
+- anything that can lose or overwrite saved progress, marks, Undo, or Tumbler
+  state;
+- unsafe save-format migration;
+- any test that is removed, skipped, loosened, or otherwise weakened.
 
 ## Localisation
 
