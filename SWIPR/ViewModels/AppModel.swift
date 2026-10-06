@@ -702,8 +702,11 @@ final class AppModel: ObservableObject {
             order = refreshedOrder
 
             // Unsuccessful assets stay marked; only confirmed deletions leave
-            // the list, so a retry can never re-request or re-count them.
-            var updatedMarks = DeletionQueue(orderedIDs: requested)
+            // the list, so a retry can never re-request or re-count them. The
+            // rebuild starts from the full stored queue, not the visible
+            // subset: under Limited access a hidden mark is not being deleted
+            // and must survive this write.
+            var updatedMarks = marks
             for id in outcome.deletedIDs { updatedMarks.remove(id) }
 
             var updatedEngine = engine
@@ -712,7 +715,8 @@ final class AppModel: ObservableObject {
 
             let reconciled = AssetReconciler.reconcile(
                 PersistedState(marks: updatedMarks.ids, session: session),
-                order: refreshedOrder
+                order: refreshedOrder,
+                libraryAccessIsLimited: authorization.isLimited
             )
             let state = reconciled.state
 

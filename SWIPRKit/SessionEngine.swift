@@ -346,7 +346,15 @@ public struct SessionEngine: Equatable, Sendable {
             undoEntries: undoStack.entries,
             tumbler: tumbler,
             filterCategories: filterCategories,
-            poolIDs: poolIDs == nil ? nil : order.ids,
+            poolIDs: poolIDs.map { pool in
+                let visible = order.ids
+                // A captured pool can name members the current snapshot cannot
+                // show (for example under Limited Photos access). They have no
+                // place in the library order, but dropping them here would
+                // overwrite the captured pool on the next save, so keep them
+                // after the visible ones in a stable order.
+                return visible + pool.subtracting(Set(visible)).sorted()
+            },
             updatedAt: updatedAt,
             isFinished: isFinished
         )

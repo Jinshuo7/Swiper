@@ -129,7 +129,7 @@
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all fixed | Yes (#72, merge `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 5 | 1 | 5 | Yes — rounds 1–5 found 8 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs, stale seeded cursor); the round-5 cursor-order fix is small and rare, so the owner accepted a follow-up (#73) instead of blocking | Yes (#66, merge `c2af5f5`) |
-| [#70 — V1-06a: Keep marked photos through Limited Photos access](https://github.com/Jinshuo7/Swiper/issues/70) | — | 1 | — | — | No (PR #74 open; needs-strong-review) |
+| [#70 — V1-06a: Keep marked photos through Limited Photos access](https://github.com/Jinshuo7/Swiper/issues/70) | 1 | 1 | 1 | Yes — round 1 found that a confirmed deletion of visible marks dropped the hidden ones, and that `SessionEngine.persisted()` overwrote the captured pool with the visible subset; both fixed | No (PR #74 open; needs-strong-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >

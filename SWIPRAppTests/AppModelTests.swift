@@ -126,6 +126,40 @@ final class AppModelTests: XCTestCase {
         )
     }
 
+    func testConfirmingDeletionUnderLimitedAccessKeepsHiddenMarks() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let (model, _, store) = await bootstrapped(library: library)
+
+        model.startNewest()
+        await model.settle()
+        var marked: [String] = []
+        for _ in 0..<3 {
+            guard let id = model.currentAsset?.id else { break }
+            marked.append(id)
+            model.apply(.queueDeletion)
+            await model.settle()
+        }
+
+        // Limited access hides two marks; only the third can be deleted now.
+        let hidden = Set(marked.prefix(2))
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(hidden)
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertEqual(Set(model.markedIDs), Set(marked).subtracting(hidden))
+
+        await model.confirmDeletion()
+        await model.settle()
+
+        XCTAssertEqual(
+            Set(store.state?.marks ?? []),
+            hidden,
+            "deleting the visible marks must not drop the hidden ones"
+        )
+        XCTAssertEqual(model.hiddenMarkCount, 2)
+    }
+
     func testFailedSavePausesSortingAndKeepsTheDecisionRecoverable() async {
         let (model, _, store) = await bootstrapped()
         model.startNewest()

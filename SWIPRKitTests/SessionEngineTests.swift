@@ -242,4 +242,22 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertEqual(Set(visited), Set(["a", "b", "c"]))
         XCTAssertFalse(visited.contains("f"))
     }
+
+    func testPersistedKeepsPoolMembersHiddenFromTheCurrentOrder() {
+        // A Limited-access snapshot can hide pool members; they must survive a
+        // save so widening access restores the same fixed pool.
+        let visible = LibraryOrder(TestLibrary.sequential())
+        var engine = SessionEngine(
+            order: visible,
+            direction: .older,
+            poolIDs: Set(["a", "c", "hidden"])
+        )
+        engine.start()
+
+        XCTAssertEqual(
+            engine.persisted().poolIDs,
+            ["a", "c", "hidden"],
+            "a hidden pool member is kept after the visible ones"
+        )
+    }
 }
