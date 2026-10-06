@@ -106,6 +106,21 @@ final class AssetReconcilerTests: XCTestCase {
         )
     }
 
+    func testLimitedAccessDoesNotFinishALegacySessionWithoutAPool() {
+        // A legacy session has no captured pool, so it can never prove it is
+        // complete while the library snapshot is a Limited subset.
+        let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let state = PersistedState(
+            session: PersistedSession(currentAssetID: "a", direction: .older, decidedIDs: ["a"])
+        )
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(reconciled.state.session?.isFinished, false)
+    }
+
     func testStateReconcileKeepsMarksAndSessionCoherent() {
         let liveOrder = LibraryOrder(TestLibrary.sequential())
         let state = PersistedState(

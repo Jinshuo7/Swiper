@@ -114,9 +114,11 @@ final class AppModel: ObservableObject {
 
     var currentAsset: AssetDescriptor? { engine?.current }
 
-    /// True while ``persistenceNotice`` holds the Limited-access hidden-marks
-    /// message, so widening access can clear it instead of leaving it stale.
-    private var isShowingLimitedMarksNotice = false
+    /// The exact Limited-access hidden-marks message currently in
+    /// ``persistenceNotice``, or `nil`. Comparing the text means a later,
+    /// unrelated persistence error is never relabelled as the hidden-marks
+    /// notice.
+    private(set) var limitedMarksNotice: String?
 
     /// The marked ids the user can actually see. Under Limited Photos access a
     /// mark outside the selected subset is hidden, not gone: it stays in
@@ -251,7 +253,7 @@ final class AppModel: ObservableObject {
 
     func dismissPersistenceNotice() {
         persistenceNotice = nil
-        isShowingLimitedMarksNotice = false
+        limitedMarksNotice = nil
     }
 
     // MARK: - Teaching
@@ -321,7 +323,12 @@ final class AppModel: ObservableObject {
         storedState = reconciled.state
 
         if let session = storedState.session, session.isResumable {
-            let restored = SessionEngine.restored(from: session, order: order, marks: storedState.marks)
+            let restored = SessionEngine.restored(
+                from: session,
+                order: order,
+                marks: storedState.marks,
+                libraryAccessIsLimited: authorization.isLimited
+            )
             engine = restored
             marks = restored.queue
             resumableSession = session
@@ -347,16 +354,17 @@ final class AppModel: ObservableObject {
             // The snapshot is Limited, so these marks are preserved but not
             // shown. Say so plainly and point at the system picker.
             let count = hiddenMarkCount
-            persistenceNotice = count == 1
+            let message = count == 1
                 ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
                 : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
-            isShowingLimitedMarksNotice = true
-        } else if isShowingLimitedMarksNotice {
+            persistenceNotice = message
+            limitedMarksNotice = message
+        } else if limitedMarksNotice != nil {
             // Access widened (or the marks are visible again): the hidden-mark
             // notice is no longer true, so clear it rather than leaving a
             // stale banner on screen.
             persistenceNotice = nil
-            isShowingLimitedMarksNotice = false
+            limitedMarksNotice = nil
         }
 
         if engine?.isFinished == true && route == .viewer {
@@ -493,7 +501,8 @@ final class AppModel: ObservableObject {
             queue: sessionMarks,
             tumblerSeed: mode == .tumbler ? SessionEngine.makeSeed() : nil,
             poolIDs: Set(sessionOrder.ids),
-            filterCategories: filter.categories
+            filterCategories: filter.categories,
+            libraryAccessIsLimited: authorization.isLimited
         )
         if cursorID == nil || mode == .tumbler {
             newEngine.start()
@@ -521,7 +530,12 @@ final class AppModel: ObservableObject {
         if let categories = persisted.filterCategories {
             filter = MediaFilter(categories: categories)
         }
-        let restored = SessionEngine.restored(from: persisted, order: order, marks: storedState.marks)
+        let restored = SessionEngine.restored(
+            from: persisted,
+            order: order,
+            marks: storedState.marks,
+            libraryAccessIsLimited: authorization.isLimited
+        )
         engine = restored
         route = restored.isFinished ? .review : .viewer
     }
@@ -747,7 +761,12 @@ final class AppModel: ObservableObject {
 
             storedState = state
             if let session = state.session, session.isResumable {
-                let restored = SessionEngine.restored(from: session, order: refreshedOrder, marks: state.marks)
+                let restored = SessionEngine.restored(
+                    from: session,
+                    order: refreshedOrder,
+                    marks: state.marks,
+                    libraryAccessIsLimited: authorization.isLimited
+                )
                 self.engine = restored
                 marks = restored.queue
                 resumableSession = session

@@ -153,7 +153,7 @@ public enum AssetReconciler {
         let unavailable = Set(decidedIDs).union(queueIDs)
         let hiddenUndecided = libraryAccessIsLimited && (poolIDs?.contains { id in
             !workingOrder.idSet.contains(id) && !unavailable.contains(id)
-        } ?? false)
+        } ?? true)
         let nothingLeftToShow = resolvedCurrentID == nil
             && unavailable.isSuperset(of: workingOrder.idSet)
         let isFinished = (session.isFinished || nothingLeftToShow) && !hiddenUndecided

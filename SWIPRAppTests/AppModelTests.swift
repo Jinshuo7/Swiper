@@ -94,6 +94,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.markedIDs, marked, "marks reappear in their saved order")
         XCTAssertEqual(model.hiddenMarkCount, 0)
         XCTAssertNil(model.persistenceNotice, "the hidden-mark notice is cleared once access widens")
+        XCTAssertNil(model.limitedMarksNotice)
     }
 
     func testHiddenMarksSurviveARelaunchUnderLimitedAccess() async {
@@ -159,6 +160,40 @@ final class AppModelTests: XCTestCase {
             "deleting the visible marks must not drop the hidden ones"
         )
         XCTAssertEqual(model.hiddenMarkCount, 2)
+    }
+
+    func testALimitedHiddenMarksNoticeDoesNotRebrandASaveError() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let (model, _, store) = await bootstrapped(library: library)
+
+        model.startNewest()
+        await model.settle()
+        var marked: [String] = []
+        for _ in 0..<3 {
+            guard let id = model.currentAsset?.id else { break }
+            marked.append(id)
+            model.apply(.queueDeletion)
+            await model.settle()
+        }
+        let hidden = Set(marked.prefix(2))
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(hidden)
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertNotNil(model.limitedMarksNotice)
+
+        // A later, unrelated save failure must keep its own error treatment.
+        store.failsWrites = true
+        await model.confirmDeletion()
+        await model.settle()
+
+        XCTAssertNotNil(model.persistenceNotice)
+        XCTAssertNotEqual(
+            model.persistenceNotice,
+            model.limitedMarksNotice,
+            "a save error is not relabelled as the hidden-marks notice"
+        )
     }
 
     func testFailedSavePausesSortingAndKeepsTheDecisionRecoverable() async {

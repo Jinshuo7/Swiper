@@ -115,13 +115,13 @@ struct RootView: View {
                     primaryAction: { Task { await model.recoverFromUnreadableState() } }
                 )
                 .accessibilityIdentifier("persistence.readOnly")
-            } else if model.hiddenMarkCount > 0, let notice = model.persistenceNotice {
+            } else if let limited = model.limitedMarksNotice, model.persistenceNotice == limited {
                 // Marks kept while Photos access is Limited. Explain, and offer
                 // the system picker right where the user notices the gap.
                 PersistenceBanner(
                     systemImage: "info.circle",
                     title: "Some marked photos are hidden",
-                    message: notice,
+                    message: limited,
                     primaryTitle: "Select more photos",
                     primaryAction: { model.manageLimitedLibrary() },
                     secondaryTitle: "Not now",

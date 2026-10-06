@@ -22,6 +22,9 @@ public struct SessionEngine: Equatable, Sendable {
     public private(set) var poolIDs: Set<String>?
     /// The media categories selected when the session started.
     public private(set) var filterCategories: Set<MediaCategory>?
+    /// True when the library snapshot is a Limited-access subset, so the
+    /// session must never be treated as complete while work may be hidden.
+    public private(set) var libraryAccessIsLimited: Bool
     public private(set) var isFinished: Bool
 
     public init(
@@ -37,6 +40,7 @@ public struct SessionEngine: Equatable, Sendable {
         tumblerSeed: UInt64? = nil,
         poolIDs: Set<String>? = nil,
         filterCategories: Set<MediaCategory>? = nil,
+        libraryAccessIsLimited: Bool = false,
         isFinished: Bool = false
     ) {
         // The engine's order is the traversal order. A captured pool confines it
@@ -55,6 +59,7 @@ public struct SessionEngine: Equatable, Sendable {
         self.keptIDs = keptIDs
         self.poolIDs = poolIDs
         self.filterCategories = filterCategories
+        self.libraryAccessIsLimited = libraryAccessIsLimited
         self.isFinished = isFinished
         if mode == .tumbler {
             var plan = tumbler ?? TumblerPlan(
@@ -215,8 +220,12 @@ public struct SessionEngine: Equatable, Sendable {
     public mutating func advance() -> SessionEffect {
         guard let next = nextCandidateID() else {
             cursorID = nil
-            isFinished = true
-            return .sessionFinished
+            // A Limited snapshot can be exhausted while work is still hidden,
+            // and a legacy session with no captured pool can never prove it is
+            // complete. Neither may finish here: the finished overlay's Finish
+            // would discard the hidden work.
+            isFinished = !hasHiddenUndecidedWork
+            return isFinished ? .sessionFinished : .noOp
         }
         cursorID = next
         isFinished = false
@@ -283,6 +292,18 @@ public struct SessionEngine: Equatable, Sendable {
         decidedIDs.union(queue.orderedIDs)
     }
 
+    /// Whether this Limited snapshot may still hide undecided work: a captured
+    /// pool member outside it, or — for a legacy session with no captured pool —
+    /// any unseen library member at all.
+    private var hasHiddenUndecidedWork: Bool {
+        guard libraryAccessIsLimited else { return false }
+        guard let poolIDs else { return true }
+        let visible = order.idSet
+        return poolIDs.contains { id in
+            !visible.contains(id) && !isUnavailable(id)
+        }
+    }
+
     private func firstUndecided(preferNewest: Bool) -> String? {
         let count = order.assets.count
         guard count > 0 else { return nil }
@@ -347,9 +368,7 @@ public struct SessionEngine: Equatable, Sendable {
         // not really finished, so never persist it as finished: widening access
         // must return to the viewer, not jump to Review.
         let visible = order.idSet
-        let hiddenUndecidedPoolMember = poolIDs?.contains { id in
-            !visible.contains(id) && !isUnavailable(id)
-        } ?? false
+        let hiddenUndecidedPoolMember = hasHiddenUndecidedWork
         return PersistedSession(
             currentAssetID: cursorID,
             currentAssetDate: current?.creationDate,
@@ -378,7 +397,8 @@ public struct SessionEngine: Equatable, Sendable {
     public static func restored(
         from persisted: PersistedSession,
         order: LibraryOrder,
-        marks: [String] = []
+        marks: [String] = [],
+        libraryAccessIsLimited: Bool = false
     ) -> SessionEngine {
         SessionEngine(
             order: order,
@@ -392,6 +412,7 @@ public struct SessionEngine: Equatable, Sendable {
             tumbler: persisted.tumbler,
             poolIDs: persisted.poolIDs.map { Set($0) },
             filterCategories: persisted.filterCategories,
+            libraryAccessIsLimited: libraryAccessIsLimited,
             isFinished: persisted.isFinished
         )
     }
