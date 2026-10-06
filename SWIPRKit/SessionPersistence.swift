@@ -341,15 +341,33 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         var isFinished: Bool?
 
         func migrated(updatedAt now: Date) -> PersistedState {
+            // An empty or whitespace-only cursor is not a position: treat it as
+            // absent so a file with no other progress is reported as having
+            // nothing to restore rather than resuming an empty identifier.
+            let current = currentAssetID.flatMap { $0.isBlankIdentifier ? nil : $0 }
+            // A persisted Tumbler plan only exists for a Random session, so a
+            // plan means `.tumbler` even when the legacy `mode` is missing or
+            // contradicts it; otherwise the plan would be ignored and the
+            // user's remaining random order silently rewritten.
+            let resolvedMode: SessionMode = tumbler == nil ? (mode ?? .sequential) : .tumbler
+            // A plan-only save lost its cursor. Reconstruct it from the plan's
+            // own next identifier so reconciliation cannot fill it
+            // chronologically and silently reorder the saved random traversal.
+            var resolvedTumbler = tumbler
+            var resolvedCurrent = current
+            if resolvedCurrent == nil, var plan = resolvedTumbler {
+                resolvedCurrent = plan.next()
+                resolvedTumbler = plan
+            }
             let session = PersistedSession(
-                currentAssetID: currentAssetID,
+                currentAssetID: resolvedCurrent,
                 currentAssetDate: currentAssetDate,
                 direction: direction ?? .older,
-                mode: mode ?? .sequential,
+                mode: resolvedMode,
                 decidedIDs: decidedIDs ?? [],
                 keptIDs: keptIDs ?? [],
                 undoEntries: undoEntries ?? [],
-                tumbler: tumbler,
+                tumbler: resolvedTumbler,
                 updatedAt: updatedAt ?? now,
                 isFinished: isFinished ?? false
             )
@@ -386,15 +404,166 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
                 return .unreadable(reason: "the saved file is damaged")
             }
             if probe.schemaVersion < PersistedState.currentSchemaVersion {
+                guard backupBeforeMigration(at: url, fileManager: fileManager) else {
+                    return .unreadable(reason: "the saved file could not be backed up before migration")
+                }
                 return .migrated(migrate(state))
             }
             return .loaded(state)
         }
 
+        // No usable `schemaVersion`. A file is the old unversioned shape only
+        // when it carries at least one legacy-only key with the right value type
+        // and none of the keys the versioned shape owns. A legacy key that is
+        // present but null or the wrong type, or a legacy file with nothing to
+        // restore, is damaged: reporting it as unreadable keeps it on disk
+        // instead of overwriting it with the empty state an all-optional legacy
+        // decode would produce.
+        let versionedKeys: Set<String> = ["schemaVersion", "marks", "session"]
+        guard let object = topLevelObject(in: data),
+              Set(object.keys).isDisjoint(with: versionedKeys),
+              isValidLegacyShape(object) else {
+            return .unreadable(reason: "the saved file is not in a known format")
+        }
+
         guard let legacy = try? decoder.decode(LegacyPersistedSession.self, from: data) else {
             return .unreadable(reason: "the saved file is not in a known format")
         }
-        return .migrated(legacy.migrated(updatedAt: Date()))
+        let migrated = legacy.migrated(updatedAt: Date())
+        guard hasSomethingToRestore(migrated) else {
+            return .unreadable(reason: "the saved file has nothing to restore")
+        }
+        guard backupBeforeMigration(at: url, fileManager: fileManager) else {
+            return .unreadable(reason: "the saved file could not be backed up before migration")
+        }
+        return .migrated(migrated)
+    }
+
+    private static let legacyOnlyKeys: Set<String> = [
+        "queueIDs", "decidedIDs", "currentAssetID", "keptIDs", "undoEntries", "tumbler"
+    ]
+
+    /// The top-level JSON object, or `nil` when the data is not a JSON object.
+    /// Used to tell a real legacy file from damaged or unknown data.
+    private static func topLevelObject(in data: Data) -> [String: Any]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return object as? [String: Any]
+    }
+
+    /// True when the object is the old unversioned shape: at least one
+    /// legacy-only key is present, and every legacy-only key it does have holds
+    /// a non-null value of the expected type. A present-but-null, wrong-typed or
+    /// blank-identifier value means the file is damaged, not legacy. (An empty
+    /// `currentAssetID` is the one exception: it is a valid string that counts
+    /// as an absent cursor, so the shape stays legacy and the progress check
+    /// below decides.)
+    private static func isValidLegacyShape(_ object: [String: Any]) -> Bool {
+        var sawLegacyKey = false
+        for key in legacyOnlyKeys {
+            guard let value = object[key] else { continue }
+            sawLegacyKey = true
+            if value is NSNull { return false }
+            switch key {
+            case "queueIDs", "decidedIDs", "keptIDs":
+                guard let array = value as? [Any],
+                      array.allSatisfy({ element in
+                          guard let id = element as? String else { return false }
+                          return !id.isBlankIdentifier
+                      }) else {
+                    return false
+                }
+            case "currentAssetID":
+                guard value is String else { return false }
+            case "undoEntries":
+                guard value is [Any] else { return false }
+            case "tumbler":
+                guard let plan = value as? [String: Any], isValidTumblerPlanShape(plan) else {
+                    return false
+                }
+            default:
+                return false
+            }
+        }
+        return sawLegacyKey
+    }
+
+    /// A Tumbler plan's identifiers must be non-blank everywhere, exactly like
+    /// the top-level ID arrays. A plan whose `remaining` or `handled` hides a
+    /// blank string would otherwise migrate with a blank cursor that
+    /// reconciliation replaces chronologically, reordering the random walk.
+    private static func isValidTumblerPlanShape(_ plan: [String: Any]) -> Bool {
+        for key in ["remaining", "handled"] {
+            guard let array = plan[key] as? [Any],
+                  array.allSatisfy({ element in
+                      guard let id = element as? String else { return false }
+                      return !id.isBlankIdentifier
+                  }) else {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Whether a migrated legacy state carries work the app can actually use:
+    /// a mark, a resumable session (a current asset, decided IDs, or a pending
+    /// Tumbler plan with assets left). Only a valid non-empty identifier counts.
+    ///
+    /// A keptIDs- or undoEntries-only fragment is deliberately not enough. Such
+    /// a session is not resumable (``PersistedSession/isResumable`` is false),
+    /// so its state would never be exposed and the next session would silently
+    /// replace it; reporting it unreadable keeps the bytes on disk instead.
+    private static func hasSomethingToRestore(_ state: PersistedState) -> Bool {
+        // Tumbler mode without its plan cannot be resumed faithfully:
+        // ``SessionEngine`` would generate a fresh random order while the app
+        // claimed to have upgraded the file, silently replacing the saved one.
+        // This is checked before the marks shortcut: a durable mark does not
+        // make an inconsistent session safe to migrate.
+        if let session = state.session, session.mode == .tumbler, session.tumbler == nil {
+            return false
+        }
+        if state.marks.contains(where: { !$0.isBlankIdentifier }) { return true }
+        guard let session = state.session else { return false }
+        if let current = session.currentAssetID, !current.isBlankIdentifier { return true }
+        if session.decidedIDs.contains(where: { !$0.isBlankIdentifier }) { return true }
+        if let tumbler = session.tumbler,
+           tumbler.remaining.contains(where: { !$0.isBlankIdentifier }) {
+            return true
+        }
+        return false
+    }
+
+    /// Copies the original file next to itself before a migration overwrites it,
+    /// and reports whether the copy succeeded. A failed copy stops the migration
+    /// so the original bytes are never lost.
+    private static func backupBeforeMigration(at url: URL, fileManager: FileManager) -> Bool {
+        let directory = url.deletingLastPathComponent()
+        guard let original = try? Data(contentsOf: url) else { return false }
+        // Reuse a backup that already holds these exact bytes. When a migration
+        // copy succeeds but the upgrade write later fails, the source keeps its
+        // old bytes, so a retrying launch must not pile up another full copy of
+        // the same file (which could fill the disk and make a readable save
+        // report as unreadable).
+        let existing = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        if existing.contains(where: { candidate in
+            candidate.lastPathComponent.hasPrefix("session-premigration-")
+                && candidate.pathExtension == "json"
+                && (try? Data(contentsOf: candidate)) == original
+        }) {
+            return true
+        }
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        var destination = directory.appendingPathComponent("session-premigration-\(stamp).json")
+        var suffix = 1
+        while fileManager.fileExists(atPath: destination.path) {
+            destination = directory.appendingPathComponent("session-premigration-\(stamp)-\(suffix).json")
+            suffix += 1
+        }
+        do {
+            try fileManager.copyItem(at: url, to: destination)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Brings older in-memory state up to the current schema version.
@@ -402,6 +571,13 @@ public final class FileSessionStore: SessionStoring, @unchecked Sendable {
         var migrated = state
         migrated.schemaVersion = PersistedState.currentSchemaVersion
         return migrated
+    }
+}
+
+private extension String {
+    /// An identifier that carries no information: empty or only whitespace.
+    var isBlankIdentifier: Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

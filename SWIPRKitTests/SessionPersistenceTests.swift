@@ -257,6 +257,287 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertFalse(store.loadState().allowsWrites)
     }
 
+    // MARK: - A damaged save file is kept, never replaced with empty progress
+
+    private func writeSessionFile(_ json: String, in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("session.json")
+        try Data(json.utf8).write(to: url)
+        return url
+    }
+
+    /// The file must read as unreadable, refuse writes, and stay byte-for-byte
+    /// as it was, so a damaged save is never overwritten with empty progress.
+    private func assertDamagedFileIsKept(
+        _ json: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try writeSessionFile(json, in: directory)
+        let before = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+
+        guard case .unreadable = store.loadState() else {
+            return XCTFail("expected unreadable, got \(store.loadState())", file: file, line: line)
+        }
+        XCTAssertFalse(store.loadState().allowsWrites, file: file, line: line)
+        XCTAssertEqual(
+            try Data(contentsOf: url),
+            before,
+            "the damaged file must be left byte-for-byte unchanged",
+            file: file,
+            line: line
+        )
+    }
+
+    func testMissingSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"marks":["a"],"session":null,"updatedAt":0}"#)
+    }
+
+    func testNullSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"schemaVersion":null,"marks":["a"]}"#)
+    }
+
+    func testStringSchemaVersionIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"schemaVersion":"3","marks":["a"]}"#)
+    }
+
+    func testEmptyJSONObjectIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept("{}")
+    }
+
+    func testNullLegacyKeyIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":null}"#)
+    }
+
+    func testWrongTypedLegacyKeyIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":"abc"}"#)
+    }
+
+    func testWrongTypedCurrentAssetIDIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":5}"#)
+    }
+
+    func testEmptyLegacyKeysWithNothingToRestoreAreUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":[]}"#)
+    }
+
+    func testEmptyCurrentAssetIDWithNothingElseToRestoreIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":"","queueIDs":[]}"#)
+    }
+
+    func testWhitespaceCurrentAssetIDWithNothingElseToRestoreIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"currentAssetID":"   ","queueIDs":[]}"#)
+    }
+
+    func testEmptyIdentifierInLegacyQueueIDsIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"queueIDs":[""]}"#)
+    }
+
+    func testWhitespaceIdentifierInALegacyIDArrayIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(#"{"decidedIDs":["  "],"keptIDs":["a"]}"#)
+    }
+
+    func testLegacyFileMigratesKeepsMarksAndLeavesABackup() async throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let legacy = #"{"currentAssetID":"c","queueIDs":["b"],"decidedIDs":["c"]}"#
+        let url = try writeSessionFile(legacy, in: directory)
+        let original = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let state) = store.loadState() else {
+            return XCTFail("a real legacy file must still migrate, got \(store.loadState())")
+        }
+        XCTAssertEqual(state.marks, ["b"], "legacy queueIDs become the durable deletion list")
+        XCTAssertEqual(state.session?.currentAssetID, "c")
+
+        try await store.saveState(state)
+        XCTAssertEqual(FileSessionStore(directory: directory).loadState(), .loaded(state))
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        let name = try XCTUnwrap(backups.first, "a pre-migration backup must be left next to the file")
+        let backup = try Data(contentsOf: directory.appendingPathComponent(name))
+        XCTAssertEqual(backup, original, "the backup must hold the original legacy bytes")
+    }
+
+    /// A real legacy file must still migrate, keep every kind of progress, write
+    /// only after the upgrade succeeds, and leave a backup of the original bytes.
+    private func assertLegacyFileMigratesAndLeavesABackup(
+        _ json: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        assertProgress: (PersistedState) -> Void = { _ in }
+    ) async throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try writeSessionFile(json, in: directory)
+        let original = try Data(contentsOf: url)
+
+        let store = FileSessionStore(directory: directory)
+        let result = store.loadState()
+        guard case .migrated(let state) = result else {
+            return XCTFail("expected a migration, got \(result)", file: file, line: line)
+        }
+        assertProgress(state)
+
+        try await store.saveState(state)
+        XCTAssertEqual(
+            FileSessionStore(directory: directory).loadState(),
+            .loaded(state),
+            file: file,
+            line: line
+        )
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        let name = try XCTUnwrap(
+            backups.first,
+            "a pre-migration backup must be left next to the file",
+            file: file,
+            line: line
+        )
+        let backup = try Data(contentsOf: directory.appendingPathComponent(name))
+        XCTAssertEqual(
+            backup,
+            original,
+            "the backup must hold the original legacy bytes",
+            file: file,
+            line: line
+        )
+    }
+
+    func testLegacyFileWithOnlyKeptIDsIsUnreadableAndKept() throws {
+        // keptIDs without a cursor or decided IDs is an inconsistent fragment:
+        // the app cannot resume it, so migrating it would let the next session
+        // silently replace it. Keep the bytes instead.
+        try assertDamagedFileIsKept(#"{"keptIDs":["a"]}"#)
+    }
+
+    func testLegacyFileWithOnlyUndoEntriesIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"undoEntries":[{"assetID":"a","effect":{"kept":{}},"displacedAssetID":null}]}"#
+        )
+    }
+
+    func testLegacyTumblerModeWithoutAPlanIsUnreadableAndKept() throws {
+        // Without the plan, restoration would invent a fresh random order while
+        // reporting a successful upgrade. Keep the bytes instead.
+        try assertDamagedFileIsKept(#"{"currentAssetID":"c","mode":"tumbler"}"#)
+    }
+
+    func testLegacyTumblerModeWithoutAPlanIsUnreadableEvenWithAMark() throws {
+        // A durable mark must not bypass the Tumbler consistency check and let
+        // restoration invent a replacement random order.
+        try assertDamagedFileIsKept(
+            #"{"currentAssetID":"c","mode":"tumbler","queueIDs":["b"]}"#
+        )
+    }
+
+    func testBlankIdentifierInsideATumblerPlansRemainingIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"tumbler":{"seed":7,"remaining":["a",""],"handled":[]}}"#
+        )
+    }
+
+    func testBlankIdentifierInsideATumblerPlansHandledIsUnreadableAndKept() throws {
+        try assertDamagedFileIsKept(
+            #"{"tumbler":{"seed":7,"remaining":["a"],"handled":["  "]}}"#
+        )
+    }
+
+    func testLegacyFileWithKeptIDsAndAResumableCursorKeepsTheKeptIDs() async throws {
+        let legacy = #"{"currentAssetID":"c","keptIDs":["a","b"]}"#
+        try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
+            XCTAssertEqual(state.session?.currentAssetID, "c")
+            XCTAssertEqual(
+                state.session?.keptIDs,
+                ["a", "b"],
+                "keptIDs are kept when the session is otherwise resumable"
+            )
+        }
+    }
+
+    func testLegacyFileWithOnlyAPendingTumblerPlanMigratesAndLeavesABackup() async throws {
+        let legacy = #"{"tumbler":{"seed":7,"remaining":["a","b"],"handled":[]}}"#
+        try await assertLegacyFileMigratesAndLeavesABackup(legacy) { state in
+            XCTAssertEqual(
+                state.session?.currentAssetID,
+                "b",
+                "a plan-only save seeds the cursor from the plan's own next identifier"
+            )
+            XCTAssertEqual(
+                state.session?.tumbler?.remaining,
+                ["a"],
+                "the rest of the pending random order is preserved"
+            )
+            XCTAssertEqual(
+                state.session?.mode,
+                .tumbler,
+                "a persisted Tumbler plan means a Random session, so the plan is not ignored"
+            )
+        }
+    }
+
+    /// The plan-only cursor must survive reconciliation. Without it, the
+    /// reconciler would pick the newest photo chronologically and the engine
+    /// would reserve that instead of the plan's next, reordering the walk.
+    func testPlanOnlyTumblerMigrationKeepsThePlanOrderThroughReconciliation() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // `next()` pops the last entry, so "a" is the plan's intended first
+        // photo; chronological reconciliation would choose the newest, "e".
+        let legacy = #"{"tumbler":{"seed":7,"remaining":["e","a"],"handled":[]}}"#
+        _ = try writeSessionFile(legacy, in: directory)
+
+        let store = FileSessionStore(directory: directory)
+        guard case .migrated(let migrated) = store.loadState() else {
+            return XCTFail("expected a migration, got \(store.loadState())")
+        }
+        XCTAssertEqual(migrated.session?.currentAssetID, "a", "the cursor comes from the plan, not the clock")
+
+        let order = TestLibrary.order()
+        let reconciled = AssetReconciler.reconcile(migrated, order: order)
+        XCTAssertEqual(
+            reconciled.state.session?.currentAssetID,
+            "a",
+            "reconciliation must keep the plan's cursor, not pick the newest asset"
+        )
+        XCTAssertEqual(reconciled.state.session?.tumbler?.remaining, ["e"])
+
+        let engine = SessionEngine.restored(from: try XCTUnwrap(reconciled.state.session), order: order)
+        XCTAssertEqual(engine.current?.id, "a")
+        XCTAssertEqual(engine.tumbler?.remaining, ["e"], "the rest of the random order survives")
+    }
+
+    /// A migration whose upgrade write keeps failing must reuse the backup it
+    /// already made, not pile up a full copy on every launch.
+    func testRepeatedMigrationAttemptsReuseTheExistingBackup() throws {
+        let directory = makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let legacy = #"{"currentAssetID":"c","queueIDs":["b"]}"#
+        _ = try writeSessionFile(legacy, in: directory)
+
+        // Each store reads the still-unmigrated file, as if the previous
+        // migration write had failed and the next launch retried it.
+        for _ in 0..<3 {
+            let store = FileSessionStore(directory: directory)
+            guard case .migrated = store.loadState() else {
+                return XCTFail("expected a migration, got \(store.loadState())")
+            }
+        }
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("session-premigration-") && $0.hasSuffix(".json") }
+        XCTAssertEqual(backups.count, 1, "a retrying migration must reuse its backup")
+        let backup = try Data(contentsOf: directory.appendingPathComponent(try XCTUnwrap(backups.first)))
+        XCTAssertEqual(backup, Data(legacy.utf8), "the backup holds the original legacy bytes")
+    }
+
     func testWritesAreRefusedWhileUnreadableDataIsInTheWay() async throws {
         let directory = makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
