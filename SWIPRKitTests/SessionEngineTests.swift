@@ -260,4 +260,39 @@ final class SessionEngineTests: XCTestCase {
             "a hidden pool member is kept after the visible ones"
         )
     }
+
+    func testPersistedDoesNotFinishWithAHiddenUndecidedPoolMember() {
+        let visible = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        var engine = SessionEngine(
+            order: visible,
+            direction: .older,
+            poolIDs: Set(["a", "hidden"])
+        )
+        engine.start()
+        engine.apply(.keep)
+        XCTAssertTrue(engine.isFinished, "the visible snapshot is exhausted")
+        XCTAssertEqual(
+            engine.persisted().isFinished,
+            false,
+            "a hidden undecided pool member means the session is not really finished"
+        )
+    }
+
+    func testTumblerDoesNotConsumeHiddenPlanEntries() {
+        let visible = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let plan = TumblerPlan(assetIDs: ["a", "hidden"], seed: 5)
+        var engine = SessionEngine(order: visible, mode: .tumbler, tumbler: plan)
+        engine.start()
+
+        XCTAssertEqual(engine.current?.id, "a", "only the visible member is served")
+        XCTAssertEqual(
+            engine.persisted().tumbler?.remaining,
+            ["hidden"],
+            "the hidden entry stays pending instead of becoming handled"
+        )
+        XCTAssertFalse(
+            engine.persisted().tumbler?.handled.contains("hidden") ?? true,
+            "the hidden entry was never consumed"
+        )
+    }
 }

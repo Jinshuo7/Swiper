@@ -93,6 +93,7 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(model.markedIDs, marked, "marks reappear in their saved order")
         XCTAssertEqual(model.hiddenMarkCount, 0)
+        XCTAssertNil(model.persistenceNotice, "the hidden-mark notice is cleared once access widens")
     }
 
     func testHiddenMarksSurviveARelaunchUnderLimitedAccess() async {

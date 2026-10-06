@@ -114,6 +114,10 @@ final class AppModel: ObservableObject {
 
     var currentAsset: AssetDescriptor? { engine?.current }
 
+    /// True while ``persistenceNotice`` holds the Limited-access hidden-marks
+    /// message, so widening access can clear it instead of leaving it stale.
+    private var isShowingLimitedMarksNotice = false
+
     /// The marked ids the user can actually see. Under Limited Photos access a
     /// mark outside the selected subset is hidden, not gone: it stays in
     /// `storedState.marks` and reappears when access widens.
@@ -245,7 +249,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func dismissPersistenceNotice() { persistenceNotice = nil }
+    func dismissPersistenceNotice() {
+        persistenceNotice = nil
+        isShowingLimitedMarksNotice = false
+    }
 
     // MARK: - Teaching
 
@@ -343,6 +350,13 @@ final class AppModel: ObservableObject {
             persistenceNotice = count == 1
                 ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
                 : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
+            isShowingLimitedMarksNotice = true
+        } else if isShowingLimitedMarksNotice {
+            // Access widened (or the marks are visible again): the hidden-mark
+            // notice is no longer true, so clear it rather than leaving a
+            // stale banner on screen.
+            persistenceNotice = nil
+            isShowingLimitedMarksNotice = false
         }
 
         if engine?.isFinished == true && route == .viewer {

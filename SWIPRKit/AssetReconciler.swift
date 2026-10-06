@@ -146,8 +146,17 @@ public enum AssetReconciler {
             }
         }
 
+        // A Limited snapshot can be exhausted while the captured pool still
+        // holds hidden undecided members. Finishing there would be permanent:
+        // widening access would restore the ids but route straight to Review,
+        // never showing the undecided photos again.
+        let unavailable = Set(decidedIDs).union(queueIDs)
+        let hiddenUndecided = libraryAccessIsLimited && (poolIDs?.contains { id in
+            !workingOrder.idSet.contains(id) && !unavailable.contains(id)
+        } ?? false)
         let nothingLeftToShow = resolvedCurrentID == nil
-            && Set(decidedIDs).union(queueIDs).isSuperset(of: workingOrder.idSet)
+            && unavailable.isSuperset(of: workingOrder.idSet)
+        let isFinished = (session.isFinished || nothingLeftToShow) && !hiddenUndecided
 
         let reconciled = PersistedSession(
             currentAssetID: resolvedCurrentID,
@@ -161,7 +170,7 @@ public enum AssetReconciler {
             filterCategories: session.filterCategories,
             poolIDs: poolIDs,
             updatedAt: session.updatedAt,
-            isFinished: session.isFinished || nothingLeftToShow
+            isFinished: isFinished
         )
         return ReconciledSession(
             session: reconciled,

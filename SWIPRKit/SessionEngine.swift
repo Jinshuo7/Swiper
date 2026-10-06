@@ -240,10 +240,16 @@ public struct SessionEngine: Equatable, Sendable {
 
     private mutating func nextCandidateID() -> String? {
         if mode == .tumbler, var plan = tumbler {
-            while let candidate = plan.next() {
+            // Consume only an identifier this snapshot can show. Calling
+            // `next()` first would move a hidden (Limited access) member into
+            // `handled`, permanently skipping a photo the user never saw.
+            if let candidate = plan.peek(
+                limit: 1,
+                availableIDs: order.idSet,
+                excluding: unavailableIDs
+            ).first {
+                plan.reserve(candidate)
                 tumbler = plan
-                guard order.contains(id: candidate) else { continue }
-                if isUnavailable(candidate) { continue }
                 return candidate
             }
             tumbler = plan
@@ -336,7 +342,15 @@ public struct SessionEngine: Equatable, Sendable {
     // MARK: - Persistence
 
     public func persisted(updatedAt: Date = Date()) -> PersistedSession {
-        PersistedSession(
+        // A captured pool can name photos this snapshot cannot show (Limited
+        // Photos access). While such a photo is still undecided the session is
+        // not really finished, so never persist it as finished: widening access
+        // must return to the viewer, not jump to Review.
+        let visible = order.idSet
+        let hiddenUndecidedPoolMember = poolIDs?.contains { id in
+            !visible.contains(id) && !isUnavailable(id)
+        } ?? false
+        return PersistedSession(
             currentAssetID: cursorID,
             currentAssetDate: current?.creationDate,
             direction: direction,
@@ -347,16 +361,15 @@ public struct SessionEngine: Equatable, Sendable {
             tumbler: tumbler,
             filterCategories: filterCategories,
             poolIDs: poolIDs.map { pool in
-                let visible = order.ids
                 // A captured pool can name members the current snapshot cannot
                 // show (for example under Limited Photos access). They have no
                 // place in the library order, but dropping them here would
                 // overwrite the captured pool on the next save, so keep them
                 // after the visible ones in a stable order.
-                return visible + pool.subtracting(Set(visible)).sorted()
+                return order.ids + pool.subtracting(visible).sorted()
             },
             updatedAt: updatedAt,
-            isFinished: isFinished
+            isFinished: isFinished && !hiddenUndecidedPoolMember
         )
     }
 

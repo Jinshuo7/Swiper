@@ -84,7 +84,30 @@ final class AssetReconcilerTests: XCTestCase {
         )
     }
 
-    func testStateReconcileKeepsMarksAndSessionCoherent() {        let liveOrder = LibraryOrder(TestLibrary.sequential())
+    func testLimitedAccessDoesNotFinishASessionWithHiddenUndecidedMembers() {
+        let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let state = PersistedState(
+            session: PersistedSession(
+                currentAssetID: "a",
+                direction: .older,
+                decidedIDs: ["a"],
+                poolIDs: ["a", "hidden"]
+            )
+        )
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(
+            reconciled.state.session?.isFinished,
+            false,
+            "a hidden undecided pool member keeps the session open"
+        )
+    }
+
+    func testStateReconcileKeepsMarksAndSessionCoherent() {
+        let liveOrder = LibraryOrder(TestLibrary.sequential())
         let state = PersistedState(
             marks: ["b", "vanished"],
             session: PersistedSession(currentAssetID: "c", direction: .older, decidedIDs: ["c"])
