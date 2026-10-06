@@ -18,11 +18,13 @@
 > substance is preserved by v1; its mutable product surface (single-entry flow,
 > grip cluster, photo-only scope) is superseded.
 >
-> **Known status for the v1 baseline:** the existing test baseline is not yet
-> all-green — the largest-accessibility-text ("AX5") reachability failure is
-> outstanding and is release-blocking (no known crash, data-loss,
-> deletion-safety or accessibility block may ship). Do not claim a green suite
-> until that is fixed and re-run on a named commit.
+> **Known status for the v1 baseline:** the former
+> largest-accessibility-text ("AX5") reachability failure was fixed by #58, and
+> #69 removed its CI skip in PR #72; on that PR's commit the simulator suite ran
+> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). One
+> saved-progress fix is still open and unmerged: PR #66 keeps a damaged save file
+> from being replaced with empty progress. Do not clear the saved-data gate until
+> #66 merges.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -71,7 +73,7 @@
 > **Newest first**, **Oldest first**, **Random**, **Jump to month**, the order
 > toggle and a grid cell (`choosePhoto.cell.fake-22`). The view itself is
 > unchanged — it already scrolls its chrome with the grid at accessibility
-> sizes — and the CI `-skip-testing` line is untouched for #32. The AX5 case is
+> sizes — and #69 later removed the CI `-skip-testing` line. The AX5 case is
 > green (1 test, 0 failures), the rest of `PlaySessionUITests` stays green with
 > the skip in place (16 tests, 0 failures), and
 > `docs/screenshots/milestones/v1-03-starting-point/choose-photo-ax5.png` shows
@@ -124,7 +126,9 @@
 | [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
 | [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
 | [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
-| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | No (PR #62 open; needs-strong-review) |
+| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
+| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | No (PR #72 open; needs-strong-review) |
+| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | No (PR #66 open; needs-strong-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 

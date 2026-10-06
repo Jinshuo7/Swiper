@@ -55,7 +55,8 @@ SWIPR is an offline iOS 17+ photo **and video** cleanup app: walk a fixed, filte
   opaque/material fallback of identical geometry; ≥44 pt targets, no colour-only meaning, Dynamic
   Type, VoiceOver labels/hints, placement actions, Voice Control names, Reduce
   Motion/Transparency, contrast, safe areas; English and Simplified Chinese complete (fluent human
-  reviews zh-Hans); AX5 largest-text reachability failure is a **release blocker**.
+  reviews zh-Hans); the AX5 largest-text reachability failure is fixed (#58/#69) and the suite,
+  including AX5, must stay green on the release candidate.
 10. **App Store release** — name **SWIPR**, subtitle "Clean photos and videos", Photo & Video
   category, free; minimal Orange & Porcelain icon, no text (owner approves final render);
   localized metadata + five screenshots; bilingual privacy policy + support page; "no data

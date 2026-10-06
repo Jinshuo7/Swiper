@@ -66,31 +66,32 @@
 - **#52 — Implement #46: wire Home and editable filters into a fixed session**
   (merge commit `907f12a`), which closed **#46**.
 
-## Queue (owner-requested, created 2026-10-05)
+## Queue (owner-requested, 2026-10-05)
 
-- **#68 — Ops: Sync docs/HANDOFF.md to the current state** (`ready-for-agent`).
-- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test**
-  (`ready-for-agent`); removes the `-skip-testing` line in
-  `.github/workflows/ci.yml`.
+- **#68 — Ops: Sync docs/HANDOFF.md to the current state** — done (PR #71,
+  merged as `67967ad`).
+- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done in
+  **PR #72**, which waits for the owner because it edits a workflow.
 - **#70 — V1-06a: Keep marked photos through Limited Photos access**
-  (`ready-for-agent`).
+  (`ready-for-agent`). Not started yet.
 
 ## What is next
 
-1. Finish the owner's decisions on the risky PRs: **#66** (conditional
-   approval round found problems, now fixed on `8d965fb`) and **#72** (AX5
-   re-enable; needs approval because it edits a workflow).
-2. Land **#68** (this handoff), then implement **#70** (Limited Photos marks).
-3. Start the next milestone, **V1-04 (#26 — the neutral direct-move decision
-   dock)**, split into subtickets.
-4. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. Finish the owner's decisions on the risky PRs: **#66** (the final Codex
+   round found problems, fixed on `8d965fb`; awaiting a fresh owner approval)
+   and **#72** (AX5 re-enable; needs approval because it edits a workflow).
+2. Implement **#70** (Limited Photos marks), then start the next milestone,
+   **V1-04 (#26 — the neutral direct-move decision dock)**, split into
+   subtickets.
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
-### Note: the AX5 skip belongs to #32 / #69
+### Note: the AX5 skip is gone (#69)
 
 The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
-#58 fixed the scroll; ticket **#69** removes the line, in PR **#72** (risky
-because it edits `.github/workflows/ci.yml`).
+#58 fixed the scroll and **#69** removed the line in **PR #72** (risky because
+it edits `.github/workflows/ci.yml`, so it waits for the owner's approval). The
+AX5 case now runs on every PR.
 
 ### Note: the two named traversals never wrap
 

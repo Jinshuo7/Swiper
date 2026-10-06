@@ -200,9 +200,10 @@ on real hardware without changing the contract.
    accessibility, store, privacy and support copy are included. A fluent human
    reviews Simplified Chinese before release. See
    [`LOCALIZATION.md`](LOCALIZATION.md).
-4. **Known release blocker:** the largest-accessibility-text ("AX5") reachability
-   failure must be fixed and the suite green before the release gate. It is
-   release-blocking, not cosmetic.
+4. **Accessibility baseline:** the former largest-accessibility-text ("AX5")
+   reachability failure is fixed (#58) and its CI skip was removed (#69), so the
+   suite including AX5 is green. Release still requires a green suite on the
+   release-candidate commit.
 
 ## 10. App Store release
 
