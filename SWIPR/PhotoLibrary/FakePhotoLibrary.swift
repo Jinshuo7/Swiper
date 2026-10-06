@@ -52,6 +52,12 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
 
     var changeHandler: (() -> Void)?
     var faults: Faults = .none
+    /// What ``currentAuthorization()`` and ``requestAuthorization()`` report.
+    /// App tests set this to `.limited` to exercise a partial snapshot.
+    var authorization: LibraryAuthorization = .authorized
+    /// The subset of assets visible under Limited access. `nil` means the whole
+    /// library is visible. Ignored unless ``authorization`` is `.limited`.
+    var limitedSelectionIDs: Set<String>?
 
     private var assets: [AssetDescriptor]
     private var deletedIDs: Set<String> = []
@@ -134,15 +140,23 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
 
     // MARK: - Authorization
 
-    func currentAuthorization() -> LibraryAuthorization { .authorized }
-    func requestAuthorization() async -> LibraryAuthorization { .authorized }
+    func currentAuthorization() -> LibraryAuthorization { authorization }
+    func requestAuthorization() async -> LibraryAuthorization { authorization }
+
+    /// The assets the app can see right now: the whole (non-deleted) library,
+    /// or just the Limited selection when access is limited.
+    private var visibleAssets: [AssetDescriptor] {
+        let live = assets.filter { !deletedIDs.contains($0.id) }
+        guard authorization == .limited, let selection = limitedSelectionIDs else { return live }
+        return live.filter { selection.contains($0.id) }
+    }
+
     @MainActor func presentLimitedLibraryPicker(from viewController: UIViewController) {}
 
     // MARK: - PhotoLibraryProviding
 
     func fetchAllDescriptors() async -> [AssetDescriptor] {
-        assets
-            .filter { !deletedIDs.contains($0.id) }
+        visibleAssets
             .map { descriptor in
                 AssetDescriptor(
                     id: descriptor.id,

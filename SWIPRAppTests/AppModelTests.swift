@@ -52,6 +52,80 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(store.state?.session?.currentAssetID, model.currentAsset?.id)
     }
 
+    // MARK: - Limited Photos access
+
+    func testLimitedAccessKeepsHiddenMarksAndRestoresThemWhenAccessWidens() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let (model, _, store) = await bootstrapped(library: library)
+
+        // Mark three photos in a known order.
+        model.startNewest()
+        await model.settle()
+        var marked: [String] = []
+        for _ in 0..<3 {
+            guard let id = model.currentAsset?.id else { break }
+            marked.append(id)
+            model.apply(.queueDeletion)
+            await model.settle()
+        }
+        XCTAssertEqual(model.markedIDs, marked)
+        let statisticsBefore = model.statistics
+
+        // Limited access now hides the first two marks but keeps the rest live.
+        let hidden = Set(marked.prefix(2))
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(hidden)
+        await model.refreshAuthorization()
+        await model.settle()
+
+        XCTAssertEqual(model.hiddenMarkCount, 2, "hidden marks are counted")
+        XCTAssertEqual(Set(model.markedIDs), Set(marked).subtracting(hidden), "only visible marks are shown")
+        XCTAssertEqual(Set(store.state?.marks ?? []), Set(marked), "the durable list keeps the hidden marks")
+        XCTAssertEqual(model.statistics, statisticsBefore, "hiding a mark credits no deletion")
+        XCTAssertNotNil(model.persistenceNotice, "the user is told some marks are hidden")
+
+        // Widening access brings the hidden marks back in their saved order.
+        library.authorization = .authorized
+        library.limitedSelectionIDs = nil
+        await model.refreshAuthorization()
+        await model.settle()
+
+        XCTAssertEqual(model.markedIDs, marked, "marks reappear in their saved order")
+        XCTAssertEqual(model.hiddenMarkCount, 0)
+    }
+
+    func testHiddenMarksSurviveARelaunchUnderLimitedAccess() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        model.startNewest()
+        await model.settle()
+        var marked: [String] = []
+        for _ in 0..<2 {
+            guard let id = model.currentAsset?.id else { break }
+            marked.append(id)
+            model.apply(.queueDeletion)
+            await model.settle()
+        }
+
+        // Relaunch with the same store while a Limited selection hides every mark.
+        let hidden = Set(marked)
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(hidden)
+        let (relaunched, _, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertEqual(relaunched.hiddenMarkCount, 2, "the relaunch still counts the hidden marks")
+        XCTAssertTrue(relaunched.markedIDs.isEmpty, "no hidden mark is presented")
+        XCTAssertEqual(
+            Set(store.state?.marks ?? []),
+            Set(marked),
+            "the durable deletion list still holds every mark"
+        )
+    }
+
     func testFailedSavePausesSortingAndKeepsTheDecisionRecoverable() async {
         let (model, _, store) = await bootstrapped()
         model.startNewest()

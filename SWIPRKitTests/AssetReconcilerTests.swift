@@ -23,8 +23,68 @@ final class AssetReconcilerTests: XCTestCase {
         XCTAssertEqual(reconciled.session.keptIDs, ["c"])
     }
 
-    func testStateReconcileKeepsMarksAndSessionCoherent() {
-        let liveOrder = LibraryOrder(TestLibrary.sequential())
+    func testLimitedAccessKeepsMarksAndMembershipOutsideTheVisibleSnapshot() {
+        let liveOrder = LibraryOrder([
+            TestLibrary.descriptor(id: "a", dayOffset: 0),
+            TestLibrary.descriptor(id: "b", dayOffset: 1),
+        ])
+        let state = PersistedState(
+            marks: ["a", "hidden"],
+            session: PersistedSession(
+                currentAssetID: "b",
+                direction: .older,
+                decidedIDs: ["hidden"],
+                keptIDs: ["hidden"],
+                poolIDs: ["a", "b", "hidden"]
+            )
+        )
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(reconciled.state.marks, ["a", "hidden"], "a hidden mark is not dropped")
+        XCTAssertEqual(reconciled.state.session?.decidedIDs, ["hidden"])
+        XCTAssertEqual(reconciled.state.session?.keptIDs, ["hidden"])
+        XCTAssertEqual(reconciled.state.session?.poolIDs, ["a", "b", "hidden"])
+        XCTAssertEqual(reconciled.state.session?.currentAssetID, "b")
+        XCTAssertEqual(reconciled.externallyRemovedIDs, [], "Limited access credits nothing as removed")
+    }
+
+    func testLimitedAccessKeepsAMarksOnlyStateWhole() {
+        let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let state = PersistedState(marks: ["a", "hidden"])
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(reconciled.state.marks, ["a", "hidden"])
+        XCTAssertEqual(reconciled.externallyRemovedIDs, [])
+    }
+
+    func testLimitedAccessKeepsThePendingTumblerPlan() {
+        let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let state = PersistedState(
+            session: PersistedSession(
+                currentAssetID: "a",
+                mode: .tumbler,
+                tumbler: TumblerPlan(assetIDs: ["a", "hidden"], seed: 3)
+            )
+        )
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(
+            reconciled.state.session?.tumbler?.remaining.count,
+            2,
+            "a hidden plan member is preserved, not reconciled away"
+        )
+    }
+
+    func testStateReconcileKeepsMarksAndSessionCoherent() {        let liveOrder = LibraryOrder(TestLibrary.sequential())
         let state = PersistedState(
             marks: ["b", "vanished"],
             session: PersistedSession(currentAssetID: "c", direction: .older, decidedIDs: ["c"])

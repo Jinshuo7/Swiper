@@ -113,7 +113,25 @@ final class AppModel: ObservableObject {
     }
 
     var currentAsset: AssetDescriptor? { engine?.current }
-    var markedIDs: [String] { engine?.queue.ids ?? marks.ids }
+
+    /// The marked ids the user can actually see. Under Limited Photos access a
+    /// mark outside the selected subset is hidden, not gone: it stays in
+    /// `storedState.marks` and reappears when access widens.
+    var markedIDs: [String] {
+        let ids = engine?.queue.ids ?? marks.ids
+        guard authorization.isLimited else { return ids }
+        let visible = order.idSet
+        return ids.filter { visible.contains($0) }
+    }
+
+    /// Marked photos kept on disk but hidden because Photos access is Limited.
+    var hiddenMarkCount: Int {
+        guard authorization.isLimited else { return 0 }
+        let ids = engine?.queue.ids ?? marks.ids
+        let visible = order.idSet
+        return ids.filter { !visible.contains($0) }.count
+    }
+
     var queueCount: Int { markedIDs.count }
     var hasPhotos: Bool { !order.isEmpty }
 
@@ -288,7 +306,11 @@ final class AppModel: ObservableObject {
         let descriptors = await library.fetchAllDescriptors()
         order = LibraryOrder(descriptors)
 
-        let reconciled = AssetReconciler.reconcile(storedState, order: order)
+        let reconciled = AssetReconciler.reconcile(
+            storedState,
+            order: order,
+            libraryAccessIsLimited: authorization.isLimited
+        )
         storedState = reconciled.state
 
         if let session = storedState.session, session.isResumable {
@@ -314,6 +336,13 @@ final class AppModel: ObservableObject {
             if !isPersistenceReadOnly {
                 await persistQuietly(storedState)
             }
+        } else if hiddenMarkCount > 0 {
+            // The snapshot is Limited, so these marks are preserved but not
+            // shown. Say so plainly and point at the system picker.
+            let count = hiddenMarkCount
+            persistenceNotice = count == 1
+                ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
+                : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
         }
 
         if engine?.isFinished == true && route == .viewer {

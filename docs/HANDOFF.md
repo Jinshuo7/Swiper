@@ -30,24 +30,24 @@
 
 ## Open PRs
 
-- **#66 — fix: keep a damaged save file instead of replacing it with empty
-  progress** (`driver/damaged-save`, head `8d965fb`). Risky
-  (`SWIPRKit/SessionPersistence.swift`), `needs-strong-review`, open, **waiting
-  for the owner**. The owner gave conditional approval and asked for one final
-  `@codex review` on `8f9f608`; that round found two more problems (a mark
-  bypassed the Tumbler-mode consistency check, and blank IDs inside a Tumbler
-  plan's `remaining`/`handled` were accepted), both fixed on `8d965fb`. No
-  further review round was requested and no merge happened. **Do not add
-  `strong-review-passed` without a fresh owner approval.**
-- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)**
-  (`driver/69-ax5-reenable`). Risky because it edits
-  `.github/workflows/ci.yml` (every workflow file is risky), so the owner must
-  approve it; labelled `needs-strong-review`.
+- **#74 — V1-06a: Keep marked photos through Limited Photos access**
+  (`driver/70-limited-marks`, this PR). Risky (`SWIPRKit/AssetReconciler.swift`,
+  `SWIPR/ViewModels/AppModel.swift`, `SWIPR/Views/RootView.swift`); labelled
+  `needs-strong-review`, so it waits for the owner.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
+
+- **#66 — fix: keep a damaged save file instead of replacing it with empty
+  progress** (merge commit `c2af5f5`), its follow-up parked as **#73**.
+- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)** (merge commit
+  `8efd39e`), which closed **#69**.
+- **#71 — docs: sync HANDOFF.md to the current state (#68)** (merge commit
+  `67967ad`), which closed **#68**.
+- **#67 — docs: record the risky-PR Codex review workflow and Code Review
+  Rules** (merge commit `881aff7`).
 
 - **#67 — docs: record the risky-PR Codex review workflow and Code Review
   Rules** (merge commit `881aff7`), which added the standing workflow to
@@ -70,19 +70,16 @@
 
 - **#68 — Ops: Sync docs/HANDOFF.md to the current state** — done (PR #71,
   merged as `67967ad`).
-- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done in
-  **PR #72**, which waits for the owner because it edits a workflow.
-- **#70 — V1-06a: Keep marked photos through Limited Photos access**
-  (`ready-for-agent`). Not started yet.
+- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
+  merged as `8efd39e`).
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — in
+  progress; PR #74 waits for the owner.
 
 ## What is next
 
-1. Finish the owner's decisions on the risky PRs: **#66** (the final Codex
-   round found problems, fixed on `8d965fb`; awaiting a fresh owner approval)
-   and **#72** (AX5 re-enable; needs approval because it edits a workflow).
-2. Implement **#70** (Limited Photos marks), then start the next milestone,
-   **V1-04 (#26 — the neutral direct-move decision dock)**, split into
-   subtickets.
+1. Finish the owner's decision on the risky PR **#74** (Limited Photos marks).
+2. Split **V1-04 (#26 — the neutral direct-move decision dock)** into subtickets
+   and work the ones that are not risky while #74 waits.
 3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the AX5 skip is gone (#69)
