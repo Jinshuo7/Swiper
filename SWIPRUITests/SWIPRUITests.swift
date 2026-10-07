@@ -369,7 +369,7 @@ final class SWIPRUITests: XCTestCase {
         let positionAtKill = photoElement(app).label
         XCTAssertNotEqual(positionAtKill, markedLabel)
 
-        AppLaunchHandoff.stop(app)
+        AppLaunchHandoff.stopAppUnderTest()
 
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.resume"].waitForExistence(timeout: 10))
@@ -1165,7 +1165,7 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
 
-        AppLaunchHandoff.stop(app)
+        AppLaunchHandoff.stopAppUnderTest()
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         XCTAssertTrue(relaunched.buttons["entry.review"].exists, "marks survive a relaunch")

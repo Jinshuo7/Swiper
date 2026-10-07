@@ -59,28 +59,27 @@ the manual real-Live-Photo check.
 ### The launch/terminate handoff (#81)
 
 The suite drives one installed app through ~50 test methods, so almost every
-test crosses a launch or a terminate handoff. `XCUIApplication.launch()` stops a
-previously running instance itself, and does so asynchronously: it returns while
-the old process is still tearing down. A launch that starts during that teardown
-can attach to the dying process, which keeps the *previous* launch arguments, so
-the app comes up as the real PhotoKit app on its permission screen instead of the
-fake-library Home that launch asked for — and the test then fails on a screen
-that should have been there. The same race is reported from the other side as
-`Failed to terminate <bundle>:<pid>: Failed to terminate <bundle>:0`.
+test crosses a launch or a terminate handoff, and every reported #81 failure is
+one of those handoffs going wrong: `Failed to terminate
+com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
+raised from `XCUIApplication.launch()`, a Home that never appeared after a
+launch, a viewer that never appeared after a relaunch, and a Home entry asserted
+before the decision behind it had been saved.
 
 Every launch, terminate and starting-point handoff now goes through
-`SWIPRUITests/AppLaunchHandoff.swift`:
+`SWIPRUITests/AppLaunchHandoff.swift`, which keeps three rules:
 
-- `stopAppUnderTest()` runs in `tearDown`, so a test never ends with the app
-  still running;
-- `stop(_:)` blocks until the system reports the process gone, so the next
-  `launch()` has nothing left to terminate;
+- the app is stopped through the one `XCUIApplication` that launched it.
+  `terminate()` resolves the process through that instance's launch record, and a
+  never-launched proxy is what reports the `:0` above;
+- `stopAppUnderTest()` runs in `tearDown` and blocks until the system reports the
+  process gone, so the next `launch()` begins from `notRunning` instead of having
+  to terminate a dying app itself;
 - `launch(_:firstScreen:)` then waits until the app is in the foreground with the
-  screen that launch promises on screen;
-- `beginSession(_:in:)` waits for the grid to hand over to the viewer **or** to
-  the `Start a new session?` confirmation a saved session raises, instead of
-  guessing after one second and leaving the confirmation covering a viewer that
-  never arrives.
+  screen that launch promises on screen, and `beginSession(_:in:)` waits for the
+  grid to hand over to the viewer **or** to the `Start a new session?`
+  confirmation a saved session raises, instead of guessing after one second and
+  leaving the confirmation covering a viewer that never arrives.
 
 This is synchronisation, not retry: no test is removed, skipped, shortened,
 loosened or marked expected-failure. `testEveryLaunchRunsTheArgumentsItWasGiven`

@@ -443,7 +443,7 @@ final class PlaySessionUITests: XCTestCase {
         let closeFrame = app.buttons["viewer.close"].frame
         goHome(app)
 
-        AppLaunchHandoff.stop(app)
+        AppLaunchHandoff.stopAppUnderTest()
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         _ = startViewer(relaunched)
