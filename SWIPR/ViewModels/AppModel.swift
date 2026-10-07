@@ -312,6 +312,11 @@ final class AppModel: ObservableObject {
 
     /// Refreshes the metadata snapshot and reconciles stored state against it.
     func reloadLibrary() async {
+        // Read the live authorization before reconciling. PhotoKit can call the
+        // change handler before the scene-phase refresh, so reconciling against
+        // a stale `.authorized` value would treat a new Limited subset as a full
+        // snapshot and drop hidden work.
+        authorization = library.currentAuthorization()
         let descriptors = await library.fetchAllDescriptors()
         order = LibraryOrder(descriptors)
 
@@ -352,13 +357,16 @@ final class AppModel: ObservableObject {
             }
         } else if hiddenMarkCount > 0 {
             // The snapshot is Limited, so these marks are preserved but not
-            // shown. Say so plainly and point at the system picker.
-            let count = hiddenMarkCount
-            let message = count == 1
-                ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
-                : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
-            persistenceNotice = message
-            limitedMarksNotice = message
+            // shown. Say so plainly and point at the system picker, but never
+            // overwrite an unrelated persistence error with this notice.
+            if persistenceNotice == nil || limitedMarksNotice != nil {
+                let count = hiddenMarkCount
+                let message = count == 1
+                    ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
+                    : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
+                persistenceNotice = message
+                limitedMarksNotice = message
+            }
         } else if limitedMarksNotice != nil {
             // Access widened (or the marks are visible again): the hidden-mark
             // notice is no longer true, so clear it rather than leaving a

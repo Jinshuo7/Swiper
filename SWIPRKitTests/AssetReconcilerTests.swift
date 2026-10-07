@@ -84,6 +84,33 @@ final class AssetReconcilerTests: XCTestCase {
         )
     }
 
+    func testLimitedAccessRequeuesAHiddenTumblerCursor() {
+        let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        var plan = TumblerPlan(assetIDs: ["a", "hidden"], seed: 3)
+        plan.reserve("hidden") // the served cursor is now hidden
+        let state = PersistedState(
+            session: PersistedSession(
+                currentAssetID: "hidden",
+                mode: .tumbler,
+                tumbler: plan
+            )
+        )
+        let reconciled = AssetReconciler.reconcile(
+            state,
+            order: liveOrder,
+            libraryAccessIsLimited: true
+        )
+        XCTAssertEqual(reconciled.state.session?.currentAssetID, "a", "the cursor moves to a visible asset")
+        XCTAssertFalse(
+            reconciled.state.session?.tumbler?.handled.contains("hidden") ?? true,
+            "the hidden cursor is returned to the plan"
+        )
+        XCTAssertTrue(
+            reconciled.state.session?.tumbler?.remaining.contains("hidden") ?? false,
+            "widening access can serve the hidden photo again"
+        )
+    }
+
     func testLimitedAccessDoesNotFinishASessionWithHiddenUndecidedMembers() {
         let liveOrder = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
         let state = PersistedState(

@@ -122,6 +122,15 @@ public enum AssetReconciler {
             tumbler = plan
         }
 
+        // Under Limited access a Tumbler cursor can become hidden. The plan is
+        // preserved, but the old cursor is already in `handled`; return it to the
+        // plan so widening access can serve it again instead of skipping it.
+        if libraryAccessIsLimited, session.mode == .tumbler,
+           let hiddenCurrent = session.currentAssetID,
+           !workingOrder.contains(id: hiddenCurrent) {
+            tumbler?.requeue(hiddenCurrent)
+        }
+
         var resolvedCurrentID = session.currentAssetID
         var resolvedCurrentDate = session.currentAssetDate
         if let currentID = resolvedCurrentID, workingOrder.contains(id: currentID) {
