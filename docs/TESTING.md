@@ -86,6 +86,20 @@ loosened or marked expected-failure. `testEveryLaunchRunsTheArgumentsItWasGiven`
 launches the same way three times in a row and makes the app prove it read the
 arguments of *that* launch, so the handoff cannot silently regress.
 
+**What the fix does not remove.** The CI runner still loses the automation
+session with the app about one run in three, and the two signatures seen so far
+are both XCTest's own: `Failed to terminate com.zhangjinshuo.swipr:<pid>:
+Failed to terminate com.zhangjinshuo.swipr:0` after a 68 s terminate wait, and
+`Failed to get matching snapshots: Timed out while evaluating UI query` after
+three 30 s accessibility-snapshot retries. Neither reproduced locally in four
+full suites and ~800 app launches/terminates on `SWIPR iPhone 11 Pro`, while the
+CI runner hits it about once every 75 handoffs, which is the rate #81 recorded
+before this work. It is an XCTest/CoreSimulator stall, so it is parked with
+`needs-owner` and its evidence rather than retried or skipped. The two costs that
+could be attacked next are the 66 app launches a run needs (every test has its
+own launch arguments) and the breadth of the accessibility queries
+(`app.descendants(matching: .any)[id]` fetches the whole tree).
+
 #### Local reproduction loop for the flake
 
 Two flakes in about six full CI runs is too rare to chase with single runs, so

@@ -110,27 +110,34 @@
 > touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
 > tests, 0 failures. The AX5 `-skip-testing` line is untouched.
 >
-> **#81 update (2026-10-07):** the flaky UI launch/terminate handoff is fixed in
-> the test harness. The failure class was any test that crosses a launch or a
-> terminate handoff: `Failed to terminate
+> **#81 update (2026-10-07):** the UI suite's launch/terminate handoff is now
+> deterministic, and the remaining flake is parked. Every #81 report is a launch
+> or terminate handoff going wrong: `Failed to terminate
 > com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
-> from `XCUIApplication.launch()`, and `could not get back to the entry screen`
-> or a missing `viewer.photo` on the screen a launch or a relaunch promised. The
-> cause is that `launch()` stops a previously running instance itself, and
-> asynchronously, so a launch that starts while the old process is still tearing
-> down can attach to the dying process and keep the *previous* launch arguments —
-> the app then comes up as the real PhotoKit app instead of the fake-library Home
-> the test asked for. Every launch, terminate and starting-point handoff now goes
-> through the new `SWIPRUITests/AppLaunchHandoff.swift`: `tearDown` stops the app
-> the test was driving, `stop(_:)` blocks until the system reports it gone,
+> from `XCUIApplication.launch()`, a Home that never appeared after a launch, a
+> viewer that never appeared after a relaunch, and a Home entry asserted before
+> the decision behind it had been saved. All of them now go through the new
+> `SWIPRUITests/AppLaunchHandoff.swift`: the app is stopped through the one
+> `XCUIApplication` that launched it (a never-launched proxy is what reports the
+> `:0`), `tearDown` stops the app and blocks until the system reports it gone,
 > `launch(_:firstScreen:)` waits for the foreground screen that launch promises,
 > and `beginSession(_:in:)` waits for the grid to hand over to the viewer **or**
 > to the replacement confirmation instead of guessing after one second. Entries
 > that a decision creates are waited for rather than assumed final, because Close
 > returns Home while the decision's save is still in flight. Nothing is skipped,
 > shortened, loosened or retried, and
-> `testEveryLaunchRunsTheArgumentsItWasGiven` pins the invariant. The reproduction
-> loop and the rule are in `docs/TESTING.md`.
+> `testEveryLaunchRunsTheArgumentsItWasGiven` pins the invariant.
+>
+> **Still open, parked as `needs-owner`.** The CI runner still loses its
+> automation session with the app about one run in three. Both signatures are
+> XCTest's own — the terminate wait above, and `Failed to get matching snapshots:
+> Timed out while evaluating UI query` after three 30 s snapshot retries — and
+> neither reproduces locally (four full suites and ~800 launches/terminates on
+> `SWIPR iPhone 11 Pro` are clean), while the CI runner hits it about once every
+> 75 handoffs. That is the rate #81 recorded *before* this work, so the harness
+> fix removes the deterministic defects and not the stall itself. Retrying or
+> skipping it is exactly what the ticket forbids, so it waits for the owner.
+> The reproduction loop and the rule are in `docs/TESTING.md`.
 
 ---
 
@@ -151,7 +158,7 @@
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
-| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | — | No | Yes |
+| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 1 | No — the harness defects are fixed, but the CI runner still loses its automation session about one run in three; parked as `needs-owner` | No (PR #83 open, `owner-blocked`) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >

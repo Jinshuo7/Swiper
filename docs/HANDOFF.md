@@ -23,21 +23,24 @@
 
 ## Current ticket
 
-- **#81 — V1-12a: Stabilise the flaky UI app-termination test**
-  (`driver/81-flaky-ui`). The launch/terminate handoff is fixed in the test
-  harness: `SWIPRUITests/AppLaunchHandoff.swift` stops the app the test was
-  driving in `tearDown`, blocks until the system reports the old process gone
-  before every launch, waits for the first screen that launch promises, and waits
-  for the grid to hand over to the viewer **or** the replacement confirmation
-  instead of guessing after one second. Nothing is skipped, shortened, loosened
-  or retried; `docs/TESTING.md` has the rule and the reproduction loop.
+- **#81 — V1-12a: Stabilise the flaky UI app-termination test** —
+  (`driver/81-flaky-ui`, PR #83, `owner-blocked`). The launch/terminate handoff
+  is fixed in the test harness (`SWIPRUITests/AppLaunchHandoff.swift`), but the
+  CI runner still loses its automation session with the app about one full run in
+  three, in XCTest's own terminate and snapshot timeouts. That is the rate the
+  issue recorded before the work and it does not reproduce locally, so it is
+  parked for the owner with the evidence rather than retried or skipped. See
+  `docs/TESTING.md` and the `needs-owner` issue filed for it.
 - The next milestone after this is **V1-04 (#26, the neutral direct-move
   decision dock)**, split into subtickets #76–#79.
 
 ## Open PRs
 
-- **#81's PR** (`driver/81-flaky-ui`) — the flaky-UI fix above. Test-only plus
-  docs, so it is not a risky path.
+- **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)**
+  (`driver/81-flaky-ui`, head `c6d8e7c`). Test-only plus docs, so it is not a
+  risky path. Two consecutive CI runs were green (38m20s, 43m39s) and the third
+  hit the residual XCTest snapshot timeout, so it is labelled `owner-blocked` and
+  **not merged**. Decide whether to take it and how to handle the residual.
 - **#74 — fix: keep marked photos through Limited Photos access (#70)**
   (`driver/70-limited-marks`, head `ff118ee`). Risky, `needs-strong-review`,
   open, **waiting for the owner**. Do not add `strong-review-passed` without the
@@ -82,7 +85,9 @@
 
 ## What is next
 
-1. Merge **#81**'s test-only PR once CI is green on repeated full runs.
+1. Decide **#81**: PR #83 is green on the harness fix, but the CI runner still
+   stalls the automation session about one run in three; the `needs-owner` issue
+   has the evidence and the options.
 2. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
    **V1-04** subtickets #76–#79.
 3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
@@ -90,11 +95,18 @@
 ### Note: the UI suite's launch handoff (#81)
 
 Every `SWIPRUITests` launch, terminate and starting-point handoff goes through
-`SWIPRUITests/AppLaunchHandoff.swift`. The flake it fixes is any test that
-crosses a handoff: `Failed to terminate com.zhangjinshuo.swipr:<pid>: Failed to
-terminate com.zhangjinshuo.swipr:0` raised from `XCUIApplication.launch()`, and
-a Home or viewer that never appeared after a launch or a relaunch. Add new UI
-tests through those helpers rather than calling `app.launch()` directly.
+`SWIPRUITests/AppLaunchHandoff.swift`. Add new UI tests through those helpers
+rather than calling `app.launch()` directly. What they give you: the app is
+stopped through the one `XCUIApplication` that launched it, a stop blocks until
+the system reports the process gone, and a launch or a starting point returns
+only once the screen it promises is on screen.
+
+They do not remove the runner-level stall. The CI runner still loses its
+automation session with the app about one full run in three, as XCTest's own
+`Failed to terminate …:0` (a 68 s terminate wait) or `Failed to get matching
+snapshots: Timed out while evaluating UI query` (three 30 s snapshot retries).
+Those are the flakes #81 was opened for, and they did not reproduce in four full
+local suites and ~800 launches/terminates on `SWIPR iPhone 11 Pro`.
 
 ### Note: the AX5 skip is gone (#69)
 
