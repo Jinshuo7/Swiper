@@ -91,12 +91,33 @@ All agents must follow [`docs/agents/OWNER-INSTRUCTIONS.md`](docs/agents/OWNER-I
   `FakePhotoLibrary`.
 - Do not add private APIs or Key-Value Coding file-size tricks. Storage is an
   estimate; see `SWIPRKit/StorageEstimate.swift` and `docs/adr/0002`.
-- Agents must never add the `strong-review-passed` label or remove the
-  `needs-strong-review` label; only the owner does. The `strong-review` workflow
+- Agents never remove the `needs-strong-review` label. Under the delegated
+  approval above, the agent may add `strong-review-passed` and merge only when
+  every condition holds; otherwise only the owner does. The `strong-review` workflow
   flags any PR that touches a path in `.github/risky-paths.txt`.
 - Agents must never weaken `.github/workflows/strong-review.yml`. Any PR that
   changes that file or `.github/risky-paths.txt` must say so at the top of its
   pull-request description.
+
+## Full autonomy until V1 (owner directive)
+
+The owner has delegated approval decisions for the rest of V1 (milestones
+#26–#36). Work without asking for approval. Stop only when (a) V1 is
+code-complete and all checks are green on `main`, or (b) the only work left
+needs the owner: an Apple Developer account, App Store Connect, signing, the
+final icon, a native Chinese review, or a real-device test. When stopping, open a
+GitHub issue titled "Owner: V1 ready" or "Owner: action needed" that @mentions
+@Jinshuo7, in plain non-technical language.
+
+Never sit idle on one PR: keep working on any ticket that does not depend on it.
+If Codex does not respond (rate limits), keep working and retry hourly; never
+merge a risky PR without a Codex review of its exact head. Flaky tests get a
+ticket and a root-cause fix; skipping is never allowed.
+
+Rules that never change: photos are deleted only through the iOS system
+confirmation, after the in-app Review confirmation; never weaken, skip or delete
+tests, CI, `.github/risky-paths.txt` or the strong-review gate; never force-push;
+never work in the owner's folder; PR #37 stays prohibited.
 
 ## Risky PR review workflow (`needs-strong-review`)
 
@@ -105,14 +126,20 @@ Applies to any PR the strong-review gate labels `needs-strong-review`.
 1. When its checks are green, comment exactly `@codex review` with
    `gh pr comment`.
 2. Wait for Codex's review: poll every 5 minutes with `gh pr view --comments`,
-   `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and `.../comments`. Give up
-   after 60 minutes and tell the owner.
+   `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and `.../comments`. If Codex
+   does not respond, keep working elsewhere and retry hourly.
 3. If Codex reports problems, fix them in the same PR, push without force, wait
-   for green checks, then comment `@codex review` again.
-4. Stop after 3 review rounds, or when Codex reports no problems. Then post the
-   owner a short summary: what changed, what Codex found, and what was fixed.
-5. Never add `strong-review-passed` and never merge a risky PR. Only the owner
-   says "approve #N".
+   for green checks, then comment `@codex review` again. Up to **5 rounds** per
+   PR.
+4. If a **P1** remains after 5 rounds, leave the PR open, add the
+   `owner-blocked` label, and move on. Revisit later with a fresh approach.
+   Never merge with an open P1.
+5. **Delegated approval.** The owner has delegated `strong-review-passed` to the
+   agent. Add it and merge (`--match-head-commit`, full SHA) only when ALL hold:
+   checks green on the current head; a Codex review of that exact head reports
+   **no P1**; no test, workflow, `risky-paths.txt` or gate was removed, skipped,
+   weakened or loosened. P2 findings: fix quick ones, otherwise open a follow-up
+   ticket and merge.
 6. Never comment `@codex` with anything other than `review`. Only the agent
    writes code.
 
