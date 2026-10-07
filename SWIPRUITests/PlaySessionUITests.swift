@@ -29,6 +29,12 @@ final class PlaySessionUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Leaves the app stopped, so the next test's launch cannot race a teardown.
+    override func tearDown() {
+        AppLaunchHandoff.stopAppUnderTest()
+        super.tearDown()
+    }
+
     // MARK: - Launching and driving
 
     private func launchApp(
@@ -45,7 +51,7 @@ final class PlaySessionUITests: XCTestCase {
         if persistentStore { app.launchArguments += ["-uiTestingPersistentStore"] }
         if resetStore { app.launchArguments += ["-uiTestingResetStore"] }
         app.launchArguments += extraArguments
-        app.launch()
+        AppLaunchHandoff.launch(app, firstScreen: "entry.settings")
         return app
     }
 
@@ -169,11 +175,7 @@ final class PlaySessionUITests: XCTestCase {
     /// replacement confirmation appear, chooses **Start new**. Tests that need to
     /// inspect the confirmation itself drive it directly instead.
     private func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
-        start.tap()
-        let confirm = app.buttons["replaceSession.startNew"]
-        if confirm.waitForExistence(timeout: 1) {
-            confirm.tap()
-        }
+        AppLaunchHandoff.beginSession(start, in: app)
     }
 
     /// Opens the Home media choice and starts the newest-first traversal.
@@ -441,7 +443,7 @@ final class PlaySessionUITests: XCTestCase {
         let closeFrame = app.buttons["viewer.close"].frame
         goHome(app)
 
-        app.terminate()
+        AppLaunchHandoff.stop(app)
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         _ = startViewer(relaunched)
@@ -974,14 +976,17 @@ final class PlaySessionUITests: XCTestCase {
         startViewer(app)
         keepCurrent(app)
         goHome(app)
-        XCTAssertTrue(app.buttons["entry.resume"].exists)
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
         capture("Entry — a session waiting")
 
         startViewer(app)
         markCurrent(app)
         goHome(app)
-        XCTAssertTrue(app.buttons["entry.review"].exists)
-        XCTAssertTrue(app.buttons["entry.resume"].exists)
+        // Close returns to Home as soon as it is tapped, while the decision's
+        // save is still in flight, so the entries a decision creates are waited
+        // for rather than assumed to be final already.
+        XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
         capture("Entry — a session and marks waiting")
     }
 }

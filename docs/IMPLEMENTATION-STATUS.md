@@ -21,10 +21,10 @@
 > **Known status for the v1 baseline:** the former
 > largest-accessibility-text ("AX5") reachability failure was fixed by #58, and
 > #69 removed its CI skip in PR #72; on that PR's commit the simulator suite ran
-> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). One
-> saved-progress fix is still open and unmerged: PR #66 keeps a damaged save file
-> from being replaced with empty progress. Do not clear the saved-data gate until
-> #66 merges.
+> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). The
+> damaged-save-file fix that was open for review is merged as PR #66, and PR #72
+> merged too (merge commits `c2af5f5` and `8efd39e`). The one open risky PR left
+> is #74 (marked photos through Limited Photos access, `needs-strong-review`).
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -109,6 +109,28 @@
 > and reconciliation drops vanished members while crediting no deletion and
 > touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
 > tests, 0 failures. The AX5 `-skip-testing` line is untouched.
+>
+> **#81 update (2026-10-07):** the flaky UI launch/terminate handoff is fixed in
+> the test harness. The failure class was any test that crosses a launch or a
+> terminate handoff: `Failed to terminate
+> com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
+> from `XCUIApplication.launch()`, and `could not get back to the entry screen`
+> or a missing `viewer.photo` on the screen a launch or a relaunch promised. The
+> cause is that `launch()` stops a previously running instance itself, and
+> asynchronously, so a launch that starts while the old process is still tearing
+> down can attach to the dying process and keep the *previous* launch arguments —
+> the app then comes up as the real PhotoKit app instead of the fake-library Home
+> the test asked for. Every launch, terminate and starting-point handoff now goes
+> through the new `SWIPRUITests/AppLaunchHandoff.swift`: `tearDown` stops the app
+> the test was driving, `stop(_:)` blocks until the system reports it gone,
+> `launch(_:firstScreen:)` waits for the foreground screen that launch promises,
+> and `beginSession(_:in:)` waits for the grid to hand over to the viewer **or**
+> to the replacement confirmation instead of guessing after one second. Entries
+> that a decision creates are waited for rather than assumed final, because Close
+> returns Home while the decision's save is still in flight. Nothing is skipped,
+> shortened, loosened or retried, and
+> `testEveryLaunchRunsTheArgumentsItWasGiven` pins the invariant. The reproduction
+> loop and the rule are in `docs/TESTING.md`.
 
 ---
 
@@ -127,8 +149,9 @@
 | [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
 | [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
-| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | No (PR #72 open; needs-strong-review) |
-| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | No (PR #66 open; needs-strong-review) |
+| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
+| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
+| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | — | No | Yes |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >

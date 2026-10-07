@@ -56,6 +56,69 @@ the full-simulator run and result-bundle/screenshot inspection documented below,
 the physical-iPhone run (unlocked, developer mode, personal-team signing), and
 the manual real-Live-Photo check.
 
+### The launch/terminate handoff (#81)
+
+The suite drives one installed app through ~50 test methods, so almost every
+test crosses a launch or a terminate handoff. `XCUIApplication.launch()` stops a
+previously running instance itself, and does so asynchronously: it returns while
+the old process is still tearing down. A launch that starts during that teardown
+can attach to the dying process, which keeps the *previous* launch arguments, so
+the app comes up as the real PhotoKit app on its permission screen instead of the
+fake-library Home that launch asked for — and the test then fails on a screen
+that should have been there. The same race is reported from the other side as
+`Failed to terminate <bundle>:<pid>: Failed to terminate <bundle>:0`.
+
+Every launch, terminate and starting-point handoff now goes through
+`SWIPRUITests/AppLaunchHandoff.swift`:
+
+- `stopAppUnderTest()` runs in `tearDown`, so a test never ends with the app
+  still running;
+- `stop(_:)` blocks until the system reports the process gone, so the next
+  `launch()` has nothing left to terminate;
+- `launch(_:firstScreen:)` then waits until the app is in the foreground with the
+  screen that launch promises on screen;
+- `beginSession(_:in:)` waits for the grid to hand over to the viewer **or** to
+  the `Start a new session?` confirmation a saved session raises, instead of
+  guessing after one second and leaving the confirmation covering a viewer that
+  never arrives.
+
+This is synchronisation, not retry: no test is removed, skipped, shortened,
+loosened or marked expected-failure. `testEveryLaunchRunsTheArgumentsItWasGiven`
+launches the same way three times in a row and makes the app prove it read the
+arguments of *that* launch, so the handoff cannot silently regress.
+
+#### Local reproduction loop for the flake
+
+Two flakes in about six full CI runs is too rare to chase with single runs, so
+run the tests that cross a handoff several times in a row. The loop the #81 fix
+was developed and re-run against:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild test-without-building -project SWIPR.xcodeproj -scheme SWIPR \
+  -destination 'platform=iOS Simulator,id=71EAC83D-54D4-451A-AB32-74A8878C7869' \
+  -derivedDataPath ./.derivedData-simulator \
+  -only-testing:SWIPRUITests/SWIPRUITests/testCaptureViewerKindScreensInEveryAppearance \
+  -only-testing:SWIPRUITests/SWIPRUITests/testKillingTheAppMidSessionRestoresPositionMarksAndUndo \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayPreferencesSurviveRelaunch \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayEntryScreenInEveryState \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayTumblerVisitsEveryPhotoExactlyOnce \
+  -test-iterations 6
+```
+
+`-test-iterations` only repeats the selection inside one local run; it is never
+added to CI and it never hides a failure (`-retry-tests-on-failure` is not used
+anywhere). The full-suite loop is the CI job's own command repeated:
+
+```sh
+for i in 1 2 3; do
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
+    -destination 'platform=iOS Simulator,id=71EAC83D-54D4-451A-AB32-74A8878C7869' \
+    -derivedDataPath ./.derivedData-simulator
+done
+```
+
 ### Focused simulator prototype check
 
 ```sh

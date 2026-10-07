@@ -23,40 +23,43 @@
 
 ## Current ticket
 
-- **None in progress.** The V1-03 milestone is merged (PRs #59–#62) and the
-  strong-review gate is in place (#65, docs #67). The next milestone is
-  **V1-04 (#26, the neutral direct-move decision dock)**, unblocked (#25 is
-  closed). Break it into subtickets before implementing.
+- **#81 — V1-12a: Stabilise the flaky UI app-termination test**
+  (`driver/81-flaky-ui`). The launch/terminate handoff is fixed in the test
+  harness: `SWIPRUITests/AppLaunchHandoff.swift` stops the app the test was
+  driving in `tearDown`, blocks until the system reports the old process gone
+  before every launch, waits for the first screen that launch promises, and waits
+  for the grid to hand over to the viewer **or** the replacement confirmation
+  instead of guessing after one second. Nothing is skipped, shortened, loosened
+  or retried; `docs/TESTING.md` has the rule and the reproduction loop.
+- The next milestone after this is **V1-04 (#26, the neutral direct-move
+  decision dock)**, split into subtickets #76–#79.
 
 ## Open PRs
 
-- **#66 — fix: keep a damaged save file instead of replacing it with empty
-  progress** (`driver/damaged-save`, head `8d965fb`). Risky
-  (`SWIPRKit/SessionPersistence.swift`), `needs-strong-review`, open, **waiting
-  for the owner**. The owner gave conditional approval and asked for one final
-  `@codex review` on `8f9f608`; that round found two more problems (a mark
-  bypassed the Tumbler-mode consistency check, and blank IDs inside a Tumbler
-  plan's `remaining`/`handled` were accepted), both fixed on `8d965fb`. No
-  further review round was requested and no merge happened. **Do not add
-  `strong-review-passed` without a fresh owner approval.**
-- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)**
-  (`driver/69-ax5-reenable`). Risky because it edits
-  `.github/workflows/ci.yml` (every workflow file is risky), so the owner must
-  approve it; labelled `needs-strong-review`.
+- **#81's PR** (`driver/81-flaky-ui`) — the flaky-UI fix above. Test-only plus
+  docs, so it is not a risky path.
+- **#74 — fix: keep marked photos through Limited Photos access (#70)**
+  (`driver/70-limited-marks`, head `ff118ee`). Risky, `needs-strong-review`,
+  open, **waiting for the owner**. Do not add `strong-review-passed` without the
+  owner's approval.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#82 — docs: record full autonomy until V1 and delegated risky-PR approval**
+  (merge commit `1d73a1b`).
+- **#80 — feat: add pure direct-move dock geometry (#75)** (merge commit
+  `01e57f6`).
+- **#74/#72/#71/#70/#66** — see the ticket log in
+  `docs/IMPLEMENTATION-STATUS.md`; #72 (AX5 re-enable, merge commit `8efd39e`)
+  and #66 (damaged save file, merge commit `c2af5f5`) both merged after the
+  owner's approval. #74 is still open (risky).
 - **#67 — docs: record the risky-PR Codex review workflow and Code Review
-  Rules** (merge commit `881aff7`), which added the standing workflow to
-  `AGENTS.md` and `docs/agents/OWNER-INSTRUCTIONS.md`.
+  Rules** (merge commit `881aff7`).
 - **#65 — ci: add the strong-review gate for risky paths** (merge commit
-  `251b6a6`), which labels risky PRs `needs-strong-review` and fails until the
-  owner adds `strong-review-passed`.
-- **#64 — docs: correct the CI runner label and note the #50 review gap**
-  (merge commit `46e593b`).
+  `251b6a6`).
 - **#61 — Implement #56: replace an unfinished session only after
   confirmation** (merge commit `286ec04`), which closed **#56**.
 - **#60 — Implement #58: make the starting point reachable at the largest text
@@ -70,20 +73,28 @@
 
 - **#68 — Ops: Sync docs/HANDOFF.md to the current state** — done (PR #71,
   merged as `67967ad`).
-- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done in
-  **PR #72**, which waits for the owner because it edits a workflow.
-- **#70 — V1-06a: Keep marked photos through Limited Photos access**
-  (`ready-for-agent`). Not started yet.
+- **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
+  merged as `8efd39e`). The AX5 case runs on every PR.
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — PR #74 is
+  open and risky, waiting for the owner.
+- **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
+  vanished** — not started.
 
 ## What is next
 
-1. Finish the owner's decisions on the risky PRs: **#66** (the final Codex
-   round found problems, fixed on `8d965fb`; awaiting a fresh owner approval)
-   and **#72** (AX5 re-enable; needs approval because it edits a workflow).
-2. Implement **#70** (Limited Photos marks), then start the next milestone,
-   **V1-04 (#26 — the neutral direct-move decision dock)**, split into
-   subtickets.
+1. Merge **#81**'s test-only PR once CI is green on repeated full runs.
+2. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
+   **V1-04** subtickets #76–#79.
 3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+
+### Note: the UI suite's launch handoff (#81)
+
+Every `SWIPRUITests` launch, terminate and starting-point handoff goes through
+`SWIPRUITests/AppLaunchHandoff.swift`. The flake it fixes is any test that
+crosses a handoff: `Failed to terminate com.zhangjinshuo.swipr:<pid>: Failed to
+terminate com.zhangjinshuo.swipr:0` raised from `XCUIApplication.launch()`, and
+a Home or viewer that never appeared after a launch or a relaunch. Add new UI
+tests through those helpers rather than calling `app.launch()` directly.
 
 ### Note: the AX5 skip is gone (#69)
 

@@ -16,6 +16,12 @@ final class SWIPRUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Leaves the app stopped, so the next test's launch cannot race a teardown.
+    override func tearDown() {
+        AppLaunchHandoff.stopAppUnderTest()
+        super.tearDown()
+    }
+
     /// What the viewer speaks for a demo fixture, so a test can tell exactly
     /// which asset is on screen. Mirrors `ViewerView.accessibilityDescription`.
     private func fixtureLabel(_ index: Int) -> String {
@@ -42,7 +48,7 @@ final class SWIPRUITests: XCTestCase {
         if failDeletion { app.launchArguments += ["-uiTestingFailDeletion"] }
         if failFirstDecisionSave { app.launchArguments += ["-uiTestingFailFirstDecisionSave"] }
         app.launchArguments += extraArguments
-        app.launch()
+        AppLaunchHandoff.launch(app, firstScreen: "entry.settings")
         return app
     }
 
@@ -134,11 +140,7 @@ final class SWIPRUITests: XCTestCase {
     /// replacement confirmation appear, chooses **Start new**. Tests that need to
     /// inspect the confirmation itself drive it directly instead.
     private func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
-        start.tap()
-        let confirm = app.buttons["replaceSession.startNew"]
-        if confirm.waitForExistence(timeout: 1) {
-            confirm.tap()
-        }
+        AppLaunchHandoff.beginSession(start, in: app)
     }
 
     /// Opens the Home media choice and starts the newest-first traversal, which
@@ -154,6 +156,38 @@ final class SWIPRUITests: XCTestCase {
     func testNewestStartsAViewerSession() {
         let app = launchApp()
         _ = startViewer(app)
+    }
+
+    // MARK: - The launch handoff (#81)
+
+    /// A launch always runs the arguments it was given, whatever the launch
+    /// before it left behind.
+    ///
+    /// `XCUIApplication.launch()` stops a previous instance asynchronously, and a
+    /// launch that starts during that teardown can attach to the dying process,
+    /// which keeps the *previous* launch arguments — the app then opens the
+    /// previous test's store, or the real PhotoKit library, instead of what this
+    /// launch asked for. This launches the same way three times in a row and asks
+    /// the app to prove, each time, that it read the arguments of *that* launch.
+    func testEveryLaunchRunsTheArgumentsItWasGiven() {
+        let readOnly = launchApp(extraArguments: ["-uiTestingUnreadableState"])
+        XCTAssertTrue(
+            element(readOnly, "persistence.readOnly").waitForExistence(timeout: 10),
+            "the first launch must open the state it was told to open"
+        )
+
+        let plain = launchApp()
+        XCTAssertFalse(
+            element(plain, "persistence.readOnly").waitForExistence(timeout: 3),
+            "the second launch must not inherit the first launch's arguments"
+        )
+        XCTAssertTrue(plain.buttons["entry.preset.everything"].exists)
+
+        let readOnlyAgain = launchApp(extraArguments: ["-uiTestingUnreadableState"])
+        XCTAssertTrue(
+            element(readOnlyAgain, "persistence.readOnly").waitForExistence(timeout: 10),
+            "and the arguments decide each time, so it is not the order that decides"
+        )
     }
 
     // MARK: - Home and the editable filters (#46)
@@ -335,7 +369,7 @@ final class SWIPRUITests: XCTestCase {
         let positionAtKill = photoElement(app).label
         XCTAssertNotEqual(positionAtKill, markedLabel)
 
-        app.terminate()
+        AppLaunchHandoff.stop(app)
 
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.resume"].waitForExistence(timeout: 10))
@@ -1131,7 +1165,7 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
 
-        app.terminate()
+        AppLaunchHandoff.stop(app)
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         XCTAssertTrue(relaunched.buttons["entry.review"].exists, "marks survive a relaunch")
