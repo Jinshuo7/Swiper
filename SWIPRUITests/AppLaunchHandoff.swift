@@ -65,8 +65,10 @@ enum AppLaunchHandoff {
     }
 
     /// Stops the running instance, launches `app`, and waits until it is in the
-    /// foreground with `firstScreen` on screen.
-    static func launch(_ app: XCUIApplication, firstScreen: String) {
+    /// foreground with the first screen on screen. The caller names that screen
+    /// through the concrete collection it lives in, the way every other query in
+    /// the suite does.
+    static func launch(_ app: XCUIApplication, firstScreen: XCUIElement) {
         stopAppUnderTest()
         launchedApp = app
         app.launch()
@@ -76,8 +78,8 @@ enum AppLaunchHandoff {
         }
         XCTAssertEqual(app.state, .runningForeground, "the app did not come to the foreground after launching")
         XCTAssertTrue(
-            app.descendants(matching: .any)[firstScreen].waitForExistence(timeout: readyTimeout),
-            "the app never reached \(firstScreen) after launching"
+            firstScreen.waitForExistence(timeout: readyTimeout),
+            "the app never reached \(firstScreen.identifier) after launching"
         )
     }
 
@@ -91,7 +93,7 @@ enum AppLaunchHandoff {
     static func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
         start.tap()
         let confirmation = app.buttons["replaceSession.startNew"]
-        let viewer = app.descendants(matching: .any)["viewer.photo"]
+        let viewer = app.images["viewer.photo"]
         let deadline = Date().addingTimeInterval(beginSessionTimeout)
         while !confirmation.exists, !viewer.exists, Date() < deadline {
             usleep(pollInterval)

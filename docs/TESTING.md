@@ -86,6 +86,23 @@ loosened or marked expected-failure. `testEveryLaunchRunsTheArgumentsItWasGiven`
 launches the same way three times in a row and makes the app prove it read the
 arguments of *that* launch, so the handoff cannot silently regress.
 
+**Every lookup names the collection the element lives in** — `app.buttons[…]`,
+`app.staticTexts[…]`, `app.images[…]`, `app.otherElements[…]`, `app.switches[…]`
+— instead of `app.descendants(matching: .any)[…]`. The generic form asks the
+snapshot service for the whole tree and then filters it, and it was the most
+expensive query in the suite; the typed form hands the element kind over with the
+request. A SwiftUI view takes the element its content makes it, which is not
+always obvious: `viewer.photo` and `choosePhoto.cell.<id>` are `Image`s because
+their content is a thumbnail, `viewer.cluster`, `viewer.mediaBadge` and
+`replaceSession.confirmation` are `Other` because they are combined containers,
+`settings.showButtons` is a `Switch`, and `persistence.readOnly` is the warning
+`Image` inside the banner. Dump `app.debugDescription` and read the tree rather
+than guessing; a wrong guess fails the test loudly rather than silently.
+
+One deliberate consequence: the suite has no generic `element(_:_:)` helper any
+more, and `assertReachable`/`assertFullyOnScreen` take the element itself, so the
+call site always shows which collection it expects.
+
 **What the fix does not remove.** The CI runner still loses the automation
 session with the app about one run in three, and the two signatures seen so far
 are both XCTest's own: `Failed to terminate com.zhangjinshuo.swipr:<pid>:
@@ -95,10 +112,11 @@ three 30 s accessibility-snapshot retries. Neither reproduced locally in four
 full suites and ~800 app launches/terminates on `SWIPR iPhone 11 Pro`, while the
 CI runner hits it about once every 75 handoffs, which is the rate #81 recorded
 before this work. It is an XCTest/CoreSimulator stall, so it is parked with
-`needs-owner` and its evidence rather than retried or skipped. The two costs that
-could be attacked next are the 66 app launches a run needs (every test has its
-own launch arguments) and the breadth of the accessibility queries
-(`app.descendants(matching: .any)[id]` fetches the whole tree).
+`needs-owner` and its evidence rather than retried or skipped. The remaining cost
+is the 66 app launches and terminates a run needs: every test sets its own launch
+arguments, so a test cannot reuse the previous test's app without an app-side
+reset seam inside the risky paths (and it would leak tutorial, store and session
+state between tests), which is why the launch count is left alone.
 
 #### Local reproduction loop for the flake
 
