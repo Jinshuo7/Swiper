@@ -25,6 +25,20 @@ final class PlaySessionUITests: XCTestCase {
         ]
     }
 
+    /// The viewer's canvas and the grid's cells carry their identifier on
+    /// whatever they are showing at that moment: an `Image` once the fixture has
+    /// rendered, and a `ProgressView` or an empty container before that. A typed
+    /// query would miss them in exactly the state `waitForExistence` is there to
+    /// wait out, so these two families are looked up by identifier instead of by
+    /// element kind. Everything else in the suite names its collection.
+    private func canvas(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["viewer.photo"]
+    }
+
+    private func gridCell(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)["choosePhoto.cell.\(identifier)"]
+    }
+
     /// The demo fixtures are `index * 9` days after this instant; see
     /// `FakePhotoLibrary.demoDescriptors`.
     private let fixtureBase = Date(timeIntervalSince1970: 1_700_000_000)
@@ -184,7 +198,7 @@ final class PlaySessionUITests: XCTestCase {
         goHome(app)
         let newest = openChoosePhoto(app)
         beginSession(newest, in: app)
-        let photo = app.images["viewer.photo"]
+        let photo = canvas(app)
         XCTAssertTrue(photo.waitForExistence(timeout: 10))
         return photo
     }
@@ -194,7 +208,7 @@ final class PlaySessionUITests: XCTestCase {
     private func startAt(_ app: XCUIApplication, cell identifier: String) {
         goHome(app)
         _ = openChoosePhoto(app)
-        let cell = app.images["choosePhoto.cell.\(identifier)"].firstMatch
+        let cell = gridCell(app, identifier).firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 10), "no cell \(identifier)")
         var scrolls = 0
         while !cell.isHittable && scrolls < 12 {
@@ -203,7 +217,7 @@ final class PlaySessionUITests: XCTestCase {
         }
         XCTAssertTrue(cell.isHittable, "cell \(identifier) never came on screen")
         beginSession(cell, in: app)
-        XCTAssertTrue(app.images["viewer.photo"].waitForExistence(timeout: 10))
+        XCTAssertTrue(canvas(app).waitForExistence(timeout: 10))
     }
 
     /// Decides on the current photo with the Keep button when it is shown, and
@@ -212,7 +226,7 @@ final class PlaySessionUITests: XCTestCase {
         if app.buttons["control.keep"].exists {
             app.buttons["control.keep"].tap()
         } else {
-            app.images["viewer.photo"].swipeRight()
+            canvas(app).swipeRight()
         }
     }
 
@@ -222,7 +236,7 @@ final class PlaySessionUITests: XCTestCase {
         if app.buttons["control.delete"].exists {
             app.buttons["control.delete"].tap()
         } else {
-            app.images["viewer.photo"].swipeLeft()
+            canvas(app).swipeLeft()
         }
     }
 
@@ -473,10 +487,10 @@ final class PlaySessionUITests: XCTestCase {
 
         // Older first is the default: fake-19's older neighbour is fake-18.
         startAt(app, cell: "fake-19")
-        XCTAssertEqual(app.images["viewer.photo"].label, fixtureLabel(19))
+        XCTAssertEqual(canvas(app).label, fixtureLabel(19))
         keepCurrent(app)
         XCTAssertEqual(
-            app.images["viewer.photo"].label,
+            canvas(app).label,
             fixtureLabel(18),
             "Older first must walk into the past"
         )
@@ -487,7 +501,7 @@ final class PlaySessionUITests: XCTestCase {
         startAt(app, cell: "fake-19")
         keepCurrent(app)
         XCTAssertEqual(
-            app.images["viewer.photo"].label,
+            canvas(app).label,
             fixtureLabel(20),
             "Newer first must walk into the future"
         )
@@ -529,9 +543,9 @@ final class PlaySessionUITests: XCTestCase {
 
         let markedPhoto = photo.label
         photo.swipeLeft()                                  // mark 1
-        app.images["viewer.photo"].swipeRight()          // keep and advance
-        XCTAssertNotEqual(app.images["viewer.photo"].label, markedPhoto)
-        app.images["viewer.photo"].swipeLeft()           // mark 2
+        canvas(app).swipeRight()          // keep and advance
+        XCTAssertNotEqual(canvas(app).label, markedPhoto)
+        canvas(app).swipeLeft()           // mark 2
 
         let review = app.buttons["viewer.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
@@ -602,10 +616,11 @@ final class PlaySessionUITests: XCTestCase {
         let app = launchApp()
         goHome(app)
         _ = openChoosePhoto(app)
-        XCTAssertTrue(app.images["choosePhoto.cell.fake-23"].waitForExistence(timeout: 10))
+        XCTAssertTrue(gridCell(app, "fake-23").waitForExistence(timeout: 10))
 
         assertGridCellsShareOneColumn(
-            app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", "choosePhoto.cell.")),
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "choosePhoto.cell.")),
             "Choose a photo grid"
         )
         capture("Play — Choose a photo grid columns")
@@ -617,14 +632,14 @@ final class PlaySessionUITests: XCTestCase {
         goHome(app)
         let newest = openChoosePhoto(app)
         beginSession(newest, in: app)
-        XCTAssertEqual(app.images["viewer.photo"].label, fixtureLabel(23), "Newest starts at the newest photo")
+        XCTAssertEqual(canvas(app).label, fixtureLabel(23), "Newest starts at the newest photo")
         goHome(app)
 
         _ = openChoosePhoto(app)
         let random = app.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 10))
         beginSession(random, in: app)
-        let randomPhoto = app.images["viewer.photo"]
+        let randomPhoto = canvas(app)
         XCTAssertTrue(randomPhoto.waitForExistence(timeout: 10), "Random starts a Tumbler session")
         // The Tumbler seed is random, so the opening photo is any fixture, never a
         // specific one; that it is a library photo is what the entry promises.
@@ -648,13 +663,13 @@ final class PlaySessionUITests: XCTestCase {
         goHome(app)
 
         _ = openChoosePhoto(app)
-        let cell = app.images["choosePhoto.cell.\(markedID)"].firstMatch
+        let cell = gridCell(app, markedID).firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         XCTAssertEqual(cell.label, "\(markedID), marked for deletion")
 
         cell.tap()
         XCTAssertFalse(
-            app.images["viewer.photo"].waitForExistence(timeout: 2),
+            canvas(app).waitForExistence(timeout: 2),
             "tapping a marked cell must not start a session on it"
         )
         XCTAssertTrue(app.buttons["choosePhoto.jump"].exists, "a refused tap should leave the user on the grid")
@@ -755,7 +770,7 @@ final class PlaySessionUITests: XCTestCase {
         photo.swipeLeft()
         let banner = app.images["saveFailure.banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.images["viewer.photo"].label, before, "nothing may advance past an unsaved decision")
+        XCTAssertEqual(canvas(app).label, before, "nothing may advance past an unsaved decision")
 
         let discard = app.buttons["Discard"]
         XCTAssertTrue(discard.exists)
@@ -815,11 +830,11 @@ final class PlaySessionUITests: XCTestCase {
         let random = app.buttons["choosePhoto.random"]
         XCTAssertTrue(random.waitForExistence(timeout: 10))
         random.tap()
-        XCTAssertTrue(app.images["viewer.photo"].waitForExistence(timeout: 10))
+        XCTAssertTrue(canvas(app).waitForExistence(timeout: 10))
 
         var seen: [String] = []
         for step in 0..<24 {
-            let photo = app.images["viewer.photo"]
+            let photo = canvas(app)
             XCTAssertTrue(photo.waitForExistence(timeout: 5), "Tumbler stopped after \(step) photos")
             let label = photo.label
             XCTAssertFalse(seen.contains(label), "Tumbler showed \(label) twice")

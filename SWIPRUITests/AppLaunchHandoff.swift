@@ -93,7 +93,9 @@ enum AppLaunchHandoff {
     static func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
         start.tap()
         let confirmation = app.buttons["replaceSession.startNew"]
-        let viewer = app.images["viewer.photo"]
+        // The viewer canvas is an `Image` once the fixture has rendered and a
+        // `ProgressView` before that, so it is found by identifier, not by kind.
+        let viewer = app.descendants(matching: .any)["viewer.photo"]
         let deadline = Date().addingTimeInterval(beginSessionTimeout)
         while !confirmation.exists, !viewer.exists, Date() < deadline {
             usleep(pollInterval)

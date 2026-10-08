@@ -52,8 +52,17 @@ final class SWIPRUITests: XCTestCase {
         return app
     }
 
+    /// The viewer's canvas carries its identifier on whatever it is showing: an
+    /// `Image` once the fixture has rendered, and a `ProgressView` before that,
+    /// so it is looked up by identifier rather than by element kind.
     private func photoElement(_ app: XCUIApplication) -> XCUIElement {
-        app.images["viewer.photo"]
+        app.descendants(matching: .any)["viewer.photo"]
+    }
+
+    /// Grid cells have the same two states as the viewer canvas, so they are
+    /// looked up by identifier too.
+    private func gridCell(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)["choosePhoto.cell.\(identifier)"]
     }
 
     private func tutorialElement(_ app: XCUIApplication) -> XCUIElement {
@@ -526,7 +535,7 @@ final class SWIPRUITests: XCTestCase {
 
         // fake-23 is the newest photo and a 4:1 panorama, so the viewer's own
         // aspect ratio proves the session started where it was chosen.
-        let cell = app.images["choosePhoto.cell.fake-23"]
+        let cell = gridCell(app, "fake-23")
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()
 
@@ -1439,7 +1448,7 @@ final class SWIPRUITests: XCTestCase {
         // 4:1 panorama.
         app.buttons["viewer.close"].tap()
         _ = openChoosePhoto(app)
-        let cell = app.images["choosePhoto.cell.fake-23"]
+        let cell = gridCell(app, "fake-23")
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()
         XCTAssertTrue(
