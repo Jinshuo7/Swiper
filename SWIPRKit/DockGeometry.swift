@@ -37,17 +37,25 @@ public enum DockGeometry {
     /// The destination a finger at `point` captures, given the destination
     /// currently captured (`nil` while free).
     ///
-    /// A newly captured destination uses ``captureRadius``; keeping one already
-    /// captured uses the larger ``releaseRadius``. Returns `nil` when the finger
-    /// is outside the applicable radius, so the dock is free again.
+    /// A destination already captured holds until the finger has left its
+    /// ``releaseRadius``, checked before anything nearer is considered. The
+    /// nearest destination can change while the finger is still well inside the
+    /// release radius — mid-way between the bottom row and a side column, for
+    /// instance — and dropping the capture there would make the highlighted
+    /// marker release before the finger left it. Only then does a new capture
+    /// use the tighter ``captureRadius``. Returns `nil` when the finger is
+    /// outside the applicable radius, so the dock is free again.
     public static func capture(
         at point: CGPoint,
         in size: CGSize,
         currentlyCaptured: ControlPosition?
     ) -> ControlPosition? {
+        if let currentlyCaptured,
+           distance(from: point, to: centre(for: currentlyCaptured, in: size)) <= releaseRadius {
+            return currentlyCaptured
+        }
         guard let nearest = nearestDestination(to: point, in: size) else { return nil }
-        let radius = currentlyCaptured == nearest ? releaseRadius : captureRadius
-        return distance(from: point, to: centre(for: nearest, in: size)) <= radius ? nearest : nil
+        return distance(from: point, to: centre(for: nearest, in: size)) <= captureRadius ? nearest : nil
     }
 
     /// The destination a release at `point` lands in, or `nil` when the release

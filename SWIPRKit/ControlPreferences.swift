@@ -59,7 +59,7 @@ public enum UndoSide: String, Codable, CaseIterable, Identifiable, Sendable {
 public struct ControlPreferences: Codable, Equatable, Sendable {
     /// Which of the three fixed places the cluster sits in.
     public var position: ControlPosition
-    /// Whether the three buttons and their grip are drawn at all. Swipe gestures
+    /// Whether the three buttons and their dock are drawn at all. Swipe gestures
     /// are always available either way (`docs/adr/0009-swipe-always-buttons-
     /// optional.md`).
     public var showButtons: Bool
@@ -122,18 +122,18 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     }
 }
 
-/// Pure geometry for the control cluster: how big it is, where its centre sits
-/// at each of the three fixed positions, and where its grip starts a drag.
+/// Pure geometry for the decision dock: how big it is, where its centre sits at
+/// each of the three fixed positions, and the frame each destination marker
+/// draws.
 ///
-/// Kept in the framework rather than only inside the SwiftUI view so the
-/// geometry the spec pins down is directly testable on macOS.
+/// The dock is dragged by its whole surface, so it has no grip: it is exactly
+/// the three decision controls and the tray's padding around them. Kept in the
+/// framework rather than only inside the SwiftUI view so the geometry the spec
+/// pins down is directly testable on macOS.
 public enum ControlClusterLayout {
     public static let controlSize: CGFloat = 56
     public static let controlSpacing: CGFloat = 14
     public static let trayInset: CGFloat = 16
-    /// The grip's hit region. The drawn three dots are much smaller; this is the
-    /// area that can be grabbed.
-    public static let gripHitSize: CGFloat = 44
     /// How far the cluster stays from the safe-area edge.
     public static let edgeMargin: CGFloat = 20
     /// Columns are centred at this fraction of the safe-area height.
@@ -144,15 +144,11 @@ public enum ControlClusterLayout {
     public static let landingDuration: Double = 0.32
     public static let reduceMotionDuration: Double = 0.16
 
-    /// The cluster's size, including the tray's padding and the grip's slot.
-    ///
-    /// The short axis is 88 pt, as the spec pins it. The long axis grew past the
-    /// spec's 228 pt once the grip moved into the tray's leading end; the 228
-    /// described the three buttons alone, and is no longer the number the three
-    /// positions depend on.
+    /// The cluster's size: the three decision controls plus the tray's padding,
+    /// 228 pt by 88 pt — the two numbers the spec pins the three positions to.
     public static func clusterSize(for position: ControlPosition) -> CGSize {
         let controls = controlSize * 3 + controlSpacing * 2
-        let long = trayInset * 2 + gripHitSize + controlSpacing + controls
+        let long = trayInset * 2 + controls
         let short = trayInset * 2 + controlSize
         return position.isVertical
             ? CGSize(width: short, height: long)
@@ -176,9 +172,8 @@ public enum ControlClusterLayout {
     ///
     /// Trash and Keep are always adjacent and in that order, so the swipe wells'
     /// mapping — delete left, keep right — is repeated by the buttons. Undo sits
-    /// at the end opposite the grip, and the user chooses which end.
+    /// at an outer end, and the user chooses which end.
     public enum ClusterControl: String, CaseIterable, Identifiable, Sendable {
-        case grip
         case trash
         case keep
         case undo
@@ -188,30 +183,14 @@ public enum ControlClusterLayout {
 
     public static func order(for undoSide: UndoSide) -> [ClusterControl] {
         switch undoSide {
-        case .leading: return [.undo, .trash, .keep, .grip]
-        case .trailing: return [.grip, .trash, .keep, .undo]
+        case .leading: return [.undo, .trash, .keep]
+        case .trailing: return [.trash, .keep, .undo]
         }
     }
 
-    /// Where the grip sits: the outer end opposite Undo, in both orientations.
-    /// A drag starts here, and the puck then follows the finger from this point.
-    public static func gripCentre(
-        for position: ControlPosition,
-        in size: CGSize,
-        undoSide: UndoSide
-    ) -> CGPoint {
-        let cluster = clusterSize(for: position)
-        let centre = centre(for: position, in: size)
-        let half = (position.isVertical ? cluster.height : cluster.width) / 2
-        let offset = half - trayInset - gripHitSize / 2
-        let gripIsLeading = undoSide == .trailing
-        let signed = gripIsLeading ? -offset : offset
-        return position.isVertical
-            ? CGPoint(x: centre.x, y: centre.y + signed)
-            : CGPoint(x: centre.x + signed, y: centre.y)
-    }
-
-    /// The rectangular area a slot occupies.
+    /// The frame the dock occupies at a destination: the same shape the
+    /// destination marker draws while the dock is being moved, so the marker
+    /// shows exactly where the dock will land.
     public static func slotRect(for position: ControlPosition, in size: CGSize) -> CGRect {
         let cluster = clusterSize(for: position)
         let centre = centre(for: position, in: size)
@@ -221,26 +200,5 @@ public enum ControlClusterLayout {
             width: cluster.width,
             height: cluster.height
         )
-    }
-
-    /// The slot a puck released at `point` lands in, or `nil` when it is over
-    /// none and the release must change nothing. When more than one slot
-    /// contains the point, the nearest centre wins.
-    public static func slot(
-        at point: CGPoint,
-        in size: CGSize,
-        inflation: CGFloat = 20
-    ) -> ControlPosition? {
-        var best: (position: ControlPosition, distance: CGFloat)?
-        for position in ControlPosition.allCases {
-            let rect = slotRect(for: position, in: size).insetBy(dx: -inflation, dy: -inflation)
-            guard rect.contains(point) else { continue }
-            let centre = centre(for: position, in: size)
-            let distance = hypot(point.x - centre.x, point.y - centre.y)
-            if best == nil || distance < best!.distance {
-                best = (position, distance)
-            }
-        }
-        return best?.position
     }
 }

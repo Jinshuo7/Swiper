@@ -124,7 +124,7 @@ final class ControlClusterLayoutTests: XCTestCase {
     func testClusterSizeShortAxisIsEightyEight() {
         let bottom = ControlClusterLayout.clusterSize(for: .bottom)
         XCTAssertEqual(bottom.height, 88)
-        XCTAssertEqual(bottom.width, 286, "grip + three controls + the tray's padding")
+        XCTAssertEqual(bottom.width, 228, "three controls and the tray's padding")
 
         // A 375 pt phone leaves room at each bottom corner for the side columns.
         XCTAssertGreaterThanOrEqual((375 - bottom.width) / 2, 40)
@@ -156,10 +156,15 @@ final class ControlClusterLayoutTests: XCTestCase {
     /// Trash and Keep stay adjacent and in the swipe wells' order; Undo is at
     /// one outer end, never between them.
     func testUndoSitsAtAnOuterEndAwayFromThePair() {
-        XCTAssertEqual(ControlClusterLayout.order(for: .leading), [.undo, .trash, .keep, .grip])
-        XCTAssertEqual(ControlClusterLayout.order(for: .trailing), [.grip, .trash, .keep, .undo])
+        XCTAssertEqual(ControlClusterLayout.order(for: .leading), [.undo, .trash, .keep])
+        XCTAssertEqual(ControlClusterLayout.order(for: .trailing), [.trash, .keep, .undo])
         for side in UndoSide.allCases {
             let order = ControlClusterLayout.order(for: side)
+            XCTAssertEqual(
+                order.count,
+                ControlClusterLayout.ClusterControl.allCases.count,
+                "every control is drawn exactly once: the dock has no grip"
+            )
             let trash = order.firstIndex(of: .trash)
             let keep = order.firstIndex(of: .keep)
             XCTAssertEqual(keep, trash.map { $0 + 1 }, "Trash and Keep must stay adjacent")
@@ -171,59 +176,25 @@ final class ControlClusterLayoutTests: XCTestCase {
         }
     }
 
-    func testTheGripSitsAtTheEndOppositeUndo() {
+    /// The dock is moved as one piece, so every destination is the same shape
+    /// and holds all three controls. Those frames are also what the destination
+    /// markers draw while the dock is in the air.
+    func testEveryDestinationHoldsAllThreeControlsAtTheSameSize() {
         for position in ControlPosition.allCases {
-            let centre = ControlClusterLayout.centre(for: position, in: safeArea)
-            let gripWhenUndoTrailing = ControlClusterLayout.gripCentre(for: position, in: safeArea, undoSide: .trailing)
-            let gripWhenUndoLeading = ControlClusterLayout.gripCentre(for: position, in: safeArea, undoSide: .leading)
-            XCTAssertTrue(
-                ControlClusterLayout.slotRect(for: position, in: safeArea).contains(gripWhenUndoTrailing),
-                "the grip must be inside its own tray at \(position)"
+            let rect = ControlClusterLayout.slotRect(for: position, in: safeArea)
+            let expected = ControlClusterLayout.clusterSize(for: position)
+            XCTAssertEqual(rect.size, expected, "\(position) is the same dock")
+            XCTAssertEqual(
+                [rect.width, rect.height].sorted(),
+                [88, 228],
+                "the dock is the same 88 by 228 shape at every destination, only turned"
             )
-            if position.isVertical {
-                XCTAssertLessThan(gripWhenUndoTrailing.y, centre.y, "grip leads when Undo trails")
-                XCTAssertGreaterThan(gripWhenUndoLeading.y, centre.y, "grip trails when Undo leads")
-                XCTAssertEqual(gripWhenUndoTrailing.x, centre.x, accuracy: 0.5)
-            } else {
-                XCTAssertLessThan(gripWhenUndoTrailing.x, centre.x, "grip leads when Undo trails")
-                XCTAssertGreaterThan(gripWhenUndoLeading.x, centre.x, "grip trails when Undo leads")
-                XCTAssertEqual(gripWhenUndoTrailing.y, centre.y, accuracy: 0.5)
-            }
+            XCTAssertEqual(
+                CGPoint(x: rect.midX, y: rect.midY),
+                ControlClusterLayout.centre(for: position, in: safeArea),
+                "the marker is drawn where the dock will land"
+            )
         }
-    }
-
-    /// A release lands only when the puck is over a slot. The middle of the
-    /// screen is above the columns and nowhere near the bottom row, so it is a
-    /// change-nothing release.
-    func testOnlyPointsOverASlotLandSomewhere() {
-        XCTAssertEqual(
-            ControlClusterLayout.slot(at: ControlClusterLayout.centre(for: .bottom, in: safeArea), in: safeArea),
-            .bottom
-        )
-        XCTAssertEqual(
-            ControlClusterLayout.slot(at: ControlClusterLayout.centre(for: .leading, in: safeArea), in: safeArea),
-            .leading
-        )
-        XCTAssertEqual(
-            ControlClusterLayout.slot(at: ControlClusterLayout.centre(for: .trailing, in: safeArea), in: safeArea),
-            .trailing
-        )
-        XCTAssertNil(
-            ControlClusterLayout.slot(at: CGPoint(x: safeArea.width / 2, y: safeArea.height * 0.35), in: safeArea),
-            "a release over no slot must change nothing"
-        )
-    }
-
-    /// Where two slots overlap, the nearer centre wins rather than the first in
-    /// case order.
-    func testOverlappingSlotsAreResolvedByDistance() {
-        let left = ControlClusterLayout.centre(for: .leading, in: safeArea)
-        let bottom = ControlClusterLayout.centre(for: .bottom, in: safeArea)
-        // A point just beside the left slot's centre stays with the left column.
-        let nearLeft = CGPoint(x: left.x + 10, y: left.y - 10)
-        XCTAssertEqual(ControlClusterLayout.slot(at: nearLeft, in: safeArea), .leading)
-        let nearBottom = CGPoint(x: bottom.x - 30, y: bottom.y - 10)
-        XCTAssertEqual(ControlClusterLayout.slot(at: nearBottom, in: safeArea), .bottom)
     }
 
     /// The spec puts the landing bounce at or below 0.2.

@@ -31,7 +31,7 @@ struct SettingsView: View {
                             preferences.position = .bottom
                             model.updatePreferences(preferences)
                         }
-                        Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at the end of the buttons, away from Trash and Keep, and you can put it on either side. Drag the three dots to move the whole cluster to the bottom, left or right edge — the photo never moves.")
+                        Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at the end of the buttons, away from Trash and Keep, and you can put it on either side. Drag the buttons themselves — or the space between them — to move them to the bottom, left or right edge, and the photo never moves.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)

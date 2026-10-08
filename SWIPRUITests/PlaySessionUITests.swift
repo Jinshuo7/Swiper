@@ -99,17 +99,18 @@ final class PlaySessionUITests: XCTestCase {
         }
     }
 
-    /// Holds a drag in place, captures what is on screen while it is held, then
-    /// releases. The phantom slots only exist mid-drag, so a post-release
-    /// screenshot could never show them.
+    /// Holds a drag in place, captures what is on screen while it is held at its
+    /// destination, then releases. The token and the three destination markers
+    /// only exist while the finger is down, so a post-release screenshot could
+    /// never show them.
     private func holdDrag(_ start: XCUICoordinate, to end: XCUICoordinate, captureNamed name: String) {
         let box = ScreenshotBox()
         let captured = expectation(description: "captured \(name)")
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 1.6) {
             box.screenshot = XCUIScreen.main.screenshot()
             captured.fulfill()
         }
-        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1.5)
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2.5)
         wait(for: [captured], timeout: 20)
         guard let screenshot = box.screenshot else {
             return XCTFail("Could not capture \(name) while the drag was held")
@@ -343,19 +344,34 @@ final class PlaySessionUITests: XCTestCase {
     // MARK: - Moving the cluster
 
     private func clusterDock(_ app: XCUIApplication) -> String {
-        (app.otherElements["viewer.cluster"].value as? String) ?? ""
+        (cluster(app).value as? String) ?? ""
     }
 
-    private func dragGrip(_ app: XCUIApplication, to point: CGPoint) {
-        let grip = app.images["viewer.grip"]
-        XCTAssertTrue(grip.waitForExistence(timeout: 10), "there is no grip to drag")
-        XCTAssertLessThan(app.otherElements["viewer.cluster"].frame.width, app.windows.firstMatch.frame.width, "viewer.cluster should be the cluster")
-        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    private func dragDock(_ app: XCUIApplication, from start: XCUICoordinate, to point: CGPoint) {
+        XCTAssertTrue(cluster(app).waitForExistence(timeout: 10), "there is no dock to drag")
+        XCTAssertLessThan(cluster(app).frame.width, app.windows.firstMatch.frame.width, "viewer.cluster should be the dock")
         let end = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y))
         start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
         usleep(600_000)
     }
 
+    /// The dock's own element, which is where it says where it is docked.
+    private func cluster(_ app: XCUIApplication) -> XCUIElement {
+        app.otherElements["viewer.cluster"]
+    }
+
+    /// A drag usually starts on a control; the grip is gone, so that is the
+    /// ordinary handle.
+    private func dockStart(_ app: XCUIApplication, _ identifier: String) -> XCUICoordinate {
+        let control = app.buttons[identifier]
+        XCTAssertTrue(control.waitForExistence(timeout: 10), "there is no \(identifier) to drag")
+        return control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    }
+
+    /// The point a destination sits at in window coordinates: a row centred on
+    /// the width 20 pt above the bottom safe edge, columns 20 pt inside the edge
+    /// at 75 % of the safe height, which in portrait is 64 pt from the window
+    /// edge for the 88 pt-wide column.
     private func bottomTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         return CGPoint(x: window.midX, y: window.height * 0.88)
@@ -363,25 +379,27 @@ final class PlaySessionUITests: XCTestCase {
 
     private func leftTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.minX + 44, y: window.height * 0.62)
+        return CGPoint(x: window.minX + 64, y: window.height * 0.73)
     }
 
     private func rightTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.maxX - 44, y: window.height * 0.62)
+        return CGPoint(x: window.maxX - 64, y: window.height * 0.73)
     }
 
-    /// Captures the phantom slots while the grip is held, because they only
-    /// exist mid-move and that is the state the owner flagged as visually busy:
-    /// the bottom row and the side columns overlap in the lower corners.
-    func testPhantomSlotsWhileDraggingTheGrip() {
+    /// Captures the destination markers while the dock is held mid-move, because
+    /// they only exist while the finger is down. The screenshot is taken from a
+    /// background queue while the gesture is held on the main thread.
+    func testDestinationMarkersWhileMovingTheDock() {
         let app = launchApp()
         _ = startViewer(app)
-        let grip = app.images["viewer.grip"]
-        XCTAssertTrue(grip.waitForExistence(timeout: 10))
-        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        // Toward the left column, where the lower slots overlap most.
-        holdDrag(start, to: start.withOffset(CGVector(dx: -120, dy: -180)), captureNamed: "Design — phantom slots mid-move")
+        let delete = dockStart(app, "control.delete")
+        holdDrag(
+            delete,
+            to: app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: leftTarget(app).x, dy: leftTarget(app).y)),
+            captureNamed: "Design — destination markers mid-move"
+        )
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
     }
 
     /// Wherever the cluster is, every control has to stay on screen and clear of
@@ -397,39 +415,39 @@ final class PlaySessionUITests: XCTestCase {
         advanceToALivePhoto(app)
 
         assertClusterIsUsable(app, context: "bottom centre")
-        capture("Play — cluster at the bottom centre")
+        capture("Play — dock at the bottom centre")
 
-        dragGrip(app, to: leftTarget(app))
+        dragDock(app, from: dockStart(app, "control.delete"), to: leftTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         assertClusterIsUsable(app, context: "left edge")
-        capture("Play — cluster at the left edge")
+        capture("Play — dock at the left edge")
 
-        dragGrip(app, to: rightTarget(app))
+        dragDock(app, from: dockStart(app, "control.keep"), to: rightTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked right edge")
         assertClusterIsUsable(app, context: "right edge")
-        capture("Play — cluster at the right edge")
+        capture("Play — dock at the right edge")
 
-        dragGrip(app, to: bottomTarget(app))
+        dragDock(app, from: dockStart(app, "control.undo"), to: bottomTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked bottom")
         assertClusterIsUsable(app, context: "bottom centre again")
-        capture("Play — cluster back at the bottom centre")
+        capture("Play — dock back at the bottom centre")
 
-        // Moving the cluster must not have decided anything: no button may fire
-        // just because the cluster was picked up and put down.
-        XCTAssertEqual(app.buttons["viewer.review"].label, marksBefore, "moving the cluster decided something")
+        // Moving the dock must not have decided anything: no control may fire
+        // just because the dock was picked up and put down.
+        XCTAssertEqual(app.buttons["viewer.review"].label, marksBefore, "moving the dock decided something")
     }
 
     // MARK: - Turning the buttons off
 
     /// The buttons are an option; swiping is not. Turning them off hides the
-    /// cluster and its grip, and every decision stays reachable.
+    /// dock, and every decision stays reachable.
     func testPlayTurningTheButtonsOffKeepsSwipingWorking() {
         let app = launchApp()
         setShowButtons(app, on: false)
         let photo = startViewer(app)
 
         XCTAssertFalse(app.buttons["control.keep"].exists, "the buttons are off")
-        XCTAssertFalse(app.images["viewer.grip"].exists, "the grip is off")
+        XCTAssertFalse(cluster(app).exists, "the dock is off with its buttons")
         capture("Play — buttons turned off")
 
         photo.swipeLeft()
@@ -445,14 +463,14 @@ final class PlaySessionUITests: XCTestCase {
 
     // MARK: - Preferences across a relaunch
 
-    /// Where the cluster sits is physical, so it has to survive a relaunch, and
+    /// Where the dock sits is physical, so it has to survive a relaunch, and
     /// the direction choice has to come back with it.
     func testPlayPreferencesSurviveRelaunch() {
         let app = launchApp(persistentStore: true, resetStore: true)
         chooseDirection(app, "Newer first")
 
         _ = startViewer(app)
-        dragGrip(app, to: leftTarget(app))
+        dragDock(app, from: dockStart(app, "control.delete"), to: leftTarget(app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         let closeFrame = app.buttons["viewer.close"].frame
         goHome(app)

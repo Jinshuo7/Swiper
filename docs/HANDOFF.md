@@ -17,28 +17,44 @@
   worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
   Never touch the owner's folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`.
 - **Risky-PR review workflow:** any PR labelled `needs-strong-review` gets up to
-  3 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). Leave
-  it open for the owner; never add `strong-review-passed` and never merge it
-  unless the owner approves it by number.
+  5 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). The
+  owner has **delegated** approval: add `strong-review-passed` and merge ("Create
+  a merge commit", `--match-head-commit <full SHA>`) only when the checks are
+  green on that head, a Codex review of that exact head reports no P1, and
+  nothing (test, workflow, `risky-paths.txt`, gate) was removed, skipped,
+  weakened or loosened. Never merge with an open P1, and never remove
+  `needs-strong-review`.
 
 ## Current ticket
 
-- **None in progress.** **#81** (the flaky UI suite) landed in **PR #83**: the
-  launch/terminate handoff is deterministic and every UI query names the
-  collection it looks in. Four consecutive CI runs and three consecutive local
-  full suites are green. `docs/TESTING.md` has the rules, the reproduction loop
-  and the one deliberate exception (the viewer canvas and the grid cells are
-  found by identifier, because their element kind follows whether their
-  thumbnail has rendered yet).
-- The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
-  split into subtickets #76–#79.
+- **#76 — V1-04b: Wire direct dock movement into the viewer** (branch
+  `driver/76-direct-dock`, PR #86). The legacy grip/puck/phantom-slot control is
+  replaced by direct whole-dock movement: a drag may begin on any control or in
+  any gap, roughly 9 pt cancels the pending tap for good, the dock becomes a
+  compact neutral token, three subtle markers (the dock's own shape) show the
+  only destinations, a valid release lands and an invalid one restores the
+  source. `dockMoved` outlives the gesture by one main-queue turn, which is what
+  makes "a move never decides" true rather than likely. Destination markers and
+  the token are neutral (no saturated colour); the labelled/icon chrome and the
+  side-layout wording are #77's, and the persisted preferences are #78's.
+  Milestone screenshots: `docs/screenshots/milestones/v1-04/` (12: bottom/left/
+  right/moving × light/dark/AX5). Full local suite green — 225 kit + 50 app + 71
+  UI = 346 tests, 0 failures on `SWIPR iPhone 11 Pro`.
+- The next V1-04 subtickets are **#77** (neutral dock chrome and side layouts,
+  blocked by #76), **#78** (persist the four control preferences) and **#79**.
+  **#73** (a migrated Tumbler plan whose cursor vanished) is still not started.
 
 ## Open PRs
 
 - **#74 — fix: keep marked photos through Limited Photos access (#70)**
-  (`driver/70-limited-marks`, head `ff118ee`). Risky, `needs-strong-review`,
-  open, **waiting for the owner**. Do not add `strong-review-passed` without the
-  owner's approval.
+  (`driver/70-limited-marks`, head **`32bf650`**). Risky, `needs-strong-review`,
+  **parked `owner-blocked`** with issue **#85**: five Codex rounds found real
+  problems and fixed them, an approved sixth round found two more (a hidden pool
+  with no visible cursor stopped counting as resumable; the hidden-marks notice
+  could bury a later save error), both are fixed on `32bf650` with tests verified
+  by breaking the fix, and that head has **no Codex review of its own**. It is not
+  broken and not merged; `#70` itself stays open. Do not merge until that head
+  has a no-P1 review.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -47,7 +63,9 @@
 
 - **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
   launch/terminate handoff helpers, the scoped UI queries and the rules in
-  `docs/TESTING.md`; closes **#81**.
+  `docs/TESTING.md`; closes **#81**. Four consecutive CI runs and three
+  consecutive local full suites green; the two stalls #81 recorded did not
+  recur, and `needs-owner` #84 keeps that evidence.
 - **#82 — docs: record full autonomy until V1 and delegated risky-PR approval**
   (merge commit `1d73a1b`).
 - **#80 — feat: add pure direct-move dock geometry (#75)** (merge commit
@@ -76,15 +94,19 @@
 - **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
   merged as `8efd39e`). The AX5 case runs on every PR.
 - **#70 — V1-06a: Keep marked photos through Limited Photos access** — PR #74 is
-  open and risky, waiting for the owner.
+  open and **`owner-blocked`**; issue **#85** holds the question. #70 stays
+  open.
 - **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
   vanished** — not started.
 
 ## What is next
 
-1. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
-   **V1-04** subtickets #76–#79.
-2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. **#77** (neutral dock chrome and side layouts — labelled Delete/Keep pair at
+   the bottom, icon controls with a non-action gap at the sides) is now
+   unblocked by #76; then **#78** (persist Control Position, Show Buttons,
+   Haptics, Undo Position) and **#79**.
+2. **#73** (the migrated Tumbler plan's vanished cursor) is still not started.
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the UI suite's launch handoff (#81)
 

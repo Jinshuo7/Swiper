@@ -148,6 +148,36 @@
 > the runner stall or only the lookup is not proved, so both readings stay in
 > `needs-owner` #84. Nothing was retried, skipped or loosened to get there.
 > The reproduction loop and the rules are in `docs/TESTING.md`.
+>
+> **#76 update (2026-10-08):** the viewer's legacy grip/puck/phantom-slot
+> control is replaced by **direct whole-dock movement**, so there is no permanent
+> grip and no long press. A drag may begin on any control or in any gap of the
+> tray; roughly 9 pt of movement cancels that gesture's pending tap for good and
+> morphs the dock into a compact neutral token; the three destination markers are
+> drawn in the dock's own shape (never in saturated colour); a valid release
+> lands, an invalid one restores the source. `SWIPRKit/DockGeometry` (#75) owns
+> the arithmetic and `ControlClusterLayout` lost the grip/slot geometry (its dock
+> is 228 × 88 — the number the spec pins the three positions to). Sharp edge: a
+> control's own action fires on the same touch-up that ends a drag, and SwiftUI
+> gives no order between the two, so `dockMoved` outlives the gesture by one
+> main-queue turn, and a drop back on the destination the dock already occupies
+> goes through `AppModel.moveDock(to:)`, which refuses a position that has not
+> changed: writing the preferences re-pins the session's direction from the saved
+> default, so an unguarded write would silently reverse a walk the user started
+> with an explicit "Newest first" or "Oldest first". That is what makes "a move
+> never decides" true rather than likely, and it is asserted from every control.
+> `DockGeometry.capture` was also corrected to check the destination already
+> captured against its release radius before considering a nearer one, so a
+> diagonal drag between the bottom row and a side column no longer drops the
+> capture early. Taps and swipes are unchanged and are tested at a side position
+> too. Full local suite green on
+> `SWIPR iPhone 11 Pro`: **225 kit + 50 app + 71 UI = 346 tests, 0 failures**.
+> Twelve dock screenshots (bottom/left/right/moving × light/dark/AX5) are in
+> `docs/screenshots/milestones/v1-04/`.
+>
+> The dock's labelled/icon chrome and the side layouts stay with **#77**, and the
+> persisted preferences (Control Position, Show Buttons, Haptics, Undo Position)
+> with **#78**.
 
 ---
 
@@ -169,6 +199,7 @@
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
 | [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
+| [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/Swiper/issues/76) | 1 | 1 | 0 | No | Yes (PR #86) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >
