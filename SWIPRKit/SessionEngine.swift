@@ -176,8 +176,16 @@ public struct SessionEngine: Equatable, Sendable {
     }
 
     /// Reverses the most recent decision and returns to that asset.
+    ///
+    /// The latest decision can belong to a photo a Limited-access snapshot
+    /// cannot show. Reversing it would consume the entry and drop its mark
+    /// without ever returning to the photo, so the entry waits, untouched,
+    /// until its asset is visible again.
     @discardableResult
     public mutating func undo() -> [SessionEffect] {
+        guard let latest = undoStack.last, order.contains(id: latest.assetID) else {
+            return [.noOp]
+        }
         guard let entry = undoStack.pop() else { return [.noOp] }
         var effects: [SessionEffect] = []
         switch entry.effect {

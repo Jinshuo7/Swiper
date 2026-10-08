@@ -214,6 +214,52 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.markedIDs, [id])
     }
 
+    func testUndoUnderLimitedAccessNeverDropsAHiddenMark() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        // Mark one photo, remembering its Undo entry.
+        model.startNewest()
+        await model.settle()
+        guard let marked = model.currentAsset?.id else { return XCTFail("no current asset") }
+        model.apply(.queueDeletion)
+        await model.settle()
+        let savedMarks = store.state?.marks
+        let savedDecisions = Set(store.state?.session?.decidedIDs ?? [])
+        let savedPool = Set(store.state?.session?.poolIDs ?? [])
+
+        // Limited access then hides exactly that marked photo.
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting([marked])
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertEqual(model.hiddenMarkCount, 1)
+
+        // Undo cannot return to a photo the app cannot show, so it must leave
+        // both the mark and its entry exactly where they are.
+        model.undo()
+        await model.settle()
+        XCTAssertEqual(store.state?.marks, savedMarks, "a hidden Undo reverses nothing")
+        XCTAssertEqual(Set(store.state?.session?.decidedIDs ?? []), savedDecisions)
+        XCTAssertEqual(Set(store.state?.session?.poolIDs ?? []), savedPool, "the captured pool is intact")
+        XCTAssertEqual(model.hiddenMarkCount, 1, "the hidden mark survives Undo")
+        XCTAssertEqual(model.engine?.undoStack.last?.assetID, marked, "the entry is kept")
+
+        // Widening access makes the same Undo reversible again.
+        library.authorization = .authorized
+        library.limitedSelectionIDs = nil
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, [marked])
+
+        model.undo()
+        await model.settle()
+        XCTAssertTrue(model.markedIDs.isEmpty, "Undo removes the mark once the photo is visible")
+        XCTAssertEqual(model.currentAsset?.id, marked, "Undo returns to the photo")
+    }
+
     func testConfirmingDeletionUnderLimitedAccessKeepsHiddenMarks() async {
         let library = FakePhotoLibrary.demo(count: 6)
         let (model, _, store) = await bootstrapped(library: library)
