@@ -23,40 +23,46 @@
 
 ## Current ticket
 
-- **None in progress.** The V1-03 milestone is merged (PRs #59–#62) and the
-  strong-review gate is in place (#65, docs #67). The next milestone is
-  **V1-04 (#26, the neutral direct-move decision dock)**, unblocked (#25 is
-  closed). Break it into subtickets before implementing.
+- **None in progress.** **#81** (the flaky UI suite) landed in **PR #83**: the
+  launch/terminate handoff is deterministic and every UI query names the
+  collection it looks in. Four consecutive CI runs and three consecutive local
+  full suites are green. `docs/TESTING.md` has the rules, the reproduction loop
+  and the one deliberate exception (the viewer canvas and the grid cells are
+  found by identifier, because their element kind follows whether their
+  thumbnail has rendered yet).
+- The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
+  split into subtickets #76–#79.
 
 ## Open PRs
 
-- **#74 — V1-06a: Keep marked photos through Limited Photos access**
-  (`driver/70-limited-marks`, this PR). Risky (`SWIPRKit/AssetReconciler.swift`,
+- **#74 — fix: keep marked photos through Limited Photos access (#70)**
+  (`driver/70-limited-marks`). Risky (`SWIPRKit/AssetReconciler.swift`,
   `SWIPR/ViewModels/AppModel.swift`, `SWIPR/Views/RootView.swift`); labelled
-  `needs-strong-review`, so it waits for the owner.
+  `needs-strong-review`, and being finished now under the delegated approval
+  rule (Codex review of the final head plus green checks).
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
-- **#66 — fix: keep a damaged save file instead of replacing it with empty
-  progress** (merge commit `c2af5f5`), its follow-up parked as **#73**.
+- **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
+  launch/terminate handoff helpers, the scoped UI queries and the rules in
+  `docs/TESTING.md`; closes **#81**.
+- **#82 — docs: record full autonomy until V1 and delegated risky-PR approval**
+  (merge commit `1d73a1b`).
+- **#80 — feat: add pure direct-move dock geometry (#75)** (merge commit
+  `01e57f6`).
 - **#72 — test: re-enable the AX5 large-text UI case in CI (#69)** (merge commit
   `8efd39e`), which closed **#69**.
 - **#71 — docs: sync HANDOFF.md to the current state (#68)** (merge commit
   `67967ad`), which closed **#68**.
+- **#66 — fix: keep a damaged save file instead of replacing it with empty
+  progress** (merge commit `c2af5f5`); its follow-up is the parked **#73**.
 - **#67 — docs: record the risky-PR Codex review workflow and Code Review
   Rules** (merge commit `881aff7`).
-
-- **#67 — docs: record the risky-PR Codex review workflow and Code Review
-  Rules** (merge commit `881aff7`), which added the standing workflow to
-  `AGENTS.md` and `docs/agents/OWNER-INSTRUCTIONS.md`.
 - **#65 — ci: add the strong-review gate for risky paths** (merge commit
-  `251b6a6`), which labels risky PRs `needs-strong-review` and fails until the
-  owner adds `strong-review-passed`.
-- **#64 — docs: correct the CI runner label and note the #50 review gap**
-  (merge commit `46e593b`).
+  `251b6a6`).
 - **#61 — Implement #56: replace an unfinished session only after
   confirmation** (merge commit `286ec04`), which closed **#56**.
 - **#60 — Implement #58: make the starting point reachable at the largest text
@@ -71,16 +77,39 @@
 - **#68 — Ops: Sync docs/HANDOFF.md to the current state** — done (PR #71,
   merged as `67967ad`).
 - **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
-  merged as `8efd39e`).
-- **#70 — V1-06a: Keep marked photos through Limited Photos access** — in
-  progress; PR #74 waits for the owner.
+  merged as `8efd39e`). The AX5 case runs on every PR.
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — PR #74,
+  the current ticket; finishing and merging now.
+- **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
+  vanished** — not started.
 
 ## What is next
 
-1. Finish the owner's decision on the risky PR **#74** (Limited Photos marks).
-2. Split **V1-04 (#26 — the neutral direct-move decision dock)** into subtickets
-   and work the ones that are not risky while #74 waits.
-3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+1. Land **#70** (PR #74), then implement **#73** (the migrated Tumbler plan's
+   vanished cursor) and the **V1-04** subtickets #76–#79.
+2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+### Note: the UI suite's launch handoff (#81)
+
+Every `SWIPRUITests` launch, terminate and starting-point handoff goes through
+`SWIPRUITests/AppLaunchHandoff.swift`. Add new UI tests through those helpers
+rather than calling `app.launch()` directly. What they give you: the app is
+stopped through the one `XCUIApplication` that launched it, a stop blocks until
+the system reports the process gone, and a launch or a starting point returns
+only once the screen it promises is on screen.
+
+Every lookup names the collection the element lives in, too:
+`app.buttons[…]`, `app.staticTexts[…]`, `app.images[…]`, `app.otherElements[…]`,
+`app.switches[…]` rather than `app.descendants(matching: .any)[…]`, which fetched
+the whole accessibility tree for every query. Two families are the deliberate
+exception — the viewer canvas (`viewer.photo`) and the grid cells
+(`choosePhoto.cell.<id>`), whose element kind follows whether their thumbnail has
+rendered yet — and they are found by identifier. Dump `app.debugDescription` to
+see what kind an identifier turns into before typing a new query.
+
+The stalls #81 was opened for (a 68 s terminate wait; three 30 s snapshot
+retries) did not recur after that: four consecutive CI runs and three consecutive
+local full suites are green. Whether the runner is now clean or simply quieter is
+not proved; `needs-owner` #84 keeps the evidence and the options.
 
 ### Note: the AX5 skip is gone (#69)
 

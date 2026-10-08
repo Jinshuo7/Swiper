@@ -16,6 +16,12 @@ final class SWIPRUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Leaves the app stopped, so the next test's launch cannot race a teardown.
+    override func tearDown() {
+        AppLaunchHandoff.stopAppUnderTest()
+        super.tearDown()
+    }
+
     /// What the viewer speaks for a demo fixture, so a test can tell exactly
     /// which asset is on screen. Mirrors `ViewerView.accessibilityDescription`.
     private func fixtureLabel(_ index: Int) -> String {
@@ -42,28 +48,33 @@ final class SWIPRUITests: XCTestCase {
         if failDeletion { app.launchArguments += ["-uiTestingFailDeletion"] }
         if failFirstDecisionSave { app.launchArguments += ["-uiTestingFailFirstDecisionSave"] }
         app.launchArguments += extraArguments
-        app.launch()
+        AppLaunchHandoff.launch(app, firstScreen: app.buttons["entry.settings"])
         return app
     }
 
+    /// The viewer's canvas carries its identifier on whatever it is showing: an
+    /// `Image` once the fixture has rendered, and a `ProgressView` before that,
+    /// so it is looked up by identifier rather than by element kind.
     private func photoElement(_ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)["viewer.photo"]
     }
 
-    private func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any)[identifier]
+    /// Grid cells have the same two states as the viewer canvas, so they are
+    /// looked up by identifier too.
+    private func gridCell(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)["choosePhoto.cell.\(identifier)"]
     }
 
     private func tutorialElement(_ app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)["viewer.tutorial"]
+        app.otherElements["viewer.tutorial"]
     }
 
     private func clusterElement(_ app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)["viewer.cluster"]
+        app.otherElements["viewer.cluster"]
     }
 
     private func gripElement(_ app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)["viewer.grip"]
+        app.images["viewer.grip"]
     }
 
     private func capture(_ name: String) {
@@ -134,11 +145,7 @@ final class SWIPRUITests: XCTestCase {
     /// replacement confirmation appear, chooses **Start new**. Tests that need to
     /// inspect the confirmation itself drive it directly instead.
     private func beginSession(_ start: XCUIElement, in app: XCUIApplication) {
-        start.tap()
-        let confirm = app.buttons["replaceSession.startNew"]
-        if confirm.waitForExistence(timeout: 1) {
-            confirm.tap()
-        }
+        AppLaunchHandoff.beginSession(start, in: app)
     }
 
     /// Opens the Home media choice and starts the newest-first traversal, which
@@ -154,6 +161,38 @@ final class SWIPRUITests: XCTestCase {
     func testNewestStartsAViewerSession() {
         let app = launchApp()
         _ = startViewer(app)
+    }
+
+    // MARK: - The launch handoff (#81)
+
+    /// A launch always runs the arguments it was given, whatever the launch
+    /// before it left behind.
+    ///
+    /// `XCUIApplication.launch()` stops a previous instance asynchronously, and a
+    /// launch that starts during that teardown can attach to the dying process,
+    /// which keeps the *previous* launch arguments — the app then opens the
+    /// previous test's store, or the real PhotoKit library, instead of what this
+    /// launch asked for. This launches the same way three times in a row and asks
+    /// the app to prove, each time, that it read the arguments of *that* launch.
+    func testEveryLaunchRunsTheArgumentsItWasGiven() {
+        let readOnly = launchApp(extraArguments: ["-uiTestingUnreadableState"])
+        XCTAssertTrue(
+            readOnly.images["persistence.readOnly"].waitForExistence(timeout: 10),
+            "the first launch must open the state it was told to open"
+        )
+
+        let plain = launchApp()
+        XCTAssertFalse(
+            plain.images["persistence.readOnly"].waitForExistence(timeout: 3),
+            "the second launch must not inherit the first launch's arguments"
+        )
+        XCTAssertTrue(plain.buttons["entry.preset.everything"].exists)
+
+        let readOnlyAgain = launchApp(extraArguments: ["-uiTestingUnreadableState"])
+        XCTAssertTrue(
+            readOnlyAgain.images["persistence.readOnly"].waitForExistence(timeout: 10),
+            "and the arguments decide each time, so it is not the order that decides"
+        )
     }
 
     // MARK: - Home and the editable filters (#46)
@@ -173,7 +212,7 @@ final class SWIPRUITests: XCTestCase {
     /// fresh preset drops a previous attempt's exclusions.
     func testMediaChoicesOpenTheirPresetsAndResetEachTime() {
         let app = launchApp()
-        let summary = app.descendants(matching: .any)["filter.summary"]
+        let summary = app.staticTexts["filter.summary"]
 
         app.buttons["entry.preset.photos"].tap()
         XCTAssertTrue(summary.waitForExistence(timeout: 10))
@@ -200,7 +239,7 @@ final class SWIPRUITests: XCTestCase {
     func testFilterRowsToggleIndependentlyAndOnlyIsolates() {
         let app = launchApp()
         app.buttons["entry.preset.everything"].tap()
-        let summary = app.descendants(matching: .any)["filter.summary"]
+        let summary = app.staticTexts["filter.summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10))
         XCTAssertEqual(summary.label, "Everything · 24 items")
 
@@ -237,10 +276,10 @@ final class SWIPRUITests: XCTestCase {
     func testAnEmptyFilterExplainsItselfAndDisablesContinue() {
         let app = launchApp()
         app.buttons["entry.preset.videos"].tap()
-        let summary = app.descendants(matching: .any)["filter.summary"]
+        let summary = app.staticTexts["filter.summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10))
         XCTAssertEqual(summary.label, "Videos · 0 items")
-        XCTAssertTrue(app.descendants(matching: .any)["filter.empty"].exists, "the empty state must explain itself")
+        XCTAssertTrue(app.staticTexts["filter.empty"].exists, "the empty state must explain itself")
         XCTAssertFalse(app.buttons["filter.continue"].isEnabled, "an empty pool cannot continue")
         capture("Filters — empty selection, Continue disabled")
 
@@ -335,7 +374,7 @@ final class SWIPRUITests: XCTestCase {
         let positionAtKill = photoElement(app).label
         XCTAssertNotEqual(positionAtKill, markedLabel)
 
-        app.terminate()
+        AppLaunchHandoff.stopAppUnderTest()
 
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.resume"].waitForExistence(timeout: 10))
@@ -369,17 +408,17 @@ final class SWIPRUITests: XCTestCase {
         _ = openChoosePhoto(app)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["choosePhoto.explanation"].waitForExistence(timeout: 10),
+            app.staticTexts["choosePhoto.explanation"].waitForExistence(timeout: 10),
             "Choose a photo must say what it is for"
         )
         XCTAssertTrue(app.buttons["choosePhoto.newest"].exists, "Newest first lives inside Choose a photo")
         XCTAssertTrue(app.buttons["choosePhoto.oldest"].exists, "Oldest first lives inside Choose a photo")
         XCTAssertTrue(app.buttons["choosePhoto.random"].exists, "Random lives inside Choose a photo")
-        let headers = app.descendants(matching: .any)
+        let headers = app.staticTexts
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "choosePhoto.month."))
         XCTAssertGreaterThanOrEqual(headers.count, 2, "the library should be grouped into months")
-        XCTAssertTrue(app.descendants(matching: .any)["choosePhoto.jump"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["choosePhoto.sort"].exists)
+        XCTAssertTrue(app.buttons["choosePhoto.jump"].exists)
+        XCTAssertTrue(app.buttons["choosePhoto.sort"].exists)
         capture("Choose a photo — explanation, Newest first/Oldest first/Random, months")
 
         // Newest first by default: toggling must actually reorder the sections.
@@ -472,7 +511,7 @@ final class SWIPRUITests: XCTestCase {
         let app = launchApp()
         _ = openChoosePhoto(app)
 
-        let jump = app.descendants(matching: .any)["choosePhoto.jump"]
+        let jump = app.buttons["choosePhoto.jump"]
         XCTAssertTrue(jump.waitForExistence(timeout: 10))
         jump.tap()
 
@@ -496,7 +535,7 @@ final class SWIPRUITests: XCTestCase {
 
         // fake-23 is the newest photo and a 4:1 panorama, so the viewer's own
         // aspect ratio proves the session started where it was chosen.
-        let cell = app.descendants(matching: .any)["choosePhoto.cell.fake-23"]
+        let cell = gridCell(app, "fake-23")
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()
 
@@ -540,7 +579,7 @@ final class SWIPRUITests: XCTestCase {
         // A second start asks first, and explains what will be replaced.
         _ = openChoosePhoto(app)
         app.buttons["choosePhoto.newest"].tap()
-        let confirmation = element(app, "replaceSession.confirmation")
+        let confirmation = app.otherElements["replaceSession.confirmation"]
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10), "a replacement start must ask first")
         XCTAssertTrue(
             app.staticTexts
@@ -599,7 +638,7 @@ final class SWIPRUITests: XCTestCase {
         let newest = app.buttons["choosePhoto.newest"]
         XCTAssertTrue(newest.waitForExistence(timeout: 10))
         newest.tap()
-        let confirmation = element(app, "replaceSession.confirmation")
+        let confirmation = app.otherElements["replaceSession.confirmation"]
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10), "an unfinished session must ask before it is replaced")
         capture(name)
     }
@@ -935,7 +974,7 @@ final class SWIPRUITests: XCTestCase {
         let app = launchApp()
         _ = startViewer(app)
 
-        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+        let badge = app.otherElements["viewer.mediaBadge"]
         XCTAssertTrue(badge.waitForExistence(timeout: 10), "every asset needs a media badge")
         XCTAssertEqual(badge.label, "Photo", "the first fixture is a still, so the badge must read Photo")
 
@@ -962,7 +1001,7 @@ final class SWIPRUITests: XCTestCase {
 
         let review = app.buttons["viewer.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5), "Review should appear once something is marked")
-        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+        let badge = app.otherElements["viewer.mediaBadge"]
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "the media badge should stay visible")
 
         XCTAssertGreaterThanOrEqual(
@@ -997,7 +1036,7 @@ final class SWIPRUITests: XCTestCase {
         for (index, expected) in expectations.enumerated() {
             let photo = photoElement(app)
             XCTAssertTrue(photo.waitForExistence(timeout: 10), "preview \(index) never appeared")
-            let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+            let badge = app.otherElements["viewer.mediaBadge"]
             XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge at step \(index)")
             XCTAssertEqual(badge.label, expected.label, "step \(index) badge")
             XCTAssertTrue(
@@ -1037,7 +1076,7 @@ final class SWIPRUITests: XCTestCase {
             extraArguments: extraArguments + [mixedMediaLaunchArgument]
         )
         _ = startViewer(app)
-        let badge = app.descendants(matching: .any)["viewer.mediaBadge"]
+        let badge = app.otherElements["viewer.mediaBadge"]
 
         XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge for the \(suffix) screenshots")
         XCTAssertEqual(badge.label, "Photo")
@@ -1131,7 +1170,7 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["viewer.close"].tap()
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 5))
 
-        app.terminate()
+        AppLaunchHandoff.stopAppUnderTest()
         let relaunched = launchApp(persistentStore: true)
         XCTAssertTrue(relaunched.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
         XCTAssertTrue(relaunched.buttons["entry.review"].exists, "marks survive a relaunch")
@@ -1166,7 +1205,7 @@ final class SWIPRUITests: XCTestCase {
 
         photo.swipeLeft()
 
-        let banner = app.descendants(matching: .any)["saveFailure.banner"]
+        let banner = app.images["saveFailure.banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "a failed save must be visible")
         XCTAssertTrue(app.staticTexts["Couldn't save your last decision"].exists)
         XCTAssertEqual(photoElement(app).label, before, "the session must not advance before the decision is saved")
@@ -1210,7 +1249,7 @@ final class SWIPRUITests: XCTestCase {
         photo.swipeLeft()
         app.buttons["viewer.review"].tap()
 
-        let cell = app.descendants(matching: .any)["review.cell.0"]
+        let cell = app.buttons["review.cell.0"]
         XCTAssertTrue(cell.waitForExistence(timeout: 5))
         cell.tap()
 
@@ -1280,7 +1319,7 @@ final class SWIPRUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
         app.buttons["entry.settings"].tap()
-        let toggle = app.descendants(matching: .any)["settings.showButtons"]
+        let toggle = app.switches["settings.showButtons"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
         toggle.tap()
         app.buttons["Back"].firstMatch.tap()
@@ -1309,7 +1348,7 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
         app.buttons["entry.settings"].tap()
 
-        let stats = app.descendants(matching: .any)["settings.statistics"]
+        let stats = app.staticTexts["settings.statistics"]
         XCTAssertTrue(stats.waitForExistence(timeout: 10), "statistics must be in Settings")
         XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeDeleted"].exists)
         XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeReclaimed"].exists)
@@ -1372,7 +1411,7 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["viewer.close"].tap()
 
         let window = app.windows.firstMatch.frame
-        let wordmark = app.descendants(matching: .any)["entry.wordmark"]
+        let wordmark = app.staticTexts["entry.wordmark"]
         XCTAssertTrue(wordmark.waitForExistence(timeout: 10))
         XCTAssertEqual(wordmark.frame.midX, window.midX, accuracy: 1, "the wordmark must be centred on the phone")
         XCTAssertLessThan(app.buttons["entry.settings"].frame.midX, wordmark.frame.midX)
@@ -1409,11 +1448,11 @@ final class SWIPRUITests: XCTestCase {
         // 4:1 panorama.
         app.buttons["viewer.close"].tap()
         _ = openChoosePhoto(app)
-        let cell = app.descendants(matching: .any)["choosePhoto.cell.fake-23"]
+        let cell = gridCell(app, "fake-23")
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         cell.tap()
         XCTAssertTrue(
-            element(app, "replaceSession.confirmation").waitForExistence(timeout: 10),
+            app.otherElements["replaceSession.confirmation"].waitForExistence(timeout: 10),
             "choosing a photo while a session waits must ask before it replaces it"
         )
         app.buttons["replaceSession.startNew"].tap()

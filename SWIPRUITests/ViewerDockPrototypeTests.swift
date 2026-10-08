@@ -4,8 +4,8 @@ final class ViewerDockPrototypeTests: XCTestCase {
     func testMovingFromTrashDoesNotMakeADecision() {
         let app = XCUIApplication()
         app.launchArguments = ["-viewerDockPrototype", "-uiTestingFakeLibrary"]
-        app.launch()
-        let dock = app.descendants(matching: .any)["prototype.dock"].firstMatch
+        AppLaunchHandoff.launch(app, firstScreen: app.otherElements["prototype.dock"])
+        let dock = app.otherElements["prototype.dock"].firstMatch
         XCTAssertTrue(dock.waitForExistence(timeout: 10))
         let home = app.buttons["prototype.home"]
         let review = app.buttons["prototype.review"]

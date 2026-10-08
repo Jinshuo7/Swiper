@@ -21,10 +21,10 @@
 > **Known status for the v1 baseline:** the former
 > largest-accessibility-text ("AX5") reachability failure was fixed by #58, and
 > #69 removed its CI skip in PR #72; on that PR's commit the simulator suite ran
-> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). One
-> saved-progress fix is still open and unmerged: PR #66 keeps a damaged save file
-> from being replaced with empty progress. Do not clear the saved-data gate until
-> #66 merges.
+> every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). The
+> damaged-save-file fix that was open for review is merged as PR #66, and PR #72
+> merged too (merge commits `c2af5f5` and `8efd39e`). The one open risky PR left
+> is #74 (marked photos through Limited Photos access, `needs-strong-review`).
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -109,6 +109,45 @@
 > and reconciliation drops vanished members while crediting no deletion and
 > touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
 > tests, 0 failures. The AX5 `-skip-testing` line is untouched.
+>
+> **#81 update (2026-10-07):** the UI suite's launch/terminate handoff is
+> deterministic and every UI query is scoped to the collection it looks in. Every #81 report is a launch
+> or terminate handoff going wrong: `Failed to terminate
+> com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
+> from `XCUIApplication.launch()`, a Home that never appeared after a launch, a
+> viewer that never appeared after a relaunch, and a Home entry asserted before
+> the decision behind it had been saved. All of them now go through the new
+> `SWIPRUITests/AppLaunchHandoff.swift`: the app is stopped through the one
+> `XCUIApplication` that launched it (a never-launched proxy is what reports the
+> `:0`), `tearDown` stops the app and blocks until the system reports it gone,
+> `launch(_:firstScreen:)` waits for the foreground screen that launch promises,
+> and `beginSession(_:in:)` waits for the grid to hand over to the viewer **or**
+> to the replacement confirmation instead of guessing after one second. Entries
+> that a decision creates are waited for rather than assumed final, because Close
+> returns Home while the decision's save is still in flight. Nothing is skipped,
+> shortened, loosened or retried, and
+> `testEveryLaunchRunsTheArgumentsItWasGiven` pins the invariant.
+>
+> **Second reduction: every UI query names its collection.** The suite asked for
+> elements with `app.descendants(matching: .any)[identifier]`, which fetches the
+> whole accessibility tree and filters it, and that was the query the runner
+> timed out on (`Failed to get matching snapshots: Timed out while evaluating UI
+> query`). Every lookup is now `app.buttons[…]`, `app.staticTexts[…]`,
+> `app.images[…]`, `app.otherElements[…]` or `app.switches[…]`, with the mapping
+> read off `app.debugDescription` rather than guessed. Two families are the
+> deliberate exception — the viewer canvas and the grid cells, whose element kind
+> follows whether their thumbnail has rendered yet — and they are found by
+> identifier, which is the state a `waitForExistence` is waiting out.
+>
+> **Result.** After the second reduction: four consecutive CI runs green (336
+> tests each, 0 failures) and three consecutive local full suites green on
+> `SWIPR iPhone 11 Pro`. The two stalls recorded before it (a 68 s terminate wait;
+> three 30 s snapshot retries) did not recur. The one failure in between,
+> `testPlayEntryScreenInEveryState` waiting 30 s for a viewer, stopped when the
+> canvas and the cells went back to being found by identifier; whether that was
+> the runner stall or only the lookup is not proved, so both readings stay in
+> `needs-owner` #84. Nothing was retried, skipped or loosened to get there.
+> The reproduction loop and the rules are in `docs/TESTING.md`.
 
 ---
 
@@ -129,6 +168,7 @@
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all fixed | Yes (#72, merge `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 5 | 1 | 5 | Yes — rounds 1–5 found 8 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs, stale seeded cursor); the round-5 cursor-order fix is small and rare, so the owner accepted a follow-up (#73) instead of blocking | Yes (#66, merge `c2af5f5`) |
+| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
 | [#70 — V1-06a: Keep marked photos through Limited Photos access](https://github.com/Jinshuo7/Swiper/issues/70) | 4 | 1 | 4 | Yes — rounds 1–3 as logged; round 4: a hidden Tumbler cursor stayed in `handled` (returned to the plan now), `reloadLibrary` could reconcile a new Limited subset with stale `.authorized`, and the hidden-mark notice could overwrite an unrelated save error. All fixed | No (PR #74 open; awaiting re-review) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
