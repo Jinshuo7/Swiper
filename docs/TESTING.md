@@ -99,9 +99,14 @@ their content is a thumbnail, `viewer.cluster`, `viewer.mediaBadge` and
 `Image` inside the banner. Dump `app.debugDescription` and read the tree rather
 than guessing; a wrong guess fails the test loudly rather than silently.
 
-One deliberate consequence: the suite has no generic `element(_:_:)` helper any
-more, and `assertReachable`/`assertFullyOnScreen` take the element itself, so the
-call site always shows which collection it expects.
+Two families are deliberately the exception, because their element kind follows
+their content: the viewer canvas (`viewer.photo`) and the grid cells
+(`choosePhoto.cell.<id>`) are an `Image` once the fixture has rendered and a
+`ProgressView` or an empty container before that, so a typed query would miss
+them in precisely the state `waitForExistence` is there to wait out. They — and
+only they — are looked up by identifier. The suite has no generic `element(_:_:)`
+helper any more, and `assertReachable`/`assertFullyOnScreen` take the identifier
+plus the collection, so every call site still shows what it expects.
 
 **What the fix does not remove.** The CI runner still loses the automation
 session with the app about one run in three, and the two signatures seen so far
