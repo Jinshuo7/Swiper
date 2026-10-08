@@ -129,8 +129,10 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
 /// The dock has no grip: it is dragged by its whole surface, which is exactly
 /// the controls plus the padding and gaps around them. Two layouts share the
 /// three positions — at the bottom a labelled Delete/Keep pair in a tray with a
-/// separate smaller Undo, at a side three separate icon controls — and the pair
-/// keeps its anchor whichever end Undo takes. Kept in the framework rather than
+/// separate smaller Undo, at a side three separate icon controls with Undo as one
+/// of them. The bottom pair keeps its own anchor whichever end Undo takes; a side
+/// column is anchored as a whole, so Undo takes its top or bottom and the pair
+/// sits above or below it (docs/SPEC.md §5.6). Kept in the framework rather than
 /// only inside the SwiftUI view so the geometry the spec pins down is directly
 /// testable on macOS.
 public enum ControlClusterLayout {
@@ -177,13 +179,16 @@ public enum ControlClusterLayout {
             : CGSize(width: undoControlSize + undoGap + traySize.width, height: traySize.height)
     }
 
-    /// The anchor the dock's pair occupies in a safe area of `size`: the bottom
-    /// Delete/Keep pair centred on the width, a column centred at 75 % of the
-    /// height 20 pt inside its edge.
+    /// The anchor the dock occupies in a safe area of `size`.
     ///
-    /// Undo is deliberately outside this anchor. Its end is the user's choice
-    /// (`UndoSide`), and putting it at the other end must never shift Delete and
-    /// Keep (docs/SPEC.md §5.1 and §5.6).
+    /// At the bottom the anchor is the labelled Delete/Keep pair's own centre:
+    /// the separate Undo control hangs off one end of it, so changing which end
+    /// Undo takes never moves Delete and Keep. At a side the anchor is the whole
+    /// column's centre, and Undo is one of its three controls: it takes the top
+    /// or the bottom of the column — above or below the pair, which is how the
+    /// spec describes the two Undo ends — so the pair moves with the column
+    /// rather than around Undo. Delete and Keep never move relative to each other
+    /// in either layout (docs/SPEC.md §5.1 and §5.6).
     public static func centre(for position: ControlPosition, in size: CGSize) -> CGPoint {
         let cluster = clusterSize(for: position)
         switch position {
@@ -221,7 +226,9 @@ public enum ControlClusterLayout {
     /// shows exactly where the dock will land.
     ///
     /// At the bottom the pair keeps its anchor and the frame grows to the side
-    /// Undo took, so the dock is never centred *with* Undo — the pair is.
+    /// Undo took, so the dock is never centred *with* Undo — the pair is. A side
+    /// column is the same rect whichever end Undo takes, because it holds all
+    /// three of its controls.
     public static func slotRect(
         for position: ControlPosition,
         in size: CGSize,

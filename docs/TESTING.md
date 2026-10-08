@@ -476,13 +476,16 @@ the chrome of both is neutral:
   separate Undo control drawn smaller beside it;
 - at a **side**, three separate icon controls a non-action gap apart.
 
-The pair is the dock's anchor: `ControlClusterLayout.centre` is the pair's centre
-at every position, and `slotRect(for:in:undoSide:)` grows off that anchor to the
-side Undo took. That is what makes "Before actions" (Undo left of the bottom
-pair, above a side pair) and "After actions" mirror each other without Delete and
-Keep ever moving. The dock's size is fixed per layout (286 × 68 at the bottom,
-56 × 196 at a side) so the media never moves for chrome (ADR-0006) and the dock
-never resizes.
+The pair is the dock's anchor **at the bottom**: `ControlClusterLayout.centre`
+is the pair's centre there, and `slotRect(for:in:undoSide:)` grows off that
+anchor to the side Undo took, so Undo moving from one end to the other never
+moves Delete and Keep. At a **side** the anchor is the whole column — Undo is one
+of its three controls — so it takes the top or the bottom of the column, above or
+below the pair, which is how the spec describes the two Undo ends; the pair moves
+with the column rather than around Undo, and Delete and Keep never move relative
+to each other in either layout (docs/SPEC.md §5.6). The dock's size is fixed per
+layout (286 × 68 at the bottom, 56 × 196 at a side) so the media never moves for
+chrome (ADR-0006) and the dock never resizes.
 
 Sharp edges for the next change here:
 
