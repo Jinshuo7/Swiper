@@ -1,3 +1,4 @@
+import SWIPRKit
 import SwiftUI
 
 /// The app's primary button look: full-width, high contrast, generous tap area.
@@ -52,6 +53,56 @@ struct AdaptiveButtonStyle: ButtonStyle {
     }
 }
 
+/// The only red and green in the viewer: a faint, desaturated edge glow on the
+/// Delete and Keep chrome (docs/SPEC.md §4.3). Saturation never carries the
+/// meaning — the symbol, the word, the stroke and the weight do — so these two
+/// values stay barely visible on purpose.
+enum DockEdgeTint {
+    /// Delete: a dusty, desaturated red that never reads as an alarm.
+    static let delete = Color(red: 0.74, green: 0.48, blue: 0.45)
+    /// Keep: the matching desaturated green.
+    static let keep = Color(red: 0.47, green: 0.60, blue: 0.49)
+}
+
+/// The neutral chrome one dock control wears: glass, a hairline white edge, and
+/// — for Delete and Keep only — the extremely faint desaturated edge glow above.
+///
+/// Undo and the moving token pass `nil`, because neither is an outcome and
+/// neither is allowed to lean on colour.
+struct DockControlBackground<Shape: InsettableShape>: View {
+    let shape: Shape
+    /// The control's faint edge glow, or `nil` for a neutral part of the dock.
+    var edgeTint: Color?
+
+    var body: some View {
+        shape
+            .fill(.ultraThinMaterial)
+            .overlay {
+                if let edgeTint {
+                    shape
+                        .fill(
+                            LinearGradient(
+                                // Only the rim: the middle of the control stays
+                                // neutral glass, so the glow can never be read as
+                                // a red or green button.
+                                stops: [
+                                    .init(color: edgeTint.opacity(0.16), location: 0),
+                                    .init(color: edgeTint.opacity(0), location: 0.3),
+                                    .init(color: edgeTint.opacity(0), location: 0.7),
+                                    .init(color: edgeTint.opacity(0.16), location: 1),
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+            }
+            .overlay(
+                shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+            )
+    }
+}
+
 /// A circular, floating control used over the full-screen photo.
 struct CircleControl: View {
     let systemImage: String
@@ -60,6 +111,9 @@ struct CircleControl: View {
     /// the top strip rather than on the decision cluster.
     var identifier: String?
     var tint: Color = .white
+    /// The faint desaturated edge glow for Delete and Keep; `nil` keeps a
+    /// control neutral.
+    var edgeTint: Color?
     /// The drawn circle, and the tap region around it. Close is drawn smaller
     /// than the decision controls but keeps a full 44 pt tap region.
     var visualSize: CGFloat = 56
@@ -71,14 +125,62 @@ struct CircleControl: View {
             Image(systemName: systemImage)
                 .font(.system(size: visualSize * 0.39, weight: .semibold))
                 .frame(width: visualSize, height: visualSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(DockControlBackground(shape: Circle(), edgeTint: edgeTint))
                 .foregroundStyle(tint)
-                .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
                 .frame(width: max(visualSize, hitSize), height: max(visualSize, hitSize))
                 .contentShape(Rectangle())
         }
         .accessibilityLabel(label)
         .accessibilityIdentifier(identifier ?? "control.\(label.lowercased())")
+    }
+}
+
+/// One labelled action of the bottom dock: the symbol and the word carry the
+/// action, and the only colour is the faint desaturated edge glow shared with
+/// the side layout's controls.
+struct DecisionPill: View {
+    /// The dock is a fixed-geometry control (docs/SPEC.md §5), so its own label
+    /// grows a little with Dynamic Type and then stops: a wider pill is not an
+    /// option, and a truncated action says less than nothing. The full action
+    /// name is always spoken by the control's accessibility label.
+    @ScaledMetric(relativeTo: .subheadline) private var scaledLabelSize: CGFloat = 15
+
+    let systemImage: String
+    let title: String
+    let edgeTint: Color
+    var identifier: String
+    let action: () -> Void
+
+    private var labelSize: CGFloat { min(scaledLabelSize, 20) }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .font(.system(size: labelSize, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .frame(
+                width: ControlClusterLayout.pillWidth,
+                height: ControlClusterLayout.controlSize
+            )
+            .background(
+                DockControlBackground(
+                    shape: RoundedRectangle(
+                        cornerRadius: ControlClusterLayout.controlSize / 2,
+                        style: .continuous
+                    ),
+                    edgeTint: edgeTint
+                )
+            )
+        }
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -101,8 +203,12 @@ struct TopBarButton: View {
 }
 
 /// The translucent material behind a swipe outcome well. It arms — brighter
-/// fill, stronger stroke — the moment the drag crosses the commit threshold, so
-/// the threshold is visible as well as felt.
+/// stroke, heavier weight and a little scale — the moment the drag crosses the
+/// commit threshold, so the threshold is visible as well as felt.
+///
+/// `tint` is one of the faint desaturated `DockEdgeTint` values, never a
+/// saturated system colour: the well's symbol and its wording carry the
+/// outcome (docs/SPEC.md §4.3).
 struct WellBackground: View {
     let tint: Color
     let armed: Bool
@@ -112,7 +218,7 @@ struct WellBackground: View {
             .fill(.ultraThinMaterial)
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(tint.opacity(armed ? 0.55 : 0.22))
+                    .fill(tint.opacity(armed ? 0.34 : 0.12))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)

@@ -196,17 +196,13 @@ final class DockGeometryTests: XCTestCase {
 
     func testDestinationsRespectTheSafeAreaEdgeMargin() {
         for position in ControlPosition.allCases {
-            let centre = DockGeometry.centre(for: position, in: size)
-            let cluster = ControlClusterLayout.clusterSize(for: position)
-            let frame = CGRect(
-                x: centre.x - cluster.width / 2,
-                y: centre.y - cluster.height / 2,
-                width: cluster.width,
-                height: cluster.height
-            )
-            XCTAssertGreaterThanOrEqual(frame.minX, 0)
-            XCTAssertLessThanOrEqual(frame.maxX, size.width)
-            XCTAssertLessThanOrEqual(frame.maxY, size.height)
+            for undoSide in UndoSide.allCases {
+                let frame = ControlClusterLayout.slotRect(for: position, in: size, undoSide: undoSide)
+                XCTAssertGreaterThanOrEqual(frame.minX, 0, "\(position) \(undoSide) escapes the leading edge")
+                XCTAssertLessThanOrEqual(frame.maxX, size.width, "\(position) \(undoSide) escapes the trailing edge")
+                XCTAssertGreaterThanOrEqual(frame.minY, 0)
+                XCTAssertLessThanOrEqual(frame.maxY, size.height, "\(position) \(undoSide) escapes the bottom edge")
+            }
         }
     }
 }

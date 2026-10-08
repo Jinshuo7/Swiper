@@ -419,7 +419,7 @@ entry.
 
 The grip, the puck and the phantom slots above are gone. The dock is now dragged
 by its **whole surface**: a drag may begin on any control or in any gap in the
-tray, roughly nine points of movement cancels that gesture's pending tap for
+dock, roughly nine points of movement cancels that gesture's pending tap for
 good, and the dock becomes a compact neutral token that follows the finger.
 `SWIPRKit/DockGeometry` owns the arithmetic (tap-cancel threshold, bounded
 capture radius with hysteresis, invalid-release return); the three destination
@@ -466,6 +466,54 @@ adds `testEverySourceCanReachEveryDestination`,
 `testPlayEveryControlPosition` and `testDestinationMarkersWhileMovingTheDock`.
 `testCaptureTheDockAtEveryPositionInEveryAppearance` produces the v1-04
 dock-* screenshots in light, dark and at the largest text size.
+
+### Neutral dock chrome and its two layouts (2026-10-09, #77) — current
+
+`ControlClusterLayout` now gives the three fixed positions **two layouts**, and
+the chrome of both is neutral:
+
+- at the **bottom**, a labelled **Delete / Keep** pair inside one tray, with the
+  separate Undo control drawn smaller beside it;
+- at a **side**, three separate icon controls a non-action gap apart.
+
+The pair is the dock's anchor: `ControlClusterLayout.centre` is the pair's centre
+at every position, and `slotRect(for:in:undoSide:)` grows off that anchor to the
+side Undo took. That is what makes "Before actions" (Undo left of the bottom
+pair, above a side pair) and "After actions" mirror each other without Delete and
+Keep ever moving. The dock's size is fixed per layout (286 × 68 at the bottom,
+56 × 196 at a side) so the media never moves for chrome (ADR-0006) and the dock
+never resizes.
+
+Sharp edges for the next change here:
+
+- **No state rests on colour.** The only red and green in the viewer are the
+  `DockEdgeTint` rims — desaturated, 0.16 opacity, drawn only at a control's
+  outer edges — plus the swipe wells' fill. The symbol, the word, the stroke and
+  the weight carry every outcome, and `WellBackground`'s armed state is a heavier
+  stroke and a scale change rather than a stronger fill.
+- **The drag handle is the whole box.** `contentShape` is a lightly rounded
+  rectangle (12 pt) over the dock's frame, so the 12 pt gap beside the separate
+  Undo control and the tray's own padding both move the dock, and a drag that
+  begins in either is still not a decision.
+- **`Undo` at the bottom is 44 pt**, the smallest target the accessibility
+  contract allows; at a side it is a full 56 pt control like the other two.
+- **The pill labels stop growing on purpose.** The dock's geometry is pinned, so
+  `DecisionPill` caps its scaled font at 20 pt and never truncates an action —
+  the AX5 screenshots show both labels whole. The full action name is always the
+  control's accessibility label.
+
+`SWIPRUITests` covers it with `testTheDockLayoutsAndTheOneUndoMapping` (both
+layouts, the pill/circle shapes, the pair centred, Undo outside it and smaller,
+Undo leading both layouts, then After actions mirrored), and the dock tests above
+now assert the row's pair is centred rather than the whole dock. When the column
+is on screen, `assertClusterIsAColumn` also asserts the non-action gap and the
+safe-area inset. `ControlClusterLayoutTests` adds
+`testTheTwoLayoutsHaveTheirOwnFixedSize`,
+`testTheBottomPairStaysCentredWhenUndoChangesEnd`,
+`testTheSideLayoutSeparatesItsControlsWithANonActionGap` and
+`testEveryDestinationDrawsTheWholeDockAtItsOwnSize`; `DockGeometryTests` now
+checks the real `slotRect` at both Undo ends. The v1-04 dock screenshots were
+re-captured in light, dark and at the largest text size.
 
 ## Screenshots
 

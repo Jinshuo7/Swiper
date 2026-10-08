@@ -707,19 +707,20 @@ final class SWIPRUITests: XCTestCase {
 
     /// The point a destination sits at, in window coordinates.
     ///
-    /// `DockGeometry` pins the three: a row centred on the width 20 pt above the
-    /// bottom safe edge, and columns centred at 75 % of the safe height 20 pt
-    /// inside the edge. Portrait leaves no leading or trailing safe inset, so a
-    /// column's centre is 64 pt from the window edge — its 20 pt margin plus half
-    /// its 88 pt width. The destinations are far enough apart that a finger well
-    /// inside one captures it.
+    /// `DockGeometry` pins the three: the labelled Delete/Keep pair centred on
+    /// the width 20 pt above the bottom safe edge, and columns of separate icon
+    /// controls centred at 75 % of the safe height 20 pt inside the edge.
+    /// Portrait leaves no leading or trailing safe inset, so a column's centre
+    /// is 48 pt from the window edge — its 20 pt margin plus half its 56 pt
+    /// width. The destinations are far enough apart that a finger well inside
+    /// one captures it.
     private func destinationTarget(_ position: String, in app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         switch position {
         case "left":
-            return CGPoint(x: window.minX + 64, y: window.height * 0.73)
+            return CGPoint(x: window.minX + 48, y: window.height * 0.73)
         case "right":
-            return CGPoint(x: window.maxX - 64, y: window.height * 0.73)
+            return CGPoint(x: window.maxX - 48, y: window.height * 0.73)
         default:
             return CGPoint(x: window.midX, y: window.height * 0.88)
         }
@@ -754,6 +755,14 @@ final class SWIPRUITests: XCTestCase {
         usleep(600_000)
     }
 
+    /// The pair the user acts on: Delete and Keep, including the tray's padding
+    /// around them. Its centre is the dock's anchor at the bottom.
+    private func actionPairFrame(_ app: XCUIApplication) -> CGRect {
+        let delete = app.buttons["control.delete"].frame
+        let keep = app.buttons["control.keep"].frame
+        return delete.union(keep)
+    }
+
     /// The three buttons are one column when the cluster is at a side, and one
     /// row at the bottom.
     private func assertClusterIsAColumn(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
@@ -772,6 +781,25 @@ final class SWIPRUITests: XCTestCase {
             file: file,
             line: line
         )
+        // A side layout is separate controls: the gap between two of them is a
+        // non-action gap, so they never touch.
+        let stacked = [delete.frame, keep.frame, undo.frame].sorted { $0.minY < $1.minY }
+        for (upper, lower) in zip(stacked, stacked.dropFirst()) {
+            XCTAssertGreaterThanOrEqual(
+                lower.minY - upper.maxY,
+                8,
+                "the side controls must stand apart, not merge into one tray",
+                file: file,
+                line: line
+            )
+        }
+        // And the column keeps its safe-area inset on the edge it sits against.
+        let window = app.windows.firstMatch.frame
+        if keep.frame.midX < window.midX {
+            XCTAssertGreaterThanOrEqual(delete.frame.minX - window.minX, 16, "the left column keeps its inset", file: file, line: line)
+        } else {
+            XCTAssertGreaterThanOrEqual(window.maxX - delete.frame.maxX, 16, "the right column keeps its inset", file: file, line: line)
+        }
     }
 
     private func assertClusterIsARow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
@@ -798,7 +826,22 @@ final class SWIPRUITests: XCTestCase {
         assertClusterIsARow(app)
         let window = app.windows.firstMatch.frame
 
-        XCTAssertEqual(clusterElement(app).frame.midX, window.midX, accuracy: 6, "the bottom dock is centred on the width")
+        XCTAssertEqual(
+            actionPairFrame(app).midX,
+            window.midX,
+            accuracy: 6,
+            "the labelled Delete/Keep pair is centred on the width"
+        )
+        XCTAssertLessThan(
+            app.buttons["control.undo"].frame.maxX,
+            app.buttons["control.delete"].frame.minX,
+            "Undo is a separate control before the pair, outside the tray"
+        )
+        XCTAssertLessThan(
+            app.buttons["control.undo"].frame.width,
+            app.buttons["control.delete"].frame.width,
+            "the bottom Undo is drawn smaller than an action"
+        )
         let undoAtBottom = app.buttons["control.undo"].frame
         XCTAssertGreaterThan(undoAtBottom.midY, window.height * 0.8, "the bottom row sits low")
         let photoBefore = photoElement(app).label
@@ -824,6 +867,90 @@ final class SWIPRUITests: XCTestCase {
         // Moving the dock is not a decision, however the grab lands.
         XCTAssertEqual(photoElement(app).label, photoBefore, "moving the dock must not decide anything")
         XCTAssertFalse(app.buttons["viewer.review"].exists, "moving the dock must not mark the photo")
+    }
+
+    /// The neutral dock's two layouts, and the one mapping they share.
+    ///
+    /// At the bottom Delete and Keep are labelled pills with a separate smaller
+    /// Undo outside them; at a side all three are separate icon controls with a
+    /// non-action gap between them. "Before actions" then has to mean the same
+    /// thing in both: Undo leads the row, and Undo leads the column.
+    func testTheDockLayoutsAndTheOneUndoMapping() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let window = app.windows.firstMatch.frame
+        let windowMidX = window.midX
+        let delete = app.buttons["control.delete"]
+        let keep = app.buttons["control.keep"]
+        let undo = app.buttons["control.undo"]
+        for control in [delete, keep, undo] {
+            XCTAssertTrue(control.waitForExistence(timeout: 10), "the dock is missing a control")
+        }
+
+        // The bottom layout: two labelled pills, a separate smaller Undo, and
+        // the pair centred on the width.
+        XCTAssertEqual(delete.label, "Delete")
+        XCTAssertEqual(keep.label, "Keep")
+        XCTAssertGreaterThan(
+            delete.frame.width,
+            delete.frame.height + 20,
+            "the bottom action is a labelled pill, not an icon circle"
+        )
+        XCTAssertEqual(actionPairFrame(app).midX, windowMidX, accuracy: 6, "the pair is centred on the width")
+        XCTAssertLessThan(undo.frame.midX, delete.frame.midX, "Undo leads the pair: Before actions by default")
+        XCTAssertLessThan(undo.frame.width, delete.frame.width, "the bottom Undo is drawn smaller than an action")
+        capture("Controls — bottom, labelled pair")
+
+        // The side layout: three separate icon controls, none of them touching.
+        dragDock(app, from: dockStart(app, "control.keep"), to: destinationTarget("left", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
+        XCTAssertEqual(delete.frame.width, delete.frame.height, accuracy: 1, "a side control is icon-only")
+        XCTAssertEqual(delete.frame.width, keep.frame.width, accuracy: 1, "the side controls are one size")
+        XCTAssertEqual(undo.frame.width, keep.frame.width, accuracy: 1, "Undo is not smaller at a side")
+        XCTAssertLessThan(undo.frame.midY, delete.frame.midY, "Undo leads the column too: Before actions")
+        assertClusterIsAColumn(app)
+        capture("Controls — left, separate icon controls")
+
+        // After actions mirrors both layouts. At a side that moves Undo past
+        // the pair — the column stays where it is and the pair keeps its own
+        // order and spacing; at the bottom it puts Undo after the centred pair.
+        let columnAtTheColumn = undo.frame.union(actionPairFrame(app))
+        let pairSpacing = keep.frame.midY - delete.frame.midY
+        app.buttons["viewer.close"].tap()
+        app.buttons["entry.settings"].tap()
+        let trailing = app.buttons["settings.undoSide.trailing"]
+        XCTAssertTrue(trailing.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !trailing.isHittable { app.swipeUp() }
+        trailing.tap()
+        app.buttons["Back"].firstMatch.tap()
+
+        _ = startViewer(app)
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(undo.frame.midY, keep.frame.midY, "Undo follows the column: After actions")
+        XCTAssertEqual(
+            undo.frame.union(actionPairFrame(app)).midY,
+            columnAtTheColumn.midY,
+            accuracy: 1,
+            "moving Undo moved the column"
+        )
+        XCTAssertEqual(
+            undo.frame.union(actionPairFrame(app)).midX,
+            columnAtTheColumn.midX,
+            accuracy: 1,
+            "moving Undo moved the column"
+        )
+        XCTAssertEqual(
+            keep.frame.midY - delete.frame.midY,
+            pairSpacing,
+            accuracy: 1,
+            "Delete and Keep must never move relative to each other"
+        )
+
+        dragDock(app, from: dockStart(app, "control.keep"), to: destinationTarget("bottom", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked bottom")
+        XCTAssertGreaterThan(undo.frame.midX, keep.frame.midX, "Undo follows the pair: After actions")
+        XCTAssertEqual(actionPairFrame(app).midX, windowMidX, accuracy: 6, "the pair is still centred on the width")
+        capture("Controls — bottom, Undo after the pair")
     }
 
     /// The dock has no grip, so no source is special: a drag from each control

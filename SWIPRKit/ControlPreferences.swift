@@ -122,18 +122,35 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     }
 }
 
-/// Pure geometry for the decision dock: how big it is, where its centre sits at
-/// each of the three fixed positions, and the frame each destination marker
+/// Pure geometry for the decision dock: how big each layout is, where it sits
+/// at each of the three fixed positions, and the frame each destination marker
 /// draws.
 ///
-/// The dock is dragged by its whole surface, so it has no grip: it is exactly
-/// the three decision controls and the tray's padding around them. Kept in the
-/// framework rather than only inside the SwiftUI view so the geometry the spec
-/// pins down is directly testable on macOS.
+/// The dock has no grip: it is dragged by its whole surface, which is exactly
+/// the controls plus the padding and gaps around them. Two layouts share the
+/// three positions — at the bottom a labelled Delete/Keep pair in a tray with a
+/// separate smaller Undo, at a side three separate icon controls — and the pair
+/// keeps its anchor whichever end Undo takes. Kept in the framework rather than
+/// only inside the SwiftUI view so the geometry the spec pins down is directly
+/// testable on macOS.
 public enum ControlClusterLayout {
+    /// One side-layout icon control, and the height of one bottom pill.
     public static let controlSize: CGFloat = 56
+    /// A side layout's controls stand apart: this gap between two of them is the
+    /// functional non-action gap, part of the dock's handle and nothing more.
     public static let controlSpacing: CGFloat = 14
-    public static let trayInset: CGFloat = 16
+    /// A bottom pill's width. It is fixed so the dock never resizes with its
+    /// label: the label scales inside the pill instead (docs/SPEC.md §5).
+    public static let pillWidth: CGFloat = 104
+    /// The gap between the two labelled pills, inside the bottom tray.
+    public static let pillSpacing: CGFloat = 10
+    /// How much tray surrounds the bottom pair.
+    public static let trayInset: CGFloat = 6
+    /// The bottom layout's separate Undo control is drawn smaller than an
+    /// action, while keeping a full 44 pt tap target.
+    public static let undoControlSize: CGFloat = 44
+    /// The gap separating the separate Undo control from the labelled pair.
+    public static let undoGap: CGFloat = 12
     /// How far the cluster stays from the safe-area edge.
     public static let edgeMargin: CGFloat = 20
     /// Columns are centred at this fraction of the safe-area height.
@@ -144,18 +161,29 @@ public enum ControlClusterLayout {
     public static let landingDuration: Double = 0.32
     public static let reduceMotionDuration: Double = 0.16
 
-    /// The cluster's size: the three decision controls plus the tray's padding,
-    /// 228 pt by 88 pt — the two numbers the spec pins the three positions to.
-    public static func clusterSize(for position: ControlPosition) -> CGSize {
-        let controls = controlSize * 3 + controlSpacing * 2
-        let long = trayInset * 2 + controls
-        let short = trayInset * 2 + controlSize
-        return position.isVertical
-            ? CGSize(width: short, height: long)
-            : CGSize(width: long, height: short)
+    /// The bottom tray: the labelled Delete/Keep pair and the padding around it.
+    public static var traySize: CGSize {
+        CGSize(
+            width: pillWidth * 2 + pillSpacing + trayInset * 2,
+            height: controlSize + trayInset * 2
+        )
     }
 
-    /// The cluster's centre in a safe area of `size`.
+    /// The whole dock's size at a position: a labelled pair plus its separate
+    /// Undo control at the bottom, three separate icon controls at a side.
+    public static func clusterSize(for position: ControlPosition) -> CGSize {
+        position.isVertical
+            ? CGSize(width: controlSize, height: controlSize * 3 + controlSpacing * 2)
+            : CGSize(width: undoControlSize + undoGap + traySize.width, height: traySize.height)
+    }
+
+    /// The anchor the dock's pair occupies in a safe area of `size`: the bottom
+    /// Delete/Keep pair centred on the width, a column centred at 75 % of the
+    /// height 20 pt inside its edge.
+    ///
+    /// Undo is deliberately outside this anchor. Its end is the user's choice
+    /// (`UndoSide`), and putting it at the other end must never shift Delete and
+    /// Keep (docs/SPEC.md §5.1 and §5.6).
     public static func centre(for position: ControlPosition, in size: CGSize) -> CGPoint {
         let cluster = clusterSize(for: position)
         switch position {
@@ -191,14 +219,29 @@ public enum ControlClusterLayout {
     /// The frame the dock occupies at a destination: the same shape the
     /// destination marker draws while the dock is being moved, so the marker
     /// shows exactly where the dock will land.
-    public static func slotRect(for position: ControlPosition, in size: CGSize) -> CGRect {
+    ///
+    /// At the bottom the pair keeps its anchor and the frame grows to the side
+    /// Undo took, so the dock is never centred *with* Undo — the pair is.
+    public static func slotRect(
+        for position: ControlPosition,
+        in size: CGSize,
+        undoSide: UndoSide = .leading
+    ) -> CGRect {
         let cluster = clusterSize(for: position)
-        let centre = centre(for: position, in: size)
-        return CGRect(
-            x: centre.x - cluster.width / 2,
-            y: centre.y - cluster.height / 2,
-            width: cluster.width,
-            height: cluster.height
-        )
+        let anchor = centre(for: position, in: size)
+        let origin: CGPoint
+        if position.isVertical {
+            // The column holds all three controls, Undo included, so the whole
+            // column is the thing that is centred in the safe area.
+            origin = CGPoint(x: anchor.x - cluster.width / 2, y: anchor.y - cluster.height / 2)
+        } else {
+            let pairHalf = traySize.width / 2
+            let leading = undoSide == .leading
+            origin = CGPoint(
+                x: leading ? anchor.x - pairHalf - undoGap - undoControlSize : anchor.x - pairHalf,
+                y: anchor.y - cluster.height / 2
+            )
+        }
+        return CGRect(origin: origin, size: cluster)
     }
 }

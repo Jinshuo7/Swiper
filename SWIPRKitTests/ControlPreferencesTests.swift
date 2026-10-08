@@ -121,17 +121,50 @@ final class ControlClusterLayoutTests: XCTestCase {
     /// A 375 pt wide phone with a 763 pt safe area (iPhone 11 Pro after the bars).
     private let safeArea = CGSize(width: 375, height: 763)
 
-    func testClusterSizeShortAxisIsEightyEight() {
-        let bottom = ControlClusterLayout.clusterSize(for: .bottom)
-        XCTAssertEqual(bottom.height, 88)
-        XCTAssertEqual(bottom.width, 228, "three controls and the tray's padding")
+    /// The tray an Undo at `undoSide` leaves for the labelled Delete/Keep pair,
+    /// in the same coordinates as `slotRect`. At a side position the pair is two
+    /// of the three separate controls, and there is no tray at all.
+    private func pairRect(for position: ControlPosition, undoSide: UndoSide) -> CGRect {
+        let box = ControlClusterLayout.slotRect(for: position, in: safeArea, undoSide: undoSide)
+        return CGRect(
+            x: box.minX + (undoSide == .leading && !position.isVertical
+                ? ControlClusterLayout.undoControlSize + ControlClusterLayout.undoGap
+                : 0),
+            y: box.minY,
+            width: ControlClusterLayout.traySize.width,
+            height: ControlClusterLayout.traySize.height
+        )
+    }
 
-        // A 375 pt phone leaves room at each bottom corner for the side columns.
-        XCTAssertGreaterThanOrEqual((375 - bottom.width) / 2, 40)
+    /// The two layouts: at the bottom a wide labelled pair with a separate
+    /// smaller Undo beside it, at a side three separate icon controls in a
+    /// column.
+    func testTheTwoLayoutsHaveTheirOwnFixedSize() {
+        let bottom = ControlClusterLayout.clusterSize(for: .bottom)
+        XCTAssertEqual(bottom.height, ControlClusterLayout.traySize.height)
+        XCTAssertEqual(
+            bottom.width,
+            ControlClusterLayout.undoControlSize + ControlClusterLayout.undoGap
+                + ControlClusterLayout.traySize.width,
+            "the bottom dock is the pair's tray plus the separate Undo"
+        )
+        XCTAssertGreaterThan(
+            ControlClusterLayout.traySize.width,
+            ControlClusterLayout.pillWidth,
+            "two labelled pills, not one"
+        )
+
+        // A 375 pt phone leaves the pair room to be centred with Undo beside it.
+        XCTAssertGreaterThanOrEqual((375 - bottom.width) / 2, 16)
 
         let column = ControlClusterLayout.clusterSize(for: .leading)
-        XCTAssertEqual(column.width, 88)
-        XCTAssertEqual(column.height, bottom.width)
+        XCTAssertEqual(column.width, ControlClusterLayout.controlSize, "a side control stands on its own")
+        XCTAssertEqual(
+            column.height,
+            ControlClusterLayout.controlSize * 3 + ControlClusterLayout.controlSpacing * 2,
+            "three separate controls and the non-action gaps between them"
+        )
+        XCTAssertEqual(ControlClusterLayout.clusterSize(for: .trailing), column, "both sides are the same column")
     }
 
     /// The spec's geometry: a row centred on the width 20 pt above the bottom
@@ -176,24 +209,86 @@ final class ControlClusterLayoutTests: XCTestCase {
         }
     }
 
-    /// The dock is moved as one piece, so every destination is the same shape
-    /// and holds all three controls. Those frames are also what the destination
-    /// markers draw while the dock is in the air.
-    func testEveryDestinationHoldsAllThreeControlsAtTheSameSize() {
+    /// The bottom pair keeps its anchor: it is the labelled Delete/Keep pair
+    /// that is centred on the width, and changing which end Undo takes moves
+    /// only Undo. Its action must never shift under the thumb.
+    func testTheBottomPairStaysCentredWhenUndoChangesEnd() {
+        for undoSide in UndoSide.allCases {
+            let tray = pairRect(for: .bottom, undoSide: undoSide)
+            XCTAssertEqual(
+                tray.midX,
+                safeArea.width / 2,
+                accuracy: 0.5,
+                "the labelled pair is centred on the width with Undo at the \(undoSide) end"
+            )
+            XCTAssertEqual(tray.midY, ControlClusterLayout.centre(for: .bottom, in: safeArea).y, accuracy: 0.5)
+        }
+
+        // The separate Undo sits outside the pair, on the end the user chose.
+        let leading = ControlClusterLayout.slotRect(for: .bottom, in: safeArea, undoSide: .leading)
+        let leadingTray = pairRect(for: .bottom, undoSide: .leading)
+        XCTAssertEqual(leading.minX, leadingTray.minX - ControlClusterLayout.undoGap - ControlClusterLayout.undoControlSize, accuracy: 0.5)
+        XCTAssertLessThan(leading.minX, leadingTray.minX, "Undo leads the pair")
+
+        let trailing = ControlClusterLayout.slotRect(for: .bottom, in: safeArea, undoSide: .trailing)
+        let trailingTray = pairRect(for: .bottom, undoSide: .trailing)
+        XCTAssertEqual(trailing.maxX, trailingTray.maxX + ControlClusterLayout.undoGap + ControlClusterLayout.undoControlSize, accuracy: 0.5)
+        XCTAssertGreaterThan(trailing.maxX, trailingTray.maxX, "Undo follows the pair")
+
+        XCTAssertEqual(
+            leadingTray, trailingTray,
+            "moving Undo to the other end must not move Delete and Keep at all"
+        )
+    }
+
+    /// A side layout is three separate controls: nothing between them acts, and
+    /// nothing touches, so a stray tap lands on no control at all.
+    func testTheSideLayoutSeparatesItsControlsWithANonActionGap() {
+        let gap = ControlClusterLayout.controlSpacing
+        XCTAssertGreaterThanOrEqual(gap, 8, "a non-action gap has to be wide enough to be one")
+        XCTAssertLessThan(gap, ControlClusterLayout.controlSize, "the controls read as separate, not as a tray")
+
+        for position in [ControlPosition.leading, .trailing] {
+            let box = ControlClusterLayout.slotRect(for: position, in: safeArea)
+            XCTAssertEqual(box.width, ControlClusterLayout.controlSize)
+            for index in 0..<3 {
+                let top = box.minY + CGFloat(index) * (ControlClusterLayout.controlSize + gap)
+                XCTAssertGreaterThanOrEqual(top, box.minY)
+                XCTAssertLessThanOrEqual(
+                    top + ControlClusterLayout.controlSize,
+                    box.maxY,
+                    "control \(index) has to fit inside the column"
+                )
+            }
+            XCTAssertEqual(
+                box.height,
+                3 * ControlClusterLayout.controlSize + 2 * gap,
+                "the column is exactly its three controls and their two gaps"
+            )
+        }
+    }
+
+    /// The dock is moved as one piece, so each destination holds the whole dock
+    /// at its fixed size. Those frames are also what the destination markers
+    /// draw while the dock is in the air.
+    func testEveryDestinationDrawsTheWholeDockAtItsOwnSize() {
         for position in ControlPosition.allCases {
-            let rect = ControlClusterLayout.slotRect(for: position, in: safeArea)
-            let expected = ControlClusterLayout.clusterSize(for: position)
-            XCTAssertEqual(rect.size, expected, "\(position) is the same dock")
-            XCTAssertEqual(
-                [rect.width, rect.height].sorted(),
-                [88, 228],
-                "the dock is the same 88 by 228 shape at every destination, only turned"
-            )
-            XCTAssertEqual(
-                CGPoint(x: rect.midX, y: rect.midY),
-                ControlClusterLayout.centre(for: position, in: safeArea),
-                "the marker is drawn where the dock will land"
-            )
+            for undoSide in UndoSide.allCases {
+                let rect = ControlClusterLayout.slotRect(for: position, in: safeArea, undoSide: undoSide)
+                XCTAssertEqual(
+                    rect.size,
+                    ControlClusterLayout.clusterSize(for: position),
+                    "\(position) is the same dock whichever end Undo takes"
+                )
+                XCTAssertGreaterThanOrEqual(rect.minX, 0, "the marker must stay on screen")
+                XCTAssertLessThanOrEqual(rect.maxX, safeArea.width)
+                XCTAssertGreaterThanOrEqual(rect.minY, 0)
+                XCTAssertLessThanOrEqual(rect.maxY, safeArea.height)
+                // The dock hangs off the anchor to the side Undo took, and the
+                // anchor is always inside it.
+                let anchor = ControlClusterLayout.centre(for: position, in: safeArea)
+                XCTAssertTrue(rect.contains(anchor), "the marker is drawn where the dock will land")
+            }
         }
     }
 
