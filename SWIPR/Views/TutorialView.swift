@@ -116,9 +116,9 @@ struct TutorialView: View {
                 tint: .orange
             ),
             Instruction(
-                symbol: "ellipsis",
+                symbol: "hand.draw",
                 title: "Move the buttons",
-                detail: "Drag the three dots to put the buttons at the bottom, left or right edge. The photo stays exactly where it is.",
+                detail: "Drag the buttons — or the space between them — to put them at the bottom, left or right edge. The photo stays exactly where it is.",
                 tint: .blue
             ),
         ]

@@ -11,28 +11,39 @@ struct ViewerView: View {
     @State private var cachedIDs: [String] = []
     @State private var haptics = UIImpactFeedbackGenerator(style: .light)
 
-    /// Where the grip drag is: how far the finger has moved from the grip.
+    /// Where the dock move is: whether this touch became a move, which
+    /// destination it captured, and where the finger is.
     ///
-    /// This is a `@GestureState` on purpose. A gesture state resets itself when
-    /// the gesture ends *or is cancelled*, so an interrupted drag can never
-    /// leave a puck stranded or the cluster half-moved.
-    @GestureState private var gripMove = GripMove.idle
-    /// The slot the puck is over, or nil when it is over none.
-    @State private var highlightedSlot: ControlPosition?
-    /// One lift haptic per drag.
-    @State private var didLift = false
+    /// It is not a `@GestureState`, because the release still needs the captured
+    /// destination after the touch-up that ends the gesture.
+    @State private var dockMove = DockMove.idle
+    /// True for the whole of a touch on the dock and false again the moment that
+    /// touch ends *or is cancelled*, so an interrupted move can never leave the
+    /// token stranded. This is the reset path a normal end cannot provide.
+    @GestureState private var dockTouching = false
+    /// Set when the current touch passes the tap-cancel threshold, and cleared on
+    /// the next main-queue turn after that touch has ended. It outlives the
+    /// gesture by one turn because the control under the finger fires its own
+    /// action on the very same touch-up: a move must never decide.
+    @State private var dockMoved = false
 
-    private let liftHaptics = UIImpactFeedbackGenerator(style: .light)
-    private let slotHaptics = UIImpactFeedbackGenerator(style: .light)
-    private let landingHaptics = UIImpactFeedbackGenerator(style: .rigid)
+    /// One light response on entering capture and one soft response on a valid
+    /// landing. There is deliberately none on pickup, none on an invalid
+    /// release, and none while a destination stays captured.
+    private let captureHaptics = UIImpactFeedbackGenerator(style: .light)
+    private let landingHaptics = UIImpactFeedbackGenerator(style: .soft)
 
-    private struct GripMove: Equatable {
-        var translation: CGSize = .zero
-        /// The puck appears once the drag has passed a few points, matching the
-        /// drag-image rule.
-        static let liftThreshold: CGFloat = 3
-        var isActive: Bool { hypot(translation.width, translation.height) > Self.liftThreshold }
-        static let idle = GripMove()
+    /// The live state of one dock move. The compact token appears the moment
+    /// `isMoving` turns true, which is exactly when the pending tap is cancelled
+    /// for good.
+    private struct DockMove: Equatable {
+        var isMoving = false
+        /// The destination the finger has captured, or nil when it is between
+        /// them, where a release would restore the source.
+        var captured: ControlPosition?
+        /// The finger's position in the dock's own coordinate space.
+        var pointer: CGPoint = .zero
+        static let idle = DockMove()
     }
 
     /// The cluster fades a little after a few quiet seconds, and comes back on
@@ -73,10 +84,18 @@ struct ViewerView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
             .overlay { dragFeedback }
             .overlay(alignment: .top) { topBar }
-            .overlay { controlSlots(in: geometry.size) }
-            .overlay { puck(in: geometry.size) }
-            .overlay(alignment: .topLeading) { controlCluster(in: geometry.size) }
+            .overlay { destinationMarkers(in: geometry.size) }
+            .overlay(alignment: .topLeading) {
+                dockLayer(in: geometry.size, origin: geometry.frame(in: .global).origin)
+            }
             .task(id: activityToken) { await fadeClusterWhenIdle() }
+            // A cancelled gesture never reaches the drag's `onEnded`, so this is
+            // where the token goes back to being the dock. A normal end has
+            // already landed it and left this with nothing to do.
+            .onChange(of: dockTouching) { _, touching in
+                guard !touching else { return }
+                finishDockTouch()
+            }
         }
         .task(id: currentID) {
             updatePrefetch()
@@ -347,25 +366,62 @@ struct ViewerView: View {
         }
     }
 
-    // MARK: - The control cluster
+    // MARK: - The decision dock
 
-    /// The cluster, at its remembered position. It no longer follows a drag: the
-    /// grip lifts a separate puck and only the landing moves the cluster, so a
-    /// move is never mistaken for a decision and the buttons never travel under
-    /// a wandering finger.
+    /// The dock at its remembered position. Its whole surface is draggable — a
+    /// drag may begin on any control or in any gap — so the legacy grip is gone.
+    /// While a touch is moving the dock the controls are replaced by one compact
+    /// neutral token, and a valid release lands the controls there.
     @ViewBuilder
-    private func controlCluster(in size: CGSize) -> some View {
+    private func dockLayer(in size: CGSize, origin: CGPoint) -> some View {
         if model.preferences.showButtons {
-            clusterBody(in: size)
+            let position = model.preferences.position
+            let cluster = ControlClusterLayout.clusterSize(for: position)
+            let centre = DockGeometry.centre(for: position, in: size)
+            let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+
+            ZStack {
+                if dockMove.isMoving {
+                    dockToken(in: size, centre: centre)
+                } else {
+                    dockControls(vertical: position.isVertical)
+                }
+            }
+            .frame(width: cluster.width, height: cluster.height)
+            // The whole frame, gaps included, is the drag surface: `contentShape`
+            // is what puts the tray's empty corners and the space between two
+            // controls under the finger as well.
+            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .opacity(isClusterIdle && !dockMove.isMoving ? 0.7 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
+            // Recorded before `.offset` so a gesture that begins in a gap is
+            // recognised too. Simultaneous with the controls' own taps, so a
+            // normal tap still performs its action with no movement delay.
+            .simultaneousGesture(dockGesture(in: size, origin: origin))
+            // The accessibility element has to be the dock itself. Applying these
+            // after `.position` would report the whole screen instead, because
+            // `.position` fills its parent.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("viewer.cluster")
+            .accessibilityLabel("Photo controls")
+            .accessibilityValue(dockMove.isMoving ? "Moving controls" : "Docked \(position.title)")
+            // A drag is not available to everyone, so the position can also be
+            // stepped through without one.
+            .accessibilityAction(named: "Move to the next position") { cycleControlPosition() }
+            // Offset from the top-leading corner rather than `.position`:
+            // `.position` wraps the view in a full-screen container, which both
+            // mis-reports the dock's frame and stopped its gesture from ever
+            // being recognised.
+            .offset(x: centre.x - cluster.width / 2, y: centre.y - cluster.height / 2)
         }
     }
 
-    private func clusterBody(in size: CGSize) -> some View {
-        let position = model.preferences.position
-        let cluster = ControlClusterLayout.clusterSize(for: position)
-        let centre = ControlClusterLayout.centre(for: position, in: size)
+    private func dockControls(vertical: Bool) -> some View {
         let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
         let controls = ControlClusterLayout.order(for: model.preferences.undoSide)
+        let stack = vertical
+            ? AnyLayout(VStackLayout(spacing: ControlClusterLayout.controlSpacing))
+            : AnyLayout(HStackLayout(spacing: ControlClusterLayout.controlSpacing))
 
         return ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -374,52 +430,71 @@ struct ViewerView: View {
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 1)
                 )
-            if position.isVertical {
-                VStack(spacing: ControlClusterLayout.controlSpacing) {
-                    ForEach(controls) { clusterControl($0, in: size) }
-                }
-            } else {
-                HStack(spacing: ControlClusterLayout.controlSpacing) {
-                    ForEach(controls) { clusterControl($0, in: size) }
-                }
+            stack {
+                ForEach(controls) { decisionControl($0) }
             }
         }
-        .frame(width: cluster.width, height: cluster.height)
-        .opacity(isClusterIdle && !gripMove.isActive ? 0.7 : 1)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
-        // The accessibility element has to be the cluster itself. Applying these
-        // after `.position` would report the whole screen instead, because
-        // `.position` fills its parent.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("viewer.cluster")
-        .accessibilityLabel("Photo controls")
-        .accessibilityValue(gripMove.isActive ? "Moving controls" : "Docked \(position.title)")
-        // A drag is not available to everyone, so the position can also be
-        // stepped through without one.
-        .accessibilityAction(named: "Move to the next position") { cycleControlPosition() }
-        // Offset from the top-leading corner rather than `.position`: `.position`
-        // wraps the view in a full-screen container, which both mis-reports the
-        // cluster's frame and stopped its gesture from ever being recognised.
-        .offset(x: centre.x - cluster.width / 2, y: centre.y - cluster.height / 2)
     }
 
-    /// The three-dot handle. Dragging it is the only way to move the cluster, so
-    /// a swipe on the photo can never shove the buttons around.
-    private func grip(in size: CGSize) -> some View {
-        Image(systemName: "ellipsis")
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.75))
-            .frame(width: ControlClusterLayout.gripHitSize, height: ControlClusterLayout.gripHitSize)
-            .contentShape(Rectangle())
-            .gesture(moveGesture(in: size))
-            .accessibilityLabel("Move controls")
-            .accessibilityIdentifier("viewer.grip")
+    /// The compact neutral token the dock becomes while it is being moved. It
+    /// follows the finger but is drawn clear of it, so the finger never covers
+    /// what it is aiming at, and it stays whole inside the safe area.
+    private func dockToken(in size: CGSize, centre: CGPoint) -> some View {
+        let tokenSize = ControlClusterLayout.controlSize
+        let half = tokenSize / 2
+        let x = min(max(dockMove.pointer.x, half), max(half, size.width - half))
+        let y = min(max(dockMove.pointer.y - tokenSize, half), max(half, size.height - half))
+
+        return ZStack {
+            Circle().fill(.ultraThinMaterial)
+            Circle().stroke(Color.white.opacity(0.45), lineWidth: 1)
+            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .frame(width: tokenSize, height: tokenSize)
+        .shadow(color: .black.opacity(0.45), radius: 12, y: 6)
+        .offset(x: x - centre.x, y: y - centre.y)
+        .accessibilityElement()
+        .accessibilityLabel("Moving controls")
+        .accessibilityIdentifier("viewer.dockToken")
+    }
+
+    /// The three subtle markers that expose the only destinations, shown only
+    /// while the dock is being moved. Each is drawn in the dock's own shape at
+    /// the dock's own size, so what the marker covers is exactly what the dock
+    /// will cover. The captured one strengthens through opacity and stroke
+    /// weight — never through saturated colour — and they are feedback, not
+    /// controls, so they take no touches.
+    @ViewBuilder
+    private func destinationMarkers(in size: CGSize) -> some View {
+        if model.preferences.showButtons && dockMove.isMoving {
+            let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+            ZStack {
+                ForEach(ControlPosition.allCases) { position in
+                    let rect = ControlClusterLayout.slotRect(for: position, in: size)
+                    let captured = dockMove.captured == position
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color.white.opacity(captured ? 0.10 : 0.04))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .stroke(
+                                    Color.white.opacity(captured ? 0.95 : 0.30),
+                                    lineWidth: captured ? 2.5 : 1
+                                )
+                        )
+                        .frame(width: rect.width, height: rect.height)
+                        .position(x: rect.midX, y: rect.midY)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
-    private func clusterControl(_ control: ControlClusterLayout.ClusterControl, in size: CGSize) -> some View {
+    private func decisionControl(_ control: ControlClusterLayout.ClusterControl) -> some View {
         switch control {
-        case .grip: grip(in: size)
         case .trash: trashControl
         case .keep: keepControl
         case .undo: undoControl
@@ -444,11 +519,11 @@ struct ViewerView: View {
         }
     }
 
-    /// A control press counts as activity, so a tap after the cluster has faded
-    /// both does its job and brings the cluster back to full strength. It is
-    /// refused while the grip is being dragged: a move must never decide.
+    /// A control press counts as activity, so a tap after the dock has faded both
+    /// does its job and brings it back to full strength. It is refused for the
+    /// whole of a touch that moved the dock: a move must never decide.
     private func clusterAction(_ action: () -> Void) {
-        guard !gripMove.isActive else { return }
+        guard !dockMoved else { return }
         activityToken += 1
         haptics.impactOccurred()
         action()
@@ -461,124 +536,95 @@ struct ViewerView: View {
         isClusterIdle = true
     }
 
-    /// The three phantom slots, shown only while the puck is in the air. The
-    /// nearest one to the puck is highlighted; releasing over it lands there.
-    @ViewBuilder
-    private func controlSlots(in size: CGSize) -> some View {
-        if model.preferences.showButtons && gripMove.isActive {
-            ZStack {
-                ForEach(ControlPosition.allCases) { position in
-                    let rect = ControlClusterLayout.slotRect(for: position, in: size)
-                    let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(Color.white.opacity(highlightedSlot == position ? 0.12 : 0.04))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .stroke(
-                                    Color.white.opacity(highlightedSlot == position ? 0.95 : 0.28),
-                                    lineWidth: highlightedSlot == position ? 3 : 1
-                                )
-                        )
-                        .frame(width: rect.width, height: rect.height)
-                        .position(x: rect.midX, y: rect.midY)
-                }
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-
-    /// The translucent circle the grip becomes while it is dragged. It tracks
-    /// the finger one-to-one and carries no animation of its own.
-    @ViewBuilder
-    private func puck(in size: CGSize) -> some View {
-        if model.preferences.showButtons && gripMove.isActive {
-            let origin = ControlClusterLayout.gripCentre(
-                for: model.preferences.position,
-                in: size,
-                undoSide: model.preferences.undoSide
-            )
-            let centre = CGPoint(
-                x: origin.x + gripMove.translation.width,
-                y: origin.y + gripMove.translation.height
-            )
-            ZStack {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1))
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-            .frame(width: ControlClusterLayout.controlSize, height: ControlClusterLayout.controlSize)
-            .position(centre)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-
-    /// Drag the grip: a puck lifts and follows the finger, the three slots
-    /// appear, and releasing over one moves the cluster there. Releasing over no
-    /// slot, or cancelling, changes nothing.
-    private func moveGesture(in size: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .updating($gripMove) { value, state, _ in
-                state = GripMove(translation: value.translation)
-            }
+    /// One gesture owns the whole dock. Moving roughly nine points cancels the
+    /// pending tap for good: the dock becomes the token, the three markers
+    /// appear, and the captured destination follows the finger with hysteresis so
+    /// a dock held near a boundary cannot flicker. A release over the captured
+    /// marker lands there; a release over none, or a cancelled gesture, restores
+    /// the source.
+    ///
+    /// `value.location` is read in the window's space, not the dock's, because
+    /// the dock changes shape and place while this gesture is running and a
+    /// point must not change meaning halfway through.
+    private func dockGesture(in size: CGSize, origin: CGPoint) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .updating($dockTouching) { _, state, _ in state = true }
             .onChanged { value in
-                let move = GripMove(translation: value.translation)
-                guard move.isActive else { return }
-                if !didLift {
-                    didLift = true
+                let point = canvasPoint(value.location, origin: origin)
+                if !dockMoved {
+                    let start = canvasPoint(value.startLocation, origin: origin)
+                    guard DockGeometry.cancelsTap(from: start, to: point) else { return }
+                    dockMoved = true
                     activityToken += 1
-                    liftHaptics.impactOccurred()
+                    withAnimation(dockMorphAnimation) { dockMove.isMoving = true }
                 }
-                let target = targetSlot(for: move, in: size)
-                if target != highlightedSlot {
-                    highlightedSlot = target
-                    if target != nil { slotHaptics.impactOccurred() }
-                }
+                dockMove.pointer = point
+                let captured = DockGeometry.capture(at: point, in: size, currentlyCaptured: dockMove.captured)
+                guard captured != dockMove.captured else { return }
+                dockMove.captured = captured
+                // One light response on entering capture, and none while a
+                // destination stays captured.
+                if captured != nil { captureHaptics.impactOccurred() }
             }
             .onEnded { value in
-                let move = GripMove(translation: value.translation)
-                let target = targetSlot(for: move, in: size)
-                highlightedSlot = nil
-                didLift = false
-                guard let target else { return }
-                if target != model.preferences.position {
-                    var preferences = model.preferences
-                    preferences.position = target
-                    withAnimation(landingAnimation) {
-                        model.updatePreferences(preferences)
-                    }
-                }
-                activityToken += 1
-                landingHaptics.impactOccurred()
+                guard dockMoved else { return }
+                let point = canvasPoint(value.location, origin: origin)
+                land(DockGeometry.destination(forReleaseAt: point, in: size, captured: dockMove.captured))
             }
     }
 
-    /// The slot a puck currently over would land in, or nil when it is over
-    /// none.
-    private func targetSlot(for move: GripMove, in size: CGSize) -> ControlPosition? {
-        let origin = ControlClusterLayout.gripCentre(
-            for: model.preferences.position,
-            in: size,
-            undoSide: model.preferences.undoSide
-        )
-        let point = CGPoint(
-            x: origin.x + move.translation.width,
-            y: origin.y + move.translation.height
-        )
-        return ControlClusterLayout.slot(at: point, in: size)
+    /// The dock's own coordinate space: the safe area the three destinations are
+    /// measured in. `DragGesture` reports the window's coordinates.
+    private func canvasPoint(_ global: CGPoint, origin: CGPoint) -> CGPoint {
+        CGPoint(x: global.x - origin.x, y: global.y - origin.y)
     }
 
-    /// The landing is the only animated part of a move; the tracked puck is
-    /// always exactly under the finger. Reduce Motion tightens the spring rather
+    /// Lands the dock on `destination`, or restores the source when the release
+    /// captured none. The whole dock is one view, so every control comes back
+    /// together: there is nothing to stagger and nothing to wait for.
+    private func land(_ destination: ControlPosition?) {
+        if let destination {
+            landingHaptics.impactOccurred()
+            var preferences = model.preferences
+            preferences.position = destination
+            withAnimation(landingAnimation) {
+                model.updatePreferences(preferences)
+                dockMove = .idle
+            }
+        } else {
+            // An invalid release says nothing and changes nothing.
+            withAnimation(landingAnimation) { dockMove = .idle }
+        }
+        activityToken += 1
+    }
+
+    /// Ends this touch's record. Both jobs are done on the next main-queue turn,
+    /// because SwiftUI may deliver this change either side of the drag's own
+    /// `onEnded`: the landing has to see the gesture's own record of what it
+    /// captured, and the control under the finger fires its own action on the
+    /// same touch-up, which a gesture that moved the dock must never let through.
+    private func finishDockTouch() {
+        DispatchQueue.main.async {
+            if dockMove.isMoving {
+                // The gesture was cancelled: the dock returns to the source.
+                withAnimation(landingAnimation) { dockMove = .idle }
+            }
+            dockMoved = false
+        }
+    }
+
+    /// The landing is the only animated part of a move; the token is always
+    /// exactly where the finger put it. Reduce Motion tightens the spring rather
     /// than swapping it for a different curve.
     private var landingAnimation: Animation {
         reduceMotion
             ? .spring(duration: ControlClusterLayout.reduceMotionDuration, bounce: 0)
             : .spring(duration: ControlClusterLayout.landingDuration, bounce: ControlClusterLayout.landingBounce)
+    }
+
+    /// The dock becoming the token, and the token becoming the dock again.
+    private var dockMorphAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.22, bounce: 0.08)
     }
 
     /// Steps the position round the three stops, for anyone who cannot drag.

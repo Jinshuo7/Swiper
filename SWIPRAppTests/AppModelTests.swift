@@ -1294,4 +1294,32 @@ final class AppModelTests: XCTestCase {
         let stillThere = await lib.existingAssetIDs(among: ids)
         XCTAssertEqual(stillThere, Set(ids), "reconciliation never mutates the library")
     }
+
+    // MARK: - The dock's position
+
+    /// Moving the dock saves its place at once, so the three fixed positions
+    /// survive a relaunch and Settings shows where the dock actually is.
+    func testMovingTheDockSavesItsPlaceImmediately() async {
+        let (model, _, store) = await bootstrapped()
+        XCTAssertEqual(model.preferences.position, .bottom)
+
+        var preferences = model.preferences
+        preferences.position = .trailing
+        model.updatePreferences(preferences)
+
+        XCTAssertEqual(
+            store.loadPreferences().position,
+            .trailing,
+            "the position has to be saved as it changes, not when the viewer closes"
+        )
+
+        let relaunched = AppModel(
+            library: FakePhotoLibrary.demo(count: 8),
+            store: store,
+            defaults: isolatedDefaults()
+        )
+        await relaunched.bootstrap()
+        await relaunched.settle()
+        XCTAssertEqual(relaunched.preferences.position, .trailing, "the position must come back")
+    }
 }

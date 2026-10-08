@@ -306,8 +306,9 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
 ## Playing the app like a user (device)
 
 `SWIPRUITests/PlaySessionUITests.swift` walks the app the way a curious person
-would, entirely against the fake library: every preset, every cluster dock
-(bottom, left and right, including sliding the cluster along an edge), marking,
+would, entirely against the fake library: every preset, the dock at all three
+places (bottom, left and right, moved by dragging its own controls and gaps),
+marking,
 review (including select mode and restoring several marks at once), deletion, the
 empty library, Tumbler played to the end, preferences across a relaunch, the
 persistence banners, and every screen at the largest accessibility text size. It
@@ -409,9 +410,46 @@ reach that every control stays on screen, tappable, and clear of the top strip.
 
 `SWIPRKitTests.ControlPreferencesTests` and `ControlClusterLayoutTests` cover the
 storage and geometry: an old three-way rail becomes the matching fixed stop, an
-unknown rail is still rejected, and the three centres, sizes, grip and slot hit
-testing match the spec. `SWIPRKitTests.SessionPersistenceTests` covers the
-version 3 state, including a version 2 session with a favourite undo entry.
+unknown rail is still rejected, and the three centres, sizes and the dock frames
+at each destination match the spec. `SWIPRKitTests.SessionPersistenceTests`
+covers the version 3 state, including a version 2 session with a favourite undo
+entry.
+
+### Direct dock movement (2026-10-08, #76) — current
+
+The grip, the puck and the phantom slots above are gone. The dock is now dragged
+by its **whole surface**: a drag may begin on any control or in any gap in the
+tray, roughly nine points of movement cancels that gesture's pending tap for
+good, and the dock becomes a compact neutral token that follows the finger.
+`SWIPRKit/DockGeometry` owns the arithmetic (tap-cancel threshold, bounded
+capture radius with hysteresis, invalid-release return); the three destination
+markers are drawn in the dock's own shape at `ControlClusterLayout.slotRect`.
+
+Sharp edges for the next change here (`ViewerView.swift`):
+
+- the drag reports its points in **window coordinates** (`DragGesture(...
+  coordinateSpace: .global)`), because the dock changes shape and place while
+  the gesture that started on it is still running, and a point must not change
+  meaning halfway through;
+- the gesture is a **`.simultaneousGesture`** on the dock's own container, so the
+  controls keep their normal taps while the tray's padding becomes draggable too;
+- a control's own action fires on the **same touch-up** that ends a drag, and
+  SwiftUI gives no order between the two. `dockMoved` therefore outlives the
+  gesture by one main-queue turn (`finishDockTouch()`), which is what makes "a
+  move never decides" true rather than likely;
+- the visual state is `@State` and the cancellation reset is keyed off a
+  `@GestureState`, so an interrupted gesture restores the source.
+
+`SWIPRUITests` covers it with `testTheDockMovesToEachFixedPosition`,
+`testEveryControlCanMoveTheDockToEveryDestination` (all three controls to all
+three destinations, plus a drag that begins in the tray's padding),
+`testNormalTapsStillDecideAtEveryPosition`, `testAShortDragCancelsTheTapWithoutDeciding`,
+`testAReleaseOverNoDestinationRestoresTheSource`, `testAPlainSwipeNeverMovesTheCluster`,
+`testTheDockIsATokenWhileItIsBeingMoved` (mid-hold media frame) and
+`testThePhotoFrameIsIdenticalAtEveryControlPosition`. The play suite adds
+`testPlayEveryControlPosition` and `testDestinationMarkersWhileMovingTheDock`.
+`testCaptureTheDockAtEveryPositionInEveryAppearance` produces the v1-04
+dock-* screenshots in light, dark and at the largest text size.
 
 ## Screenshots
 
@@ -444,12 +482,15 @@ Attachments the suite produces, and what each one is for:
 | `Tutorial — first photo` | `testFirstPhotoTutorialExplainsAndReplaysFromSettings` | The tutorial copy, including moving the buttons (`tutorial-first-photo`) |
 | `Settings — How to use` / `Settings — inline statistics` | same, `testStatisticsIsInlineAtTheTopOfSettings` | The replay entry, and the statistics block at the top of Settings (`settings-*.png`) |
 | `Save failure — Retry offered` | `testAFailedSaveShowsRetryAndDoesNotAdvanceTheSession` | The visible save-failure banner and its Retry action |
-| `Controls — bottom centre` / `left edge column` / `right edge column` | `testTheGripMovesTheClusterToEachFixedPosition`, `testPlayEveryControlPosition` | The cluster at each of the three fixed positions (`controls-bottom`, `controls-left-column`, `controls-right-column`) with the photo frame unchanged |
+| `Controls — bottom centre` / `left edge column` / `right edge column` | `testTheDockMovesToEachFixedPosition`, `testPlayEveryControlPosition` | The dock at each of the three fixed positions (`controls-bottom`, `controls-left-column`, `controls-right-column`) with the photo frame unchanged |
+| `Controls — moving, with the three destination markers` | `testTheDockIsATokenWhileItIsBeingMoved` | The compact token held at a destination and the three subtle markers, captured mid-gesture because they exist only while the finger is down |
+| `Design — destination markers mid-move` | `testDestinationMarkersWhileMovingTheDock` (play suite) | The same mid-move state next to the approved references |
+| `dock-<place>-<appearance>` (12) | `testCaptureTheDockAtEveryPositionInEveryAppearance` | The dock at bottom, left and right in light, dark and at the largest text size, plus the held mid-move state — committed under `docs/screenshots/milestones/v1-04/` |
 | `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-close-top-left`) |
 | `Entry — nothing waiting` / `a session waiting` / `a session and marks waiting` | `testPlayEntryScreenInEveryState` | The three reachable entry states (`entry-01`–`03`) |
 | `Choose a photo — overview` / `oldest first` / `jumped to a month` | `testChoosePhotoExplainsItselfAndGroupsTheLibraryByMonth`, `testChoosePhotoCanJumpStraightToAMonth` | Explanation and traversals, oldest-first, and a jumped-to month (`choose-01`–`03`) |
 | `Play — cluster position after relaunch` | `testPlayPreferencesSurviveRelaunch` | The position surviving a relaunch (`play-cluster-after-relaunch`) |
-| `Play — buttons turned off` | `testPlayTurningTheButtonsOffKeepsSwipingWorking` | The viewer with the cluster and grip hidden (`play-buttons-off`) |
+| `Play — buttons turned off` | `testPlayTurningTheButtonsOffKeepsSwipingWorking` | The viewer with the dock hidden (`play-buttons-off`) |
 | `Play — Choose a photo grid columns` / `with a marked photo` / `direction wording` | `testPlayChoosePhotoCellsStayInTheirColumns`, `testPlayChoosePhotoRefusesToStartOnAMarkedPhoto`, `testPlayTheDirectionChoiceMatchesWhereChooseAPhotoWalks` | The grid's columns, the badged cell that refuses a tap, and the direction wording (`play-choose-*`) |
 | `Play — home with an empty library` | `testPlayDeletingEverythingLeavesAnHonestEmptyApp` | Home after the whole library is deleted (`play-home-empty-library`) |
 | `Play — select mode with two marks chosen` / `review emptied by restoring` | `testPlaySelectModeRestoresSeveralMarksAtOnce` | Select mode, and the empty state after restoring every mark (`play-review-*`) |

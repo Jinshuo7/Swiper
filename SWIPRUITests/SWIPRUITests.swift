@@ -73,10 +73,6 @@ final class SWIPRUITests: XCTestCase {
         app.otherElements["viewer.cluster"]
     }
 
-    private func gripElement(_ app: XCUIApplication) -> XCUIElement {
-        app.images["viewer.grip"]
-    }
-
     private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
@@ -124,6 +120,65 @@ final class SWIPRUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// What a held dock drag looked like and measured, read from a background
+    /// queue: the token and the three destination markers only exist while the
+    /// finger is down, and a held gesture blocks the test thread.
+    private final class DockDragSample: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storedScreenshot: XCUIScreenshot?
+        private var storedPhotoFrame: CGRect?
+
+        var screenshot: XCUIScreenshot? {
+            get { lock.withLock { storedScreenshot } }
+            set { lock.withLock { storedScreenshot = newValue } }
+        }
+
+        var photoFrame: CGRect? {
+            get { lock.withLock { storedPhotoFrame } }
+            set { lock.withLock { storedPhotoFrame = newValue } }
+        }
+    }
+
+    /// Holds a dock drag in place, samples the mid-gesture state from a
+    /// background queue — a screenshot plus the media frame — and only then
+    /// releases. The attachments and the sample are returned to the caller.
+    ///
+    /// `sampleAfter` is late enough that a slow drag has arrived and is being
+    /// held at its destination, which is the state the markers are read in.
+    private func holdDockDrag(
+        _ app: XCUIApplication,
+        from start: XCUICoordinate,
+        to point: CGPoint,
+        captureNamed name: String,
+        sampleAfter delay: TimeInterval = 1.6
+    ) -> DockDragSample {
+        let sample = DockDragSample()
+        let sampled = expectation(description: "sampled \(name)")
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
+            sample.screenshot = XCUIScreen.main.screenshot()
+            let photo = self.photoElement(app)
+            if photo.exists {
+                sample.photoFrame = photo.frame
+            }
+            sampled.fulfill()
+        }
+
+        let end = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: point.x, dy: point.y))
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2.5)
+        wait(for: [sampled], timeout: 20)
+        guard let screenshot = sample.screenshot else {
+            XCTFail("Could not capture \(name) while the dock drag was held")
+            return sample
+        }
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        usleep(600_000)
+        return sample
     }
 
     /// Opens the starting-point grid the way Home reaches it now: through a
@@ -643,40 +698,60 @@ final class SWIPRUITests: XCTestCase {
         capture(name)
     }
 
-    // MARK: - Fixed control positions and the puck move
+    // MARK: - Moving the dock
 
-    /// What the cluster says about where it is docked.
+    /// What the dock says about where it is docked.
     private func clusterDock(_ app: XCUIApplication) -> String {
         (clusterElement(app).value as? String) ?? ""
     }
 
-    /// Drags the three-dot grip to a screen point. The puck follows the finger,
-    /// so the release lands in whichever slot contains that point.
-    private func dragGrip(_ app: XCUIApplication, to point: CGPoint) {
-        let grip = gripElement(app)
-        XCTAssertTrue(grip.waitForExistence(timeout: 10), "there is no grip to drag")
-        XCTAssertLessThan(clusterElement(app).frame.width, app.windows.firstMatch.frame.width, "viewer.cluster should be the cluster")
-        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    /// The point a destination sits at, in window coordinates.
+    ///
+    /// `DockGeometry` pins the three: a row centred on the width 20 pt above the
+    /// bottom safe edge, and columns centred at 75 % of the safe height 20 pt
+    /// inside the edge. Portrait leaves no leading or trailing safe inset, so a
+    /// column's centre is 64 pt from the window edge — its 20 pt margin plus half
+    /// its 88 pt width. The destinations are far enough apart that a finger well
+    /// inside one captures it.
+    private func destinationTarget(_ position: String, in app: XCUIApplication) -> CGPoint {
+        let window = app.windows.firstMatch.frame
+        switch position {
+        case "left":
+            return CGPoint(x: window.minX + 64, y: window.height * 0.73)
+        case "right":
+            return CGPoint(x: window.maxX - 64, y: window.height * 0.73)
+        default:
+            return CGPoint(x: window.midX, y: window.height * 0.88)
+        }
+    }
+
+    /// The centre of one dock control: the grip is gone, so a drag usually starts
+    /// on a control, and sometimes in the gap beside one.
+    private func dockStart(_ app: XCUIApplication, _ identifier: String) -> XCUICoordinate {
+        let control = app.buttons[identifier]
+        XCTAssertTrue(control.waitForExistence(timeout: 10), "there is no \(identifier) to drag")
+        return control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    }
+
+    /// Drags the whole dock from a point on it to a screen point. The dock has no
+    /// grip, so the start can be any control or any gap.
+    private func dragDock(
+        _ app: XCUIApplication,
+        from start: XCUICoordinate,
+        to point: CGPoint,
+        holdFor hold: TimeInterval = 0.3
+    ) {
+        XCTAssertTrue(clusterElement(app).waitForExistence(timeout: 10), "there is no dock to drag")
+        XCTAssertLessThan(
+            clusterElement(app).frame.width,
+            app.windows.firstMatch.frame.width,
+            "viewer.cluster should be the dock"
+        )
         let end = app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: point.x, dy: point.y))
-        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: hold)
         // Let the landing animation settle before the next frame is read.
         usleep(600_000)
-    }
-
-    private func bottomTarget(_ app: XCUIApplication) -> CGPoint {
-        let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.midX, y: window.height * 0.88)
-    }
-
-    private func leftTarget(_ app: XCUIApplication) -> CGPoint {
-        let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.minX + 44, y: window.height * 0.62)
-    }
-
-    private func rightTarget(_ app: XCUIApplication) -> CGPoint {
-        let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.maxX - 44, y: window.height * 0.62)
     }
 
     /// The three buttons are one column when the cluster is at a side, and one
@@ -714,61 +789,164 @@ final class SWIPRUITests: XCTestCase {
         )
     }
 
-    /// The cluster starts as a bottom row and can be moved to either side, where
-    /// it becomes a column. Releasing over no slot leaves it exactly where it
-    /// was, and a move never decides anything.
-    func testTheGripMovesTheClusterToEachFixedPosition() {
+    /// The dock starts as a bottom row and can be moved to either side, where it
+    /// becomes a column. The whole dock is the handle, so each of the three moves
+    /// starts on a different control, and none of them decides anything.
+    func testTheDockMovesToEachFixedPosition() {
         let app = launchApp()
         _ = startViewer(app)
         assertClusterIsARow(app)
         let window = app.windows.firstMatch.frame
 
-        // The tray is centred on the width and sits low. The grip leads the
-        // row, so the three buttons sit a little to its right.
-        XCTAssertEqual(clusterElement(app).frame.midX, window.midX, accuracy: 6, "the bottom cluster is centred on the width")
+        XCTAssertEqual(clusterElement(app).frame.midX, window.midX, accuracy: 6, "the bottom dock is centred on the width")
         let undoAtBottom = app.buttons["control.undo"].frame
         XCTAssertGreaterThan(undoAtBottom.midY, window.height * 0.8, "the bottom row sits low")
         let photoBefore = photoElement(app).label
         capture("Controls — bottom centre")
 
-        dragGrip(app, to: leftTarget(app))
+        dragDock(app, from: dockStart(app, "control.delete"), to: destinationTarget("left", in: app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         XCTAssertLessThan(app.buttons["control.keep"].frame.midX, window.midX, "the left column sits on the left")
         assertClusterIsAColumn(app)
         capture("Controls — left edge column")
 
-        dragGrip(app, to: rightTarget(app))
+        dragDock(app, from: dockStart(app, "control.keep"), to: destinationTarget("right", in: app))
         XCTAssertEqual(clusterDock(app), "Docked right edge")
         XCTAssertGreaterThan(app.buttons["control.keep"].frame.midX, window.midX, "the right column sits on the right")
         assertClusterIsAColumn(app)
         capture("Controls — right edge column")
 
-        dragGrip(app, to: bottomTarget(app))
+        dragDock(app, from: dockStart(app, "control.undo"), to: destinationTarget("bottom", in: app))
         XCTAssertEqual(clusterDock(app), "Docked bottom")
         assertClusterIsARow(app)
         capture("Controls — bottom centre again")
 
-        // Moving the cluster is not a decision, however the grab lands.
-        XCTAssertEqual(photoElement(app).label, photoBefore, "moving the cluster must not decide anything")
-        XCTAssertFalse(app.buttons["viewer.review"].exists, "moving the cluster must not mark the photo")
+        // Moving the dock is not a decision, however the grab lands.
+        XCTAssertEqual(photoElement(app).label, photoBefore, "moving the dock must not decide anything")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "moving the dock must not mark the photo")
     }
 
-    /// A release that is over none of the three slots changes nothing.
-    func testAReleaseAwayFromEverySlotChangesNothing() {
+    /// The dock has no grip, so no source is special: a drag from each control
+    /// can reach each of the three destinations.
+    func testEveryControlCanMoveTheDockToEveryDestination() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let photoBefore = photoElement(app).label
+        let destinations = [
+            ("left", "Docked left edge"),
+            ("bottom", "Docked bottom"),
+            ("right", "Docked right edge"),
+        ]
+
+        for source in ["control.delete", "control.keep", "control.undo"] {
+            for (destination, expected) in destinations {
+                dragDock(app, from: dockStart(app, source), to: destinationTarget(destination, in: app))
+                XCTAssertEqual(
+                    clusterDock(app),
+                    expected,
+                    "a drag that began on \(source) must reach \(destination)"
+                )
+            }
+        }
+
+        // Nine moves, and not one of them was a decision.
+        XCTAssertEqual(photoElement(app).label, photoBefore, "moving the dock must not decide anything")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "moving the dock must not mark the photo")
+        XCTAssertTrue(app.buttons["control.undo"].isHittable, "the dock must still take input after nine moves")
+
+        // The tray's own padding is part of the handle: with no grip, a drag that
+        // begins in a gap has to move the dock as well. This corner point is in
+        // the dock's padding whichever way round it is laid out.
+        let gap = clusterElement(app).coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.06))
+        dragDock(app, from: gap, to: destinationTarget("left", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked left edge", "a drag from the dock's own gap must move it")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "a drag from the gap must not mark the photo")
+    }
+
+    /// Normal taps still perform Delete, Keep and Undo, and they do it at a side
+    /// position too, where the dock is a column.
+    func testNormalTapsStillDecideAtEveryPosition() {
+        let app = launchApp()
+        let photo = startViewer(app)
+        let first = photoElement(app).label
+
+        app.buttons["control.delete"].tap()
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 5), "a tap on Delete must mark the photo")
+        app.buttons["control.undo"].tap()
+        XCTAssertFalse(
+            app.buttons["viewer.review"].waitForExistence(timeout: 2),
+            "a tap on Undo must take the mark back"
+        )
+        XCTAssertEqual(photoElement(app).label, first, "Undo returns to the photo it reversed")
+        app.buttons["control.keep"].tap()
+        XCTAssertNotEqual(photoElement(app).label, first, "a tap on Keep must advance")
+
+        // The same taps, from the left column.
+        dragDock(app, from: dockStart(app, "control.delete"), to: destinationTarget("left", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
+        let second = photoElement(app).label
+        app.buttons["control.delete"].tap()
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 5), "Delete must still tap from the left column")
+        app.buttons["control.undo"].tap()
+        XCTAssertEqual(photoElement(app).label, second, "Undo must still tap from the left column")
+        app.buttons["control.keep"].tap()
+        XCTAssertNotEqual(photoElement(app).label, second, "Keep must still tap from the left column")
+    }
+
+    /// Nine points of movement cancels the pending tap for good. A short drag may
+    /// not decide, and when it releases away from every destination the dock must
+    /// not move either.
+    func testAShortDragCancelsTheTapWithoutDeciding() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let photoBefore = photoElement(app).label
+        let dockBefore = clusterElement(app).frame
+
+        // 20 pt sideways from Delete: past the tap-cancel threshold, and still
+        // inside the bottom destination the dock already occupies.
+        let delete = dockStart(app, "control.delete")
+        dragDock(
+            app,
+            from: delete,
+            to: CGPoint(x: delete.screenPoint.x + 20, y: delete.screenPoint.y)
+        )
+        XCTAssertEqual(clusterDock(app), "Docked bottom", "a small drag lands the dock back where it was")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "a small drag from Delete must not mark the photo")
+        XCTAssertEqual(photoElement(app).label, photoBefore, "a small drag from Delete must not decide")
+
+        // 20 pt sideways from Undo: the same cancellation, now far enough from
+        // every destination that the release has nothing to land on.
+        let undo = dockStart(app, "control.undo")
+        dragDock(
+            app,
+            from: undo,
+            to: CGPoint(x: undo.screenPoint.x + 20, y: undo.screenPoint.y)
+        )
+        XCTAssertEqual(clusterDock(app), "Docked bottom", "an invalid release restores the source")
+        XCTAssertEqual(clusterElement(app).frame, dockBefore, "an invalid release restores the source exactly")
+        XCTAssertEqual(photoElement(app).label, photoBefore, "a small drag from Undo must not undo anything")
+    }
+
+    /// A release over none of the three destinations changes nothing.
+    func testAReleaseOverNoDestinationRestoresTheSource() {
         let app = launchApp()
         _ = startViewer(app)
         let before = app.buttons["control.keep"].frame
         let dock = clusterDock(app)
 
-        // The middle of the screen, above every slot.
-        dragGrip(app, to: CGPoint(x: app.windows.firstMatch.frame.midX, y: app.windows.firstMatch.frame.height * 0.3))
+        // The middle of the screen, above every destination.
+        dragDock(
+            app,
+            from: dockStart(app, "control.keep"),
+            to: CGPoint(x: app.windows.firstMatch.frame.midX, y: app.windows.firstMatch.frame.height * 0.3)
+        )
 
-        XCTAssertEqual(clusterDock(app), dock, "a release over no slot must not move the cluster")
-        XCTAssertEqual(app.buttons["control.keep"].frame, before, "a release over no slot must not move the cluster")
+        XCTAssertEqual(clusterDock(app), dock, "a release over no destination must not move the dock")
+        XCTAssertEqual(app.buttons["control.keep"].frame, before, "a release over no destination must not move the dock")
     }
 
-    /// The puck move is the grip's alone: a swipe on the photo decides nothing
-    /// about the controls.
+    /// Moving the dock is the dock's own gesture: a swipe on the photo decides
+    /// nothing about where the controls sit.
     func testAPlainSwipeNeverMovesTheCluster() {
         let app = launchApp()
         let photo = startViewer(app)
@@ -776,8 +954,8 @@ final class SWIPRUITests: XCTestCase {
         let dock = clusterDock(app)
 
         photo.swipeRight()
-        XCTAssertEqual(clusterDock(app), dock, "a swipe moved the cluster")
-        XCTAssertEqual(app.buttons["control.keep"].frame, before, "a swipe moved the cluster")
+        XCTAssertEqual(clusterDock(app), dock, "a swipe moved the dock")
+        XCTAssertEqual(app.buttons["control.keep"].frame, before, "a swipe moved the dock")
     }
 
     /// Chrome never moves the photo (ADR-0006): the fitted frame is identical at
@@ -787,15 +965,42 @@ final class SWIPRUITests: XCTestCase {
         _ = startViewer(app)
 
         let atBottom = photoElement(app).frame
-        dragGrip(app, to: leftTarget(app))
+        dragDock(app, from: dockStart(app, "control.delete"), to: destinationTarget("left", in: app))
         XCTAssertEqual(clusterDock(app), "Docked left edge")
         let atLeft = photoElement(app).frame
-        dragGrip(app, to: rightTarget(app))
+        dragDock(app, from: dockStart(app, "control.keep"), to: destinationTarget("right", in: app))
         XCTAssertEqual(clusterDock(app), "Docked right edge")
         let atRight = photoElement(app).frame
 
-        XCTAssertEqual(atLeft, atBottom, "the photo moved when the cluster went left")
-        XCTAssertEqual(atRight, atBottom, "the photo moved when the cluster went right")
+        XCTAssertEqual(atLeft, atBottom, "the photo moved when the dock went left")
+        XCTAssertEqual(atRight, atBottom, "the photo moved when the dock went right")
+    }
+
+    /// While the dock is being moved it is a compact token with three destination
+    /// markers, and the media frame is exactly what it was before. The sample is
+    /// read from a background queue, because a held gesture blocks the test thread
+    /// and the token and markers only exist while the finger is down.
+    func testTheDockIsATokenWhileItIsBeingMoved() {
+        let app = launchApp()
+        _ = startViewer(app)
+        let photoBefore = photoElement(app).frame
+
+        let delete = dockStart(app, "control.delete")
+        let sample = holdDockDrag(
+            app,
+            from: delete,
+            to: destinationTarget("left", in: app),
+            captureNamed: "Controls — moving, with the three destination markers"
+        )
+
+        XCTAssertEqual(
+            sample.photoFrame,
+            photoBefore,
+            "the media frame must be identical while the dock is moving"
+        )
+        XCTAssertEqual(clusterDock(app), "Docked left edge", "the held drag landed on the release")
+        XCTAssertEqual(photoElement(app).frame, photoBefore, "the media frame must be identical after the move")
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "a moving dock must never decide")
     }
 
     /// The controls are physical targets: they must sit in the same place for a
@@ -858,7 +1063,11 @@ final class SWIPRUITests: XCTestCase {
 
         XCTAssertTrue(tutorialElement(app).waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Nothing is deleted until you review and confirm."].exists)
-        XCTAssertTrue(app.staticTexts["Move the buttons"].exists, "the tutorial must teach the grip")
+        XCTAssertTrue(app.staticTexts["Move the buttons"].exists, "the tutorial must teach that the buttons can be moved")
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "three dots")).firstMatch.exists,
+            "the tutorial must not teach a grip the dock no longer has"
+        )
         XCTAssertTrue(
             app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "saved as you make it")).firstMatch.exists,
             "the tutorial must explain that accepted work is saved"
@@ -1102,6 +1311,48 @@ final class SWIPRUITests: XCTestCase {
         }
     }
 
+    /// The dock's own look at each of its three places, in both appearances and
+    /// at the largest text size, for the v1-04 milestone screenshots.
+    func testCaptureTheDockAtEveryPositionInEveryAppearance() {
+        captureDockPositions(extraArguments: ["-uiTestingForceLight"], suffix: "light")
+        captureDockPositions(extraArguments: ["-uiTestingForceDark"], suffix: "dark")
+        captureDockPositions(
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            ],
+            suffix: "ax5"
+        )
+    }
+
+    private func captureDockPositions(extraArguments: [String], suffix: String) {
+        let app = launchApp(extraArguments: extraArguments)
+        let photo = startViewer(app)
+        XCTAssertTrue(photo.waitForExistence(timeout: 10), "no viewer for the \(suffix) dock screenshots")
+        capture("dock-bottom-\(suffix)")
+
+        let window = app.windows.firstMatch.frame
+        dragDock(app, from: dockStart(app, "control.delete"), to: destinationTarget("left", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked left edge")
+        assertControlsInsideScreen(app, window: window)
+        capture("dock-left-\(suffix)")
+
+        dragDock(app, from: dockStart(app, "control.keep"), to: destinationTarget("right", in: app))
+        XCTAssertEqual(clusterDock(app), "Docked right edge")
+        assertControlsInsideScreen(app, window: window)
+        capture("dock-right-\(suffix)")
+
+        // The one state only a held finger can show: the token and the three
+        // subtle destination markers.
+        let sample = holdDockDrag(
+            app,
+            from: dockStart(app, "control.keep"),
+            to: destinationTarget("bottom", in: app),
+            captureNamed: "dock-moving-\(suffix)"
+        )
+        XCTAssertEqual(sample.photoFrame, photoElement(app).frame, "the media must not move while the dock does")
+        XCTAssertEqual(clusterDock(app), "Docked bottom")
+    }
+
     func testQueueForDeletionReachesReviewAndResult() {
         let app = launchApp()
         let photo = startViewer(app)
@@ -1310,8 +1561,8 @@ final class SWIPRUITests: XCTestCase {
 
     // MARK: - Settings
 
-    /// Turning the buttons off hides the cluster and its grip, and swiping keeps
-    /// working; turning them back on brings the cluster back.
+    /// Turning the buttons off hides the dock, and swiping keeps working;
+    /// turning them back on brings the dock and its controls back.
     func testShowButtonsToggleHidesAndRestoresTheCluster() {
         let app = launchApp()
         _ = startViewer(app)
@@ -1325,8 +1576,8 @@ final class SWIPRUITests: XCTestCase {
         app.buttons["Back"].firstMatch.tap()
 
         _ = startViewer(app)
-        XCTAssertFalse(app.buttons["control.keep"].exists, "turning the buttons off must hide the cluster")
-        XCTAssertFalse(gripElement(app).exists, "turning the buttons off must hide the grip")
+        XCTAssertFalse(app.buttons["control.keep"].exists, "turning the buttons off must hide the controls")
+        XCTAssertFalse(clusterElement(app).exists, "turning the buttons off must hide the dock")
 
         // Swiping is always available, so a decision still works without buttons.
         photoElement(app).swipeLeft()
@@ -1338,7 +1589,7 @@ final class SWIPRUITests: XCTestCase {
         toggle.tap()
         app.buttons["Back"].firstMatch.tap()
         _ = startViewer(app)
-        XCTAssertTrue(app.buttons["control.keep"].waitForExistence(timeout: 5), "turning them back on must restore the cluster")
+        XCTAssertTrue(app.buttons["control.keep"].waitForExistence(timeout: 5), "turning them back on must restore the controls")
     }
 
     /// Statistics is inline at the top of Settings, read-only and with no
