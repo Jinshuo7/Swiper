@@ -317,6 +317,11 @@ final class AppModel: ObservableObject {
         // a stale `.authorized` value would treat a new Limited subset as a full
         // snapshot and drop hidden work.
         authorization = library.currentAuthorization()
+        // With no browse access there is no snapshot to compare against, so the
+        // stored list and session are left exactly as they are: an empty
+        // snapshot is not proof that anything vanished. `refreshAuthorization()`
+        // routes to the permission screen instead.
+        guard authorization.canBrowse else { return }
         let descriptors = await library.fetchAllDescriptors()
         order = LibraryOrder(descriptors)
 
@@ -367,11 +372,12 @@ final class AppModel: ObservableObject {
                 persistenceNotice = message
                 limitedMarksNotice = message
             }
-        } else if limitedMarksNotice != nil {
+        } else if let limited = limitedMarksNotice {
             // Access widened (or the marks are visible again): the hidden-mark
             // notice is no longer true, so clear it rather than leaving a
-            // stale banner on screen.
-            persistenceNotice = nil
+            // stale banner on screen. Only that notice is cleared, so an
+            // unrelated save error keeps its own error treatment.
+            if persistenceNotice == limited { persistenceNotice = nil }
             limitedMarksNotice = nil
         }
 

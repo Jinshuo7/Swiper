@@ -120,7 +120,9 @@ struct RootView: View {
                 // the system picker right where the user notices the gap.
                 PersistenceBanner(
                     systemImage: "info.circle",
-                    title: "Some marked photos are hidden",
+                    title: model.hiddenMarkCount == 1
+                        ? "One marked photo is hidden"
+                        : "Some marked photos are hidden",
                     message: limited,
                     primaryTitle: "Select more photos",
                     primaryAction: { model.manageLimitedLibrary() },

@@ -143,9 +143,11 @@ final class FakePhotoLibrary: SWIPRPhotoLibrary {
     func currentAuthorization() -> LibraryAuthorization { authorization }
     func requestAuthorization() async -> LibraryAuthorization { authorization }
 
-    /// The assets the app can see right now: the whole (non-deleted) library,
-    /// or just the Limited selection when access is limited.
+    /// The assets the app can see right now: nothing without browse access,
+    /// the person's Limited selection when access is limited, and the whole
+    /// (non-deleted) library otherwise.
     private var visibleAssets: [AssetDescriptor] {
+        guard authorization.canBrowse else { return [] }
         let live = assets.filter { !deletedIDs.contains($0.id) }
         guard authorization == .limited, let selection = limitedSelectionIDs else { return live }
         return live.filter { selection.contains($0.id) }

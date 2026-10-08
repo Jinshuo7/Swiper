@@ -128,6 +128,92 @@ final class AppModelTests: XCTestCase {
         )
     }
 
+    func testLimitedAccessRelaunchThenWideningKeepsTheMarkOrderAndTheStatistics() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        // Mark three photos in a known order.
+        model.startNewest()
+        await model.settle()
+        var marked: [String] = []
+        for _ in 0..<3 {
+            guard let id = model.currentAsset?.id else { break }
+            marked.append(id)
+            model.apply(.queueDeletion)
+            await model.settle()
+        }
+        XCTAssertEqual(model.markedIDs, marked)
+        let statisticsBefore = store.statistics
+        let savedPool = store.state?.session?.poolIDs
+
+        // Limited access now hides every mark, and the app is relaunched on the
+        // same store.
+        let allIDs = Set((0..<6).map { "fake-\($0)" })
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(marked)
+        let (relaunched, _, _) = await bootstrapped(library: library, store: store)
+
+        XCTAssertEqual(relaunched.hiddenMarkCount, marked.count)
+        XCTAssertTrue(relaunched.markedIDs.isEmpty, "no phantom rows while the marks are hidden")
+        XCTAssertEqual(store.state?.marks, marked, "the relaunch keeps every hidden mark")
+        XCTAssertEqual(store.state?.session?.poolIDs, savedPool, "the captured pool survives the relaunch")
+        XCTAssertEqual(store.statistics, statisticsBefore, "hiding a mark counts nothing")
+        XCTAssertNotNil(relaunched.persistenceNotice, "the user is told the marks are hidden")
+
+        // The traversal never serves an asset the app cannot see.
+        relaunched.resumeSession()
+        await relaunched.settle()
+        XCTAssertEqual(relaunched.route, .viewer)
+        let served = relaunched.currentAsset?.id
+        XCTAssertNotNil(served, "the traversal still has a visible asset to show")
+        XCTAssertFalse(served.map(marked.contains) ?? false, "a hidden mark is never presented")
+
+        // Widening access brings the marks back in their saved order.
+        library.authorization = .authorized
+        library.limitedSelectionIDs = nil
+        await relaunched.refreshAuthorization()
+        await relaunched.settle()
+
+        XCTAssertEqual(relaunched.markedIDs, marked, "marks reappear in their saved order")
+        XCTAssertEqual(relaunched.hiddenMarkCount, 0)
+        XCTAssertNil(relaunched.persistenceNotice, "the hidden-mark notice is gone")
+        XCTAssertEqual(relaunched.statistics, statisticsBefore, "nothing was credited as a deletion")
+        XCTAssertEqual(store.statistics, statisticsBefore)
+        XCTAssertEqual(store.state?.marks, marked)
+    }
+
+    func testRevokedAccessNeverEmptiesTheDeletionListOrTheSession() async {
+        let library = FakePhotoLibrary.demo(count: 6)
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        model.startNewest()
+        await model.settle()
+        guard let id = model.currentAsset?.id else { return XCTFail("no current asset") }
+        model.apply(.queueDeletion)
+        await model.settle()
+        XCTAssertEqual(model.markedIDs, [id])
+        let savedState = store.state
+
+        // Access is revoked. A snapshot the app may not browse is not proof
+        // that anything vanished, so the library refresh must leave the stored
+        // deletion list and session exactly as they are.
+        library.authorization = .denied
+        await model.reloadLibrary()
+        await model.settle()
+
+        XCTAssertEqual(store.state, savedState, "a revoked snapshot never rewrites stored state")
+        XCTAssertEqual(model.markedIDs, [id], "the mark is kept until the library can be read again")
+        XCTAssertEqual(model.statistics.lifetimeDeletedCount, 0, "nothing is credited as a deletion")
+
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertEqual(model.route, .permission, "revoked access routes to the permission screen")
+        XCTAssertEqual(store.state, savedState)
+        XCTAssertEqual(model.markedIDs, [id])
+    }
+
     func testConfirmingDeletionUnderLimitedAccessKeepsHiddenMarks() async {
         let library = FakePhotoLibrary.demo(count: 6)
         let (model, _, store) = await bootstrapped(library: library)

@@ -17,35 +17,36 @@
   worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
   Never touch the owner's folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`.
 - **Risky-PR review workflow:** any PR labelled `needs-strong-review` gets up to
-  3 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). Leave
-  it open for the owner; never add `strong-review-passed` and never merge it
-  unless the owner approves it by number.
+  5 `@codex review` rounds and is merged under the delegated approval rule; the
+  authoritative text is `AGENTS.md` → *Risky PR review workflow* and
+  `docs/agents/OWNER-INSTRUCTIONS.md`.
 
 ## Current ticket
 
-- **None in progress.** **#81** (the flaky UI suite) landed in **PR #83**: the
-  launch/terminate handoff is deterministic and every UI query names the
-  collection it looks in. Four consecutive CI runs and three consecutive local
-  full suites are green. `docs/TESTING.md` has the rules, the reproduction loop
-  and the one deliberate exception (the viewer canvas and the grid cells are
-  found by identifier, because their element kind follows whether their
-  thumbnail has rendered yet).
+- **None in progress.** **#70** (V1-06a: keep marked photos through Limited
+  Photos access) landed in **PR #74** under the delegated approval rule: an
+  unseen identifier under Limited access is hidden, not gone, so nothing is
+  dropped, credited as an external removal or reported as a deletion, and the
+  captured pool, decisions, Undo entries and Tumbler plan survive until access
+  widens. A neutral notice offers the system picker, and a revoked snapshot no
+  longer empties the stored list. `SWIPRAppTests` covers
+  mark → Limited → relaunch → widen end to end.
 - The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
-  split into subtickets #76–#79.
+  split into subtickets #76–#79; **#73** (the migrated Tumbler plan's vanished
+  cursor) is still parked.
 
 ## Open PRs
 
-- **#74 — fix: keep marked photos through Limited Photos access (#70)**
-  (`driver/70-limited-marks`). Risky (`SWIPRKit/AssetReconciler.swift`,
-  `SWIPR/ViewModels/AppModel.swift`, `SWIPR/Views/RootView.swift`); labelled
-  `needs-strong-review`, and being finished now under the delegated approval
-  rule (Codex review of the final head plus green checks).
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
+- **#74 — fix: keep marked photos through Limited Photos access (#70)** — the
+  Limited-access reconciliation mode, the hidden-marks notice and its system
+  picker action, the test seams in `FakePhotoLibrary`, and the app/kit tests;
+  closes **#70**.
 - **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
   launch/terminate handoff helpers, the scoped UI queries and the rules in
   `docs/TESTING.md`; closes **#81**.
@@ -78,16 +79,17 @@
   merged as `67967ad`).
 - **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
   merged as `8efd39e`). The AX5 case runs on every PR.
-- **#70 — V1-06a: Keep marked photos through Limited Photos access** — PR #74,
-  the current ticket; finishing and merging now.
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — done
+  (PR #74).
 - **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
   vanished** — not started.
 
 ## What is next
 
-1. Land **#70** (PR #74), then implement **#73** (the migrated Tumbler plan's
-   vanished cursor) and the **V1-04** subtickets #76–#79.
+1. Implement **#73** (the migrated Tumbler plan's vanished cursor) and the
+   **V1-04** subtickets #76–#79.
 2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+
 ### Note: the UI suite's launch handoff (#81)
 
 Every `SWIPRUITests` launch, terminate and starting-point handoff goes through
@@ -116,8 +118,8 @@ not proved; `needs-owner` #84 keeps the evidence and the options.
 The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
 #58 fixed the scroll and **#69** removed the line in **PR #72** (risky because
-it edits `.github/workflows/ci.yml`, so it waits for the owner's approval). The
-AX5 case now runs on every PR.
+it edits `.github/workflows/ci.yml`, so it was approved by the owner before it
+merged). The AX5 case now runs on every PR.
 
 ### Note: the two named traversals never wrap
 
