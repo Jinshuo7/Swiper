@@ -22,6 +22,9 @@ public struct SessionEngine: Equatable, Sendable {
     public private(set) var poolIDs: Set<String>?
     /// The media categories selected when the session started.
     public private(set) var filterCategories: Set<MediaCategory>?
+    /// True when the library snapshot is a Limited-access subset, so the
+    /// session must never be treated as complete while work may be hidden.
+    public private(set) var libraryAccessIsLimited: Bool
     public private(set) var isFinished: Bool
 
     public init(
@@ -37,6 +40,7 @@ public struct SessionEngine: Equatable, Sendable {
         tumblerSeed: UInt64? = nil,
         poolIDs: Set<String>? = nil,
         filterCategories: Set<MediaCategory>? = nil,
+        libraryAccessIsLimited: Bool = false,
         isFinished: Bool = false
     ) {
         // The engine's order is the traversal order. A captured pool confines it
@@ -55,6 +59,7 @@ public struct SessionEngine: Equatable, Sendable {
         self.keptIDs = keptIDs
         self.poolIDs = poolIDs
         self.filterCategories = filterCategories
+        self.libraryAccessIsLimited = libraryAccessIsLimited
         self.isFinished = isFinished
         if mode == .tumbler {
             var plan = tumbler ?? TumblerPlan(
@@ -171,8 +176,16 @@ public struct SessionEngine: Equatable, Sendable {
     }
 
     /// Reverses the most recent decision and returns to that asset.
+    ///
+    /// The latest decision can belong to a photo a Limited-access snapshot
+    /// cannot show. Reversing it would consume the entry and drop its mark
+    /// without ever returning to the photo, so the entry waits, untouched,
+    /// until its asset is visible again.
     @discardableResult
     public mutating func undo() -> [SessionEffect] {
+        guard let latest = undoStack.last, order.contains(id: latest.assetID) else {
+            return [.noOp]
+        }
         guard let entry = undoStack.pop() else { return [.noOp] }
         var effects: [SessionEffect] = []
         switch entry.effect {
@@ -215,8 +228,12 @@ public struct SessionEngine: Equatable, Sendable {
     public mutating func advance() -> SessionEffect {
         guard let next = nextCandidateID() else {
             cursorID = nil
-            isFinished = true
-            return .sessionFinished
+            // A Limited snapshot can be exhausted while work is still hidden,
+            // and a legacy session with no captured pool can never prove it is
+            // complete. Neither may finish here: the finished overlay's Finish
+            // would discard the hidden work.
+            isFinished = !hasHiddenUndecidedWork
+            return isFinished ? .sessionFinished : .noOp
         }
         cursorID = next
         isFinished = false
@@ -240,10 +257,16 @@ public struct SessionEngine: Equatable, Sendable {
 
     private mutating func nextCandidateID() -> String? {
         if mode == .tumbler, var plan = tumbler {
-            while let candidate = plan.next() {
+            // Consume only an identifier this snapshot can show. Calling
+            // `next()` first would move a hidden (Limited access) member into
+            // `handled`, permanently skipping a photo the user never saw.
+            if let candidate = plan.peek(
+                limit: 1,
+                availableIDs: order.idSet,
+                excluding: unavailableIDs
+            ).first {
+                plan.reserve(candidate)
                 tumbler = plan
-                guard order.contains(id: candidate) else { continue }
-                if isUnavailable(candidate) { continue }
                 return candidate
             }
             tumbler = plan
@@ -275,6 +298,22 @@ public struct SessionEngine: Equatable, Sendable {
 
     private var unavailableIDs: Set<String> {
         decidedIDs.union(queue.orderedIDs)
+    }
+
+    /// Whether this Limited snapshot may still hide undecided work: a captured
+    /// pool member outside it, or — for a legacy session with no captured pool —
+    /// any unseen library member at all.
+    ///
+    /// The host keeps such a session in memory even when it has no visible
+    /// cursor, no decisions and no Tumbler plan, so a new start cannot replace
+    /// its pool and position without the replacement confirmation.
+    public var hasHiddenUndecidedWork: Bool {
+        guard libraryAccessIsLimited else { return false }
+        guard let poolIDs else { return true }
+        let visible = order.idSet
+        return poolIDs.contains { id in
+            !visible.contains(id) && !isUnavailable(id)
+        }
     }
 
     private func firstUndecided(preferNewest: Bool) -> String? {
@@ -336,7 +375,13 @@ public struct SessionEngine: Equatable, Sendable {
     // MARK: - Persistence
 
     public func persisted(updatedAt: Date = Date()) -> PersistedSession {
-        PersistedSession(
+        // A captured pool can name photos this snapshot cannot show (Limited
+        // Photos access). While such a photo is still undecided the session is
+        // not really finished, so never persist it as finished: widening access
+        // must return to the viewer, not jump to Review.
+        let visible = order.idSet
+        let hiddenUndecidedPoolMember = hasHiddenUndecidedWork
+        return PersistedSession(
             currentAssetID: cursorID,
             currentAssetDate: current?.creationDate,
             direction: direction,
@@ -346,9 +391,16 @@ public struct SessionEngine: Equatable, Sendable {
             undoEntries: undoStack.entries,
             tumbler: tumbler,
             filterCategories: filterCategories,
-            poolIDs: poolIDs == nil ? nil : order.ids,
+            poolIDs: poolIDs.map { pool in
+                // A captured pool can name members the current snapshot cannot
+                // show (for example under Limited Photos access). They have no
+                // place in the library order, but dropping them here would
+                // overwrite the captured pool on the next save, so keep them
+                // after the visible ones in a stable order.
+                return order.ids + pool.subtracting(visible).sorted()
+            },
             updatedAt: updatedAt,
-            isFinished: isFinished
+            isFinished: isFinished && !hiddenUndecidedPoolMember
         )
     }
 
@@ -357,7 +409,8 @@ public struct SessionEngine: Equatable, Sendable {
     public static func restored(
         from persisted: PersistedSession,
         order: LibraryOrder,
-        marks: [String] = []
+        marks: [String] = [],
+        libraryAccessIsLimited: Bool = false
     ) -> SessionEngine {
         SessionEngine(
             order: order,
@@ -371,6 +424,7 @@ public struct SessionEngine: Equatable, Sendable {
             tumbler: persisted.tumbler,
             poolIDs: persisted.poolIDs.map { Set($0) },
             filterCategories: persisted.filterCategories,
+            libraryAccessIsLimited: libraryAccessIsLimited,
             isFinished: persisted.isFinished
         )
     }

@@ -17,28 +17,36 @@
   worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
   Never touch the owner's folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`.
 - **Risky-PR review workflow:** any PR labelled `needs-strong-review` gets up to
-  3 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). Leave
-  it open for the owner; never add `strong-review-passed` and never merge it
-  unless the owner approves it by number.
+  5 `@codex review` rounds and is merged under the delegated approval rule; the
+  authoritative text is `AGENTS.md` → *Risky PR review workflow* and
+  `docs/agents/OWNER-INSTRUCTIONS.md`.
 
 ## Current ticket
 
-- **None in progress.** **#81** (the flaky UI suite) landed in **PR #83**: the
-  launch/terminate handoff is deterministic and every UI query names the
-  collection it looks in. Four consecutive CI runs and three consecutive local
-  full suites are green. `docs/TESTING.md` has the rules, the reproduction loop
-  and the one deliberate exception (the viewer canvas and the grid cells are
-  found by identifier, because their element kind follows whether their
-  thumbnail has rendered yet).
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — code
+  complete in **PR #74**, which is open and labelled `owner-blocked` for the
+  owner. Under Limited access an unseen identifier is hidden, not gone: nothing
+  is dropped, credited as an external removal or reported as a deletion, and the
+  captured pool, decisions, Undo entries and Tumbler plan survive until access
+  widens (a neutral notice offers the system picker, a revoked snapshot no longer
+  empties the stored list, an Undo whose photo is hidden is refused rather than
+  applied half-way, and a session whose whole pool is hidden keeps its
+  replacement confirmation). Review rounds stopped after the sixth round's P1
+  fix because the owner's workflow caps a risky PR at five rounds; a
+  `needs-owner` issue asks for one validation round on head `396e14d`+.
 - The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
-  split into subtickets #76–#79.
+  split into subtickets #76–#79; **#73** (the migrated Tumbler plan's vanished
+  cursor) is still parked.
 
 ## Open PRs
 
 - **#74 — fix: keep marked photos through Limited Photos access (#70)**
-  (`driver/70-limited-marks`, head `ff118ee`). Risky, `needs-strong-review`,
-  open, **waiting for the owner**. Do not add `strong-review-passed` without the
-  owner's approval.
+  (`driver/70-limited-marks`). Risky (`SWIPRKit/AssetReconciler.swift`,
+  `SWIPRKit/SessionEngine.swift`, `SWIPR/ViewModels/AppModel.swift`,
+  `SWIPR/Views/RootView.swift`, `SWIPR/PhotoLibrary/FakePhotoLibrary.swift`),
+  `needs-strong-review` + `owner-blocked`: every check is green and the code is
+  complete, but the sixth Codex round's P1 fix has no review of its own head, so
+  it waits for the owner's go-ahead rather than merging unvalidated.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
@@ -52,10 +60,12 @@
   (merge commit `1d73a1b`).
 - **#80 — feat: add pure direct-move dock geometry (#75)** (merge commit
   `01e57f6`).
-- **#74/#72/#71/#70/#66** — see the ticket log in
-  `docs/IMPLEMENTATION-STATUS.md`; #72 (AX5 re-enable, merge commit `8efd39e`)
-  and #66 (damaged save file, merge commit `c2af5f5`) both merged after the
-  owner's approval. #74 is still open (risky).
+- **#72 — test: re-enable the AX5 large-text UI case in CI (#69)** (merge commit
+  `8efd39e`), which closed **#69**.
+- **#71 — docs: sync HANDOFF.md to the current state (#68)** (merge commit
+  `67967ad`), which closed **#68**.
+- **#66 — fix: keep a damaged save file instead of replacing it with empty
+  progress** (merge commit `c2af5f5`); its follow-up is the parked **#73**.
 - **#67 — docs: record the risky-PR Codex review workflow and Code Review
   Rules** (merge commit `881aff7`).
 - **#65 — ci: add the strong-review gate for risky paths** (merge commit
@@ -75,16 +85,18 @@
   merged as `67967ad`).
 - **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
   merged as `8efd39e`). The AX5 case runs on every PR.
-- **#70 — V1-06a: Keep marked photos through Limited Photos access** — PR #74 is
-  open and risky, waiting for the owner.
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — code
+  complete in PR #74, which is open and `owner-blocked` (see above).
 - **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
   vanished** — not started.
 
 ## What is next
 
-1. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
+1. Get the owner's go-ahead for one validation review round on **PR #74**, then
+   merge it and close **#70**.
+2. Implement **#73** (the migrated Tumbler plan's vanished cursor) and the
    **V1-04** subtickets #76–#79.
-2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the UI suite's launch handoff (#81)
 
@@ -114,8 +126,8 @@ not proved; `needs-owner` #84 keeps the evidence and the options.
 The CI job carried
 `-skip-testing:SWIPRUITests/PlaySessionUITests/testPlayEveryScreenAtTheLargestAccessibilityTextSize`.
 #58 fixed the scroll and **#69** removed the line in **PR #72** (risky because
-it edits `.github/workflows/ci.yml`, so it waits for the owner's approval). The
-AX5 case now runs on every PR.
+it edits `.github/workflows/ci.yml`, so it was approved by the owner before it
+merged). The AX5 case now runs on every PR.
 
 ### Note: the two named traversals never wrap
 

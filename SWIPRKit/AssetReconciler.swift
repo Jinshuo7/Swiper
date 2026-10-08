@@ -33,8 +33,19 @@ public struct ReconciledState: Equatable, Sendable {
 /// Reconciles persisted identifiers against the current library so sessions and
 /// the deletion list survive assets being removed or changed outside SWIPR.
 public enum AssetReconciler {
-    public static func reconcile(_ state: PersistedState, order: LibraryOrder) -> ReconciledState {
+    /// - Parameter libraryAccessIsLimited: When Photos access is Limited the
+    ///   library snapshot is a subset the user chose, not the whole library. An
+    ///   unseen identifier is then hidden, not gone, so nothing is dropped and
+    ///   nothing is credited as externally removed; widening access restores it.
+    public static func reconcile(
+        _ state: PersistedState,
+        order: LibraryOrder,
+        libraryAccessIsLimited: Bool = false
+    ) -> ReconciledState {
         guard let session = state.session else {
+            guard !libraryAccessIsLimited else {
+                return ReconciledState(state: state, externallyRemovedIDs: [])
+            }
             let available = order.idSet
             let marks = state.marks.filter { available.contains($0) }
             let removed = state.marks.filter { !available.contains($0) }
@@ -43,7 +54,12 @@ public enum AssetReconciler {
             return ReconciledState(state: updated, externallyRemovedIDs: removed)
         }
 
-        let reconciled = reconcile(session, order: order, marks: state.marks)
+        let reconciled = reconcile(
+            session,
+            order: order,
+            marks: state.marks,
+            libraryAccessIsLimited: libraryAccessIsLimited
+        )
         var updated = state
         updated.marks = reconciled.marks
         updated.session = reconciled.session
@@ -53,15 +69,22 @@ public enum AssetReconciler {
     public static func reconcile(
         _ session: PersistedSession,
         order: LibraryOrder,
-        marks: [String] = []
+        marks: [String] = [],
+        libraryAccessIsLimited: Bool = false
     ) -> ReconciledSession {
         let available = order.idSet
 
         // The captured pool drops only identifiers that left the library. New
-        // arrivals are never added, so a session's membership stays fixed.
-        let poolIDs = session.poolIDs.map { $0.filter { available.contains($0) } }
+        // arrivals are never added, so a session's membership stays fixed. A
+        // Limited snapshot cannot tell "left" from "hidden", so it keeps the
+        // whole pool (and every membership list below) intact.
+        let poolIDs = libraryAccessIsLimited
+            ? session.poolIDs
+            : session.poolIDs.map { $0.filter { available.contains($0) } }
         // Traversal is confined to the pool when one was captured; a legacy
-        // session without a pool keeps walking the full library order.
+        // session without a pool keeps walking the full library order. The
+        // visible order is always the library snapshot, so hiding a member
+        // removes it from traversal without deleting it from the session.
         let workingOrder: LibraryOrder
         if let poolIDs {
             let pool = Set(poolIDs)
@@ -70,22 +93,42 @@ public enum AssetReconciler {
             workingOrder = order
         }
 
-        let queueIDs = marks.filter { available.contains($0) }
-        let decidedIDs = session.decidedIDs.filter { available.contains($0) }
-        let keptIDs = session.keptIDs.filter { available.contains($0) }
-        let undoEntries = session.undoEntries.filter { available.contains($0.assetID) }
+        let queueIDs = libraryAccessIsLimited ? marks : marks.filter { available.contains($0) }
+        let decidedIDs = libraryAccessIsLimited
+            ? session.decidedIDs
+            : session.decidedIDs.filter { available.contains($0) }
+        let keptIDs = libraryAccessIsLimited
+            ? session.keptIDs
+            : session.keptIDs.filter { available.contains($0) }
+        let undoEntries = libraryAccessIsLimited
+            ? session.undoEntries
+            : session.undoEntries.filter { available.contains($0.assetID) }
 
-        let vanishedCandidates = marks + session.decidedIDs
-        var seen = Set<String>()
-        let externallyRemoved = vanishedCandidates.filter { id in
-            guard !available.contains(id) else { return false }
-            return seen.insert(id).inserted
+        let externallyRemoved: [String]
+        if libraryAccessIsLimited {
+            externallyRemoved = []
+        } else {
+            let vanishedCandidates = marks + session.decidedIDs
+            var seen = Set<String>()
+            externallyRemoved = vanishedCandidates.filter { id in
+                guard !available.contains(id) else { return false }
+                return seen.insert(id).inserted
+            }
         }
 
         var tumbler = session.tumbler
-        if var plan = tumbler {
+        if !libraryAccessIsLimited, var plan = tumbler {
             plan.reconcile(withAvailableIDs: available)
             tumbler = plan
+        }
+
+        // Under Limited access a Tumbler cursor can become hidden. The plan is
+        // preserved, but the old cursor is already in `handled`; return it to the
+        // plan so widening access can serve it again instead of skipping it.
+        if libraryAccessIsLimited, session.mode == .tumbler,
+           let hiddenCurrent = session.currentAssetID,
+           !workingOrder.contains(id: hiddenCurrent) {
+            tumbler?.requeue(hiddenCurrent)
         }
 
         var resolvedCurrentID = session.currentAssetID
@@ -112,8 +155,17 @@ public enum AssetReconciler {
             }
         }
 
+        // A Limited snapshot can be exhausted while the captured pool still
+        // holds hidden undecided members. Finishing there would be permanent:
+        // widening access would restore the ids but route straight to Review,
+        // never showing the undecided photos again.
+        let unavailable = Set(decidedIDs).union(queueIDs)
+        let hiddenUndecided = libraryAccessIsLimited && (poolIDs?.contains { id in
+            !workingOrder.idSet.contains(id) && !unavailable.contains(id)
+        } ?? true)
         let nothingLeftToShow = resolvedCurrentID == nil
-            && Set(decidedIDs).union(queueIDs).isSuperset(of: workingOrder.idSet)
+            && unavailable.isSuperset(of: workingOrder.idSet)
+        let isFinished = (session.isFinished || nothingLeftToShow) && !hiddenUndecided
 
         let reconciled = PersistedSession(
             currentAssetID: resolvedCurrentID,
@@ -127,7 +179,7 @@ public enum AssetReconciler {
             filterCategories: session.filterCategories,
             poolIDs: poolIDs,
             updatedAt: session.updatedAt,
-            isFinished: session.isFinished || nothingLeftToShow
+            isFinished: isFinished
         )
         return ReconciledSession(
             session: reconciled,

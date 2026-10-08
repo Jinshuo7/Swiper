@@ -113,7 +113,31 @@ final class AppModel: ObservableObject {
     }
 
     var currentAsset: AssetDescriptor? { engine?.current }
-    var markedIDs: [String] { engine?.queue.ids ?? marks.ids }
+
+    /// The exact Limited-access hidden-marks message currently in
+    /// ``persistenceNotice``, or `nil`. Comparing the text means a later,
+    /// unrelated persistence error is never relabelled as the hidden-marks
+    /// notice.
+    private(set) var limitedMarksNotice: String?
+
+    /// The marked ids the user can actually see. Under Limited Photos access a
+    /// mark outside the selected subset is hidden, not gone: it stays in
+    /// `storedState.marks` and reappears when access widens.
+    var markedIDs: [String] {
+        let ids = engine?.queue.ids ?? marks.ids
+        guard authorization.isLimited else { return ids }
+        let visible = order.idSet
+        return ids.filter { visible.contains($0) }
+    }
+
+    /// Marked photos kept on disk but hidden because Photos access is Limited.
+    var hiddenMarkCount: Int {
+        guard authorization.isLimited else { return 0 }
+        let ids = engine?.queue.ids ?? marks.ids
+        let visible = order.idSet
+        return ids.filter { !visible.contains($0) }.count
+    }
+
     var queueCount: Int { markedIDs.count }
     var hasPhotos: Bool { !order.isEmpty }
 
@@ -227,7 +251,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func dismissPersistenceNotice() { persistenceNotice = nil }
+    func dismissPersistenceNotice() {
+        persistenceNotice = nil
+        limitedMarksNotice = nil
+    }
 
     // MARK: - Teaching
 
@@ -285,14 +312,33 @@ final class AppModel: ObservableObject {
 
     /// Refreshes the metadata snapshot and reconciles stored state against it.
     func reloadLibrary() async {
+        // Read the live authorization before reconciling. PhotoKit can call the
+        // change handler before the scene-phase refresh, so reconciling against
+        // a stale `.authorized` value would treat a new Limited subset as a full
+        // snapshot and drop hidden work.
+        authorization = library.currentAuthorization()
+        // With no browse access there is no snapshot to compare against, so the
+        // stored list and session are left exactly as they are: an empty
+        // snapshot is not proof that anything vanished. `refreshAuthorization()`
+        // routes to the permission screen instead.
+        guard authorization.canBrowse else { return }
         let descriptors = await library.fetchAllDescriptors()
         order = LibraryOrder(descriptors)
 
-        let reconciled = AssetReconciler.reconcile(storedState, order: order)
+        let reconciled = AssetReconciler.reconcile(
+            storedState,
+            order: order,
+            libraryAccessIsLimited: authorization.isLimited
+        )
         storedState = reconciled.state
 
-        if let session = storedState.session, session.isResumable {
-            let restored = SessionEngine.restored(from: session, order: order, marks: storedState.marks)
+        if let session = storedState.session, shouldResume(session) {
+            let restored = SessionEngine.restored(
+                from: session,
+                order: order,
+                marks: storedState.marks,
+                libraryAccessIsLimited: authorization.isLimited
+            )
             engine = restored
             marks = restored.queue
             resumableSession = session
@@ -314,12 +360,50 @@ final class AppModel: ObservableObject {
             if !isPersistenceReadOnly {
                 await persistQuietly(storedState)
             }
+        } else if hiddenMarkCount > 0 {
+            // The snapshot is Limited, so these marks are preserved but not
+            // shown. Say so plainly and point at the system picker, but never
+            // overwrite an unrelated persistence error with this notice.
+            if persistenceNotice == nil || persistenceNotice == limitedMarksNotice {
+                let count = hiddenMarkCount
+                let message = count == 1
+                    ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
+                    : "\(count) marked photos are hidden while Photos access is Limited. Select more photos to see them."
+                persistenceNotice = message
+                limitedMarksNotice = message
+            }
+        } else if let limited = limitedMarksNotice {
+            // Access widened (or the marks are visible again): the hidden-mark
+            // notice is no longer true, so clear it rather than leaving a
+            // stale banner on screen. Only that notice is cleared, so an
+            // unrelated save error keeps its own error treatment.
+            if persistenceNotice == limited { persistenceNotice = nil }
+            limitedMarksNotice = nil
         }
 
         if engine?.isFinished == true && route == .viewer {
             reviewOrigin = .viewer
             route = .review
         }
+    }
+
+    /// Whether a stored session still belongs in memory for the current
+    /// snapshot.
+    ///
+    /// A session whose captured pool is entirely hidden by Limited Photos access
+    /// has no visible cursor, no decisions and no Tumbler plan, so
+    /// `PersistedSession.isResumable` alone would drop it. Dropping it would
+    /// also drop the replacement confirmation, and a new start would then
+    /// overwrite the hidden pool and position without asking.
+    private func shouldResume(_ session: PersistedSession) -> Bool {
+        guard !session.isResumable else { return true }
+        guard authorization.isLimited else { return false }
+        return SessionEngine.restored(
+            from: session,
+            order: order,
+            marks: storedState.marks,
+            libraryAccessIsLimited: true
+        ).hasHiddenUndecidedWork
     }
 
     // MARK: - Entry points
@@ -450,7 +534,8 @@ final class AppModel: ObservableObject {
             queue: sessionMarks,
             tumblerSeed: mode == .tumbler ? SessionEngine.makeSeed() : nil,
             poolIDs: Set(sessionOrder.ids),
-            filterCategories: filter.categories
+            filterCategories: filter.categories,
+            libraryAccessIsLimited: authorization.isLimited
         )
         if cursorID == nil || mode == .tumbler {
             newEngine.start()
@@ -478,7 +563,12 @@ final class AppModel: ObservableObject {
         if let categories = persisted.filterCategories {
             filter = MediaFilter(categories: categories)
         }
-        let restored = SessionEngine.restored(from: persisted, order: order, marks: storedState.marks)
+        let restored = SessionEngine.restored(
+            from: persisted,
+            order: order,
+            marks: storedState.marks,
+            libraryAccessIsLimited: authorization.isLimited
+        )
         engine = restored
         route = restored.isFinished ? .review : .viewer
     }
@@ -673,8 +763,11 @@ final class AppModel: ObservableObject {
             order = refreshedOrder
 
             // Unsuccessful assets stay marked; only confirmed deletions leave
-            // the list, so a retry can never re-request or re-count them.
-            var updatedMarks = DeletionQueue(orderedIDs: requested)
+            // the list, so a retry can never re-request or re-count them. The
+            // rebuild starts from the full stored queue, not the visible
+            // subset: under Limited access a hidden mark is not being deleted
+            // and must survive this write.
+            var updatedMarks = marks
             for id in outcome.deletedIDs { updatedMarks.remove(id) }
 
             var updatedEngine = engine
@@ -683,7 +776,8 @@ final class AppModel: ObservableObject {
 
             let reconciled = AssetReconciler.reconcile(
                 PersistedState(marks: updatedMarks.ids, session: session),
-                order: refreshedOrder
+                order: refreshedOrder,
+                libraryAccessIsLimited: authorization.isLimited
             )
             let state = reconciled.state
 
@@ -699,8 +793,13 @@ final class AppModel: ObservableObject {
             }
 
             storedState = state
-            if let session = state.session, session.isResumable {
-                let restored = SessionEngine.restored(from: session, order: refreshedOrder, marks: state.marks)
+            if let session = state.session, shouldResume(session) {
+                let restored = SessionEngine.restored(
+                    from: session,
+                    order: refreshedOrder,
+                    marks: state.marks,
+                    libraryAccessIsLimited: authorization.isLimited
+                )
                 self.engine = restored
                 marks = restored.queue
                 resumableSession = session

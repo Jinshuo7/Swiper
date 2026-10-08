@@ -242,4 +242,99 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertEqual(Set(visited), Set(["a", "b", "c"]))
         XCTAssertFalse(visited.contains("f"))
     }
+
+    func testPersistedKeepsPoolMembersHiddenFromTheCurrentOrder() {
+        // A Limited-access snapshot can hide pool members; they must survive a
+        // save so widening access restores the same fixed pool.
+        let visible = LibraryOrder(TestLibrary.sequential())
+        var engine = SessionEngine(
+            order: visible,
+            direction: .older,
+            poolIDs: Set(["a", "c", "hidden"])
+        )
+        engine.start()
+
+        XCTAssertEqual(
+            engine.persisted().poolIDs,
+            ["a", "c", "hidden"],
+            "a hidden pool member is kept after the visible ones"
+        )
+    }
+
+    func testTumblerDoesNotConsumeHiddenPlanEntries() {
+        let visible = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        let plan = TumblerPlan(assetIDs: ["a", "hidden"], seed: 5)
+        var engine = SessionEngine(order: visible, mode: .tumbler, tumbler: plan)
+        engine.start()
+
+        XCTAssertEqual(engine.current?.id, "a", "only the visible member is served")
+        XCTAssertEqual(
+            engine.persisted().tumbler?.remaining,
+            ["hidden"],
+            "the hidden entry stays pending instead of becoming handled"
+        )
+        XCTAssertFalse(
+            engine.persisted().tumbler?.handled.contains("hidden") ?? true,
+            "the hidden entry was never consumed"
+        )
+    }
+
+    func testLimitedEngineDoesNotFinishWithHiddenUndecidedWork() {
+        let visible = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        var engine = SessionEngine(
+            order: visible,
+            direction: .older,
+            poolIDs: Set(["a", "hidden"]),
+            libraryAccessIsLimited: true
+        )
+        engine.start()
+        engine.apply(.keep)
+
+        XCTAssertNil(engine.current)
+        XCTAssertFalse(
+            engine.isFinished,
+            "a hidden undecided member keeps the in-memory session active"
+        )
+        XCTAssertEqual(engine.persisted().isFinished, false)
+    }
+
+    func testLimitedAccessDoesNotConsumeAnUndoEntryForAHiddenAsset() {
+        // The user marked "hidden", then access narrowed so only "a" is
+        // visible. Undo must not quietly drop that mark while staying on "a".
+        let undone = UndoEntry(assetID: "hidden", effect: .queuedDeletion)
+        let visible = LibraryOrder([TestLibrary.descriptor(id: "a", dayOffset: 0)])
+        var engine = SessionEngine(
+            order: visible,
+            direction: .older,
+            cursorID: "a",
+            queue: DeletionQueue(orderedIDs: ["hidden"]),
+            undoStack: UndoStack(entries: [undone]),
+            decidedIDs: ["hidden"],
+            libraryAccessIsLimited: true
+        )
+
+        XCTAssertEqual(engine.undo(), [.noOp], "a hidden entry is not reversed")
+        XCTAssertEqual(engine.queue.ids, ["hidden"], "the hidden mark survives")
+        XCTAssertEqual(engine.undoStack.last, undone, "the entry is kept for later")
+        XCTAssertEqual(engine.current?.id, "a", "Undo does not move the cursor to a photo it cannot show")
+        XCTAssertEqual(engine.persisted().undoEntries, [undone])
+
+        // Widening access makes the same entry reversible again.
+        var widened = SessionEngine(
+            order: LibraryOrder([
+                TestLibrary.descriptor(id: "a", dayOffset: 0),
+                TestLibrary.descriptor(id: "hidden", dayOffset: 1),
+            ]),
+            direction: .older,
+            queue: DeletionQueue(orderedIDs: ["hidden"]),
+            undoStack: UndoStack(entries: [undone]),
+            decidedIDs: ["hidden"]
+        )
+        XCTAssertEqual(
+            widened.undo(),
+            [.unqueuedDeletion(id: "hidden"), .undoApplied(assetID: "hidden")]
+        )
+        XCTAssertEqual(widened.current?.id, "hidden", "Undo returns to the photo")
+        XCTAssertTrue(widened.queue.isEmpty, "the mark is reversed once it is visible")
+    }
 }
