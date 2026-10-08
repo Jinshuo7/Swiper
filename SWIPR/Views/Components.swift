@@ -139,6 +139,10 @@ struct CircleControl: View {
 /// One labelled action of the bottom dock: the symbol and the word carry the
 /// action, and the only colour is the faint desaturated edge glow shared with
 /// the side layout's controls.
+///
+/// The pill takes the width the tray gives it — the tray is fixed, so the dock
+/// never resizes with its content — and the label stops growing rather than
+/// truncating.
 struct DecisionPill: View {
     /// The dock is a fixed-geometry control (docs/SPEC.md §5), so its own label
     /// grows a little with Dynamic Type and then stops: a wider pill is not an
@@ -162,14 +166,11 @@ struct DecisionPill: View {
                 Text(title)
                     .font(.system(size: labelSize, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.55)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
-            .frame(
-                width: ControlClusterLayout.pillWidth,
-                height: ControlClusterLayout.controlSize
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 DockControlBackground(
                     shape: RoundedRectangle(

@@ -140,9 +140,18 @@ public enum ControlClusterLayout {
     /// A side layout's controls stand apart: this gap between two of them is the
     /// functional non-action gap, part of the dock's handle and nothing more.
     public static let controlSpacing: CGFloat = 14
-    /// A bottom pill's width. It is fixed so the dock never resizes with its
-    /// label: the label scales inside the pill instead (docs/SPEC.md §5).
+    /// A bottom pill's width on a standard phone. A narrower screen fits the
+    /// whole dock by narrowing the pills, never by moving the pair:
+    /// ``fittedPillWidth(in:)`` is the width that actually ships.
     public static let pillWidth: CGFloat = 104
+    /// The narrowest a pill ever gets. Every iOS 17 layout is at least 320 pt
+    /// wide, where the pills still come out at 85 pt — this floor only stops a
+    /// foldable-sized width from producing an unreadable sliver.
+    public static let minimumPillWidth: CGFloat = 76
+    /// The least clear space the bottom dock keeps against each screen edge. It is
+    /// smaller than ``edgeMargin`` because the pair is centred rather than inset,
+    /// and it is only what decides when the pills have to give up width.
+    public static let bottomEdgeMargin: CGFloat = 8
     /// The gap between the two labelled pills, inside the bottom tray.
     public static let pillSpacing: CGFloat = 10
     /// How much tray surrounds the bottom pair.
@@ -162,20 +171,36 @@ public enum ControlClusterLayout {
     public static let landingDuration: Double = 0.32
     public static let reduceMotionDuration: Double = 0.16
 
-    /// The bottom tray: the labelled Delete/Keep pair and the padding around it.
-    public static var traySize: CGSize {
+    /// How wide one bottom pill is in a safe area of `size`.
+    ///
+    /// The design width is ``pillWidth``, and the pills only give it up when the
+    /// *whole* dock — the tray's other half plus the separate Undo beyond it —
+    /// would otherwise run off the screen. The pair stays centred whatever
+    /// happens, so Delete and Keep keep the anchor (docs/SPEC.md §5.1, §9.2).
+    public static func fittedPillWidth(in size: CGSize) -> CGFloat {
+        let outsideTheTray = undoGap + undoControlSize
+        let availableTrayHalf = size.width / 2 - bottomEdgeMargin - outsideTheTray
+        let fitted = (availableTrayHalf * 2 - pillSpacing - trayInset * 2) / 2
+        return min(pillWidth, max(minimumPillWidth, fitted))
+    }
+
+    /// The bottom tray in a safe area of `size`: the labelled Delete/Keep pair and
+    /// the padding around it.
+    public static func traySize(in size: CGSize) -> CGSize {
         CGSize(
-            width: pillWidth * 2 + pillSpacing + trayInset * 2,
+            width: fittedPillWidth(in: size) * 2 + pillSpacing + trayInset * 2,
             height: controlSize + trayInset * 2
         )
     }
 
-    /// The whole dock's size at a position: a labelled pair plus its separate
-    /// Undo control at the bottom, three separate icon controls at a side.
-    public static func clusterSize(for position: ControlPosition) -> CGSize {
-        position.isVertical
+    /// The whole dock's size at a position in a safe area of `size`: a labelled
+    /// pair plus its separate Undo control at the bottom, three separate icon
+    /// controls at a side.
+    public static func clusterSize(for position: ControlPosition, in size: CGSize) -> CGSize {
+        let tray = traySize(in: size)
+        return position.isVertical
             ? CGSize(width: controlSize, height: controlSize * 3 + controlSpacing * 2)
-            : CGSize(width: undoControlSize + undoGap + traySize.width, height: traySize.height)
+            : CGSize(width: undoControlSize + undoGap + tray.width, height: tray.height)
     }
 
     /// The anchor the dock's labelled Delete/Keep pair occupies in a safe area of
@@ -187,7 +212,7 @@ public enum ControlClusterLayout {
     /// Keep: `slotRect(for:in:undoSide:)` is what moves, by the one control and
     /// gap Undo adds above or beside the pair (docs/SPEC.md §5.1 and §5.6).
     public static func centre(for position: ControlPosition, in size: CGSize) -> CGPoint {
-        let cluster = clusterSize(for: position)
+        let cluster = clusterSize(for: position, in: size)
         switch position {
         case .bottom:
             return CGPoint(x: size.width / 2, y: size.height - edgeMargin - cluster.height / 2)
@@ -231,7 +256,7 @@ public enum ControlClusterLayout {
         in size: CGSize,
         undoSide: UndoSide = .leading
     ) -> CGRect {
-        let cluster = clusterSize(for: position)
+        let cluster = clusterSize(for: position, in: size)
         let anchor = centre(for: position, in: size)
         let origin: CGPoint
         if position.isVertical {
@@ -245,7 +270,7 @@ public enum ControlClusterLayout {
                 y: anchor.y - pairTop - pairSpan / 2
             )
         } else {
-            let pairHalf = traySize.width / 2
+            let pairHalf = traySize(in: size).width / 2
             let leading = undoSide == .leading
             origin = CGPoint(
                 x: leading ? anchor.x - pairHalf - undoGap - undoControlSize : anchor.x - pairHalf,

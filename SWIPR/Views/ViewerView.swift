@@ -383,7 +383,7 @@ struct ViewerView: View {
                 if dockMove.isMoving {
                     dockToken(in: size, centre: CGPoint(x: rect.midX, y: rect.midY))
                 } else {
-                    dockControls(position: position, undoSide: undoSide)
+                    dockControls(position: position, undoSide: undoSide, in: size)
                 }
             }
             .frame(width: rect.width, height: rect.height)
@@ -426,7 +426,7 @@ struct ViewerView: View {
     /// actions" means the same thing whichever layout is on screen, and Delete
     /// and Keep never move relative to each other.
     @ViewBuilder
-    private func dockControls(position: ControlPosition, undoSide: UndoSide) -> some View {
+    private func dockControls(position: ControlPosition, undoSide: UndoSide, in size: CGSize) -> some View {
         if position.isVertical {
             VStack(spacing: ControlClusterLayout.controlSpacing) {
                 ForEach(ControlClusterLayout.order(for: undoSide)) { control in
@@ -436,7 +436,7 @@ struct ViewerView: View {
         } else {
             HStack(spacing: ControlClusterLayout.undoGap) {
                 if undoLeads(undoSide) { undoControl }
-                bottomTray
+                bottomTray(in: size)
                 if !undoLeads(undoSide) { undoControl }
             }
         }
@@ -451,10 +451,12 @@ struct ViewerView: View {
     }
 
     /// The bottom tray: the two labelled pills together, so the pair reads as
-    /// one centred unit with its own quiet edge, drawn from the one frame the
-    /// geometry gives the pair.
-    private var bottomTray: some View {
-        HStack(spacing: ControlClusterLayout.pillSpacing) {
+    /// one centred unit with its own quiet edge, drawn at the one frame the
+    /// geometry gives the pair. On a narrow screen the pills narrow with it — the
+    /// pair keeps its anchor and the whole dock stays on screen.
+    private func bottomTray(in size: CGSize) -> some View {
+        let tray = ControlClusterLayout.traySize(in: size)
+        return HStack(spacing: ControlClusterLayout.pillSpacing) {
             DecisionPill(
                 systemImage: "trash",
                 title: "Delete",
@@ -473,14 +475,11 @@ struct ViewerView: View {
             }
         }
         .padding(ControlClusterLayout.trayInset)
-        .frame(
-            width: ControlClusterLayout.traySize.width,
-            height: ControlClusterLayout.traySize.height
-        )
+        .frame(width: tray.width, height: tray.height)
         .background(
             DockControlBackground(
                 shape: RoundedRectangle(
-                    cornerRadius: ControlClusterLayout.traySize.height / 2,
+                    cornerRadius: tray.height / 2,
                     style: .continuous
                 ),
                 edgeTint: nil

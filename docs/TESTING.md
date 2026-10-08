@@ -492,6 +492,13 @@ Sharp edges for the next change here:
   begins in either is still not a decision.
 - **`Undo` at the bottom is 44 pt**, the smallest target the accessibility
   contract allows; at a side it is a full 56 pt control like the other two.
+- **The pills narrow on a narrow screen, and nothing else moves.**
+  `fittedPillWidth(in:)` gives the pills their 104 pt design width until the
+  whole dock — the tray's other half plus the separate Undo — would run off a
+  320 pt layout, which is the narrowest iOS 17 one (and what Display Zoom
+  produces on a small phone). There they shrink to 85 pt, with a 76 pt floor, so
+  the pair keeps its anchor and Undo keeps its full target. This is the one place
+  the screen decides the dock's geometry.
 - **The pill labels stop growing on purpose.** The dock's geometry is pinned, so
   `DecisionPill` caps its scaled font at 20 pt and never truncates an action —
   the AX5 screenshots show both labels whole. The full action name is always the
@@ -505,11 +512,14 @@ When the column is on screen, `assertClusterIsAColumn` also asserts the
 non-action gap and the safe-area inset. `ControlClusterLayoutTests` adds
 `testTheTwoLayoutsHaveTheirOwnFixedSize`,
 `testThePairKeepsTheAnchorWhicheverEndUndoTakes`,
+`testANarrowLayoutFitsTheWholeDockWithoutMovingThePair` (320 pt, both Undo ends),
 `testTheBottomPairStaysCentredWhenUndoChangesEnd`,
 `testTheSideLayoutSeparatesItsControlsWithANonActionGap` and
 `testEveryDestinationDrawsTheWholeDockAtItsOwnSize`; `DockGeometryTests` now
 checks the real `slotRect` at both Undo ends. The v1-04 dock screenshots were
-re-captured in light, dark and at the largest text size.
+re-captured in light, dark and at the largest text size. The narrow-layout fit is
+framework-tested only: the suite's simulator is a 375 pt `SWIPR iPhone 11 Pro`,
+and no launch argument changes a device's point width.
 
 ## Screenshots
 
