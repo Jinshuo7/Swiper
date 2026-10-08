@@ -56,6 +56,105 @@ the full-simulator run and result-bundle/screenshot inspection documented below,
 the physical-iPhone run (unlocked, developer mode, personal-team signing), and
 the manual real-Live-Photo check.
 
+### The launch/terminate handoff (#81)
+
+The suite drives one installed app through ~50 test methods, so almost every
+test crosses a launch or a terminate handoff, and every reported #81 failure is
+one of those handoffs going wrong: `Failed to terminate
+com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
+raised from `XCUIApplication.launch()`, a Home that never appeared after a
+launch, a viewer that never appeared after a relaunch, and a Home entry asserted
+before the decision behind it had been saved.
+
+Every launch, terminate and starting-point handoff now goes through
+`SWIPRUITests/AppLaunchHandoff.swift`, which keeps three rules:
+
+- the app is stopped through the one `XCUIApplication` that launched it.
+  `terminate()` resolves the process through that instance's launch record, and a
+  never-launched proxy is what reports the `:0` above;
+- `stopAppUnderTest()` runs in `tearDown` and blocks until the system reports the
+  process gone, so the next `launch()` begins from `notRunning` instead of having
+  to terminate a dying app itself;
+- `launch(_:firstScreen:)` then waits until the app is in the foreground with the
+  screen that launch promises on screen, and `beginSession(_:in:)` waits for the
+  grid to hand over to the viewer **or** to the `Start a new session?`
+  confirmation a saved session raises, instead of guessing after one second and
+  leaving the confirmation covering a viewer that never arrives.
+
+This is synchronisation, not retry: no test is removed, skipped, shortened,
+loosened or marked expected-failure. `testEveryLaunchRunsTheArgumentsItWasGiven`
+launches the same way three times in a row and makes the app prove it read the
+arguments of *that* launch, so the handoff cannot silently regress.
+
+**Every lookup names the collection the element lives in** — `app.buttons[…]`,
+`app.staticTexts[…]`, `app.images[…]`, `app.otherElements[…]`, `app.switches[…]`
+— instead of `app.descendants(matching: .any)[…]`. The generic form asks the
+snapshot service for the whole tree and then filters it, and it was the most
+expensive query in the suite; the typed form hands the element kind over with the
+request. A SwiftUI view takes the element its content makes it, which is not
+always obvious: `viewer.photo` and `choosePhoto.cell.<id>` are `Image`s because
+their content is a thumbnail, `viewer.cluster`, `viewer.mediaBadge` and
+`replaceSession.confirmation` are `Other` because they are combined containers,
+`settings.showButtons` is a `Switch`, and `persistence.readOnly` is the warning
+`Image` inside the banner. Dump `app.debugDescription` and read the tree rather
+than guessing; a wrong guess fails the test loudly rather than silently.
+
+Two families are deliberately the exception, because their element kind follows
+their content: the viewer canvas (`viewer.photo`) and the grid cells
+(`choosePhoto.cell.<id>`) are an `Image` once the fixture has rendered and a
+`ProgressView` or an empty container before that, so a typed query would miss
+them in precisely the state `waitForExistence` is there to wait out. They — and
+only they — are looked up by identifier. The suite has no generic `element(_:_:)`
+helper any more, and `assertReachable`/`assertFullyOnScreen` take the identifier
+plus the collection, so every call site still shows what it expects.
+
+**What the fix does not remove.** The CI runner still loses the automation
+session with the app about one run in three, and the two signatures seen so far
+are both XCTest's own: `Failed to terminate com.zhangjinshuo.swipr:<pid>:
+Failed to terminate com.zhangjinshuo.swipr:0` after a 68 s terminate wait, and
+`Failed to get matching snapshots: Timed out while evaluating UI query` after
+three 30 s accessibility-snapshot retries. Neither reproduced locally in four
+full suites and ~800 app launches/terminates on `SWIPR iPhone 11 Pro`, while the
+CI runner hits it about once every 75 handoffs, which is the rate #81 recorded
+before this work. It is an XCTest/CoreSimulator stall, so it is parked with
+`needs-owner` and its evidence rather than retried or skipped. The remaining cost
+is the 66 app launches and terminates a run needs: every test sets its own launch
+arguments, so a test cannot reuse the previous test's app without an app-side
+reset seam inside the risky paths (and it would leak tutorial, store and session
+state between tests), which is why the launch count is left alone.
+
+#### Local reproduction loop for the flake
+
+Two flakes in about six full CI runs is too rare to chase with single runs, so
+run the tests that cross a handoff several times in a row. The loop the #81 fix
+was developed and re-run against:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild test-without-building -project SWIPR.xcodeproj -scheme SWIPR \
+  -destination 'platform=iOS Simulator,id=71EAC83D-54D4-451A-AB32-74A8878C7869' \
+  -derivedDataPath ./.derivedData-simulator \
+  -only-testing:SWIPRUITests/SWIPRUITests/testCaptureViewerKindScreensInEveryAppearance \
+  -only-testing:SWIPRUITests/SWIPRUITests/testKillingTheAppMidSessionRestoresPositionMarksAndUndo \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayPreferencesSurviveRelaunch \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayEntryScreenInEveryState \
+  -only-testing:SWIPRUITests/PlaySessionUITests/testPlayTumblerVisitsEveryPhotoExactlyOnce \
+  -test-iterations 6
+```
+
+`-test-iterations` only repeats the selection inside one local run; it is never
+added to CI and it never hides a failure (`-retry-tests-on-failure` is not used
+anywhere). The full-suite loop is the CI job's own command repeated:
+
+```sh
+for i in 1 2 3; do
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
+    -destination 'platform=iOS Simulator,id=71EAC83D-54D4-451A-AB32-74A8878C7869' \
+    -derivedDataPath ./.derivedData-simulator
+done
+```
+
 ### Focused simulator prototype check
 
 ```sh
