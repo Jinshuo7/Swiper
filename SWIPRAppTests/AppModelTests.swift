@@ -326,6 +326,58 @@ final class AppModelTests: XCTestCase {
             model.limitedMarksNotice,
             "a save error is not relabelled as the hidden-marks notice"
         )
+        XCTAssertNotNil(model.limitedMarksNotice, "the hidden-marks notice is still remembered")
+
+        // A later library refresh must not bury that error under the notice.
+        let saveError = model.persistenceNotice
+        await model.reloadLibrary()
+        await model.settle()
+        XCTAssertEqual(model.persistenceNotice, saveError, "the save error keeps its own treatment")
+    }
+
+    func testASessionWhoseEntirePoolIsHiddenStaysResumable() async {
+        // Only the video enters the session, so its captured pool can be hidden
+        // completely while ordinary photos stay visible.
+        let library = FakePhotoLibrary.mixedMedia()
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(library: library, store: store)
+
+        model.showFilters(.videos)
+        model.startNewest()
+        await model.settle()
+        XCTAssertEqual(model.currentAsset?.id, "mixed-video")
+        XCTAssertEqual(store.state?.session?.poolIDs, ["mixed-video"])
+
+        // Limited access now shows every photo and hides that one video, so the
+        // session has no visible cursor, no decisions and no Tumbler plan.
+        let allIDs = Set(FakePhotoLibrary.mixedMediaDescriptors().map(\.id))
+        library.authorization = .limited
+        library.limitedSelectionIDs = allIDs.subtracting(["mixed-video"])
+        await model.refreshAuthorization()
+        await model.settle()
+
+        XCTAssertTrue(model.hasPhotos, "the visible photos are still a library")
+        XCTAssertNil(model.engine?.current, "a hidden pool has nothing to show")
+        XCTAssertTrue(model.hasUnfinishedSession, "the hidden session is still unfinished")
+        XCTAssertEqual(model.resumableSession?.poolIDs, ["mixed-video"], "its pool is kept in memory")
+        XCTAssertEqual(store.state?.session?.poolIDs, ["mixed-video"], "and stays saved")
+        XCTAssertEqual(store.state?.session?.isFinished, false)
+
+        // A new start must ask before replacing it, and Keep current must leave
+        // the hidden session exactly as it is.
+        model.startNewest()
+        await model.settle()
+        XCTAssertNotNil(model.pendingReplacement, "a new start asks before replacing the hidden session")
+        model.keepCurrentSession()
+        XCTAssertEqual(store.state?.session?.poolIDs, ["mixed-video"], "nothing was replaced")
+
+        // Widening access resumes the same session on the same photo.
+        library.authorization = .authorized
+        library.limitedSelectionIDs = nil
+        await model.refreshAuthorization()
+        await model.settle()
+        XCTAssertEqual(model.currentAsset?.id, "mixed-video")
+        XCTAssertEqual(store.state?.session?.poolIDs, ["mixed-video"])
     }
 
     func testFailedSavePausesSortingAndKeepsTheDecisionRecoverable() async {

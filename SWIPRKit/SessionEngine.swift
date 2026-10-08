@@ -303,7 +303,11 @@ public struct SessionEngine: Equatable, Sendable {
     /// Whether this Limited snapshot may still hide undecided work: a captured
     /// pool member outside it, or — for a legacy session with no captured pool —
     /// any unseen library member at all.
-    private var hasHiddenUndecidedWork: Bool {
+    ///
+    /// The host keeps such a session in memory even when it has no visible
+    /// cursor, no decisions and no Tumbler plan, so a new start cannot replace
+    /// its pool and position without the replacement confirmation.
+    public var hasHiddenUndecidedWork: Bool {
         guard libraryAccessIsLimited else { return false }
         guard let poolIDs else { return true }
         let visible = order.idSet

@@ -332,7 +332,7 @@ final class AppModel: ObservableObject {
         )
         storedState = reconciled.state
 
-        if let session = storedState.session, session.isResumable {
+        if let session = storedState.session, shouldResume(session) {
             let restored = SessionEngine.restored(
                 from: session,
                 order: order,
@@ -364,7 +364,7 @@ final class AppModel: ObservableObject {
             // The snapshot is Limited, so these marks are preserved but not
             // shown. Say so plainly and point at the system picker, but never
             // overwrite an unrelated persistence error with this notice.
-            if persistenceNotice == nil || limitedMarksNotice != nil {
+            if persistenceNotice == nil || persistenceNotice == limitedMarksNotice {
                 let count = hiddenMarkCount
                 let message = count == 1
                     ? "One marked photo is hidden while Photos access is Limited. Select more photos to see it."
@@ -385,6 +385,25 @@ final class AppModel: ObservableObject {
             reviewOrigin = .viewer
             route = .review
         }
+    }
+
+    /// Whether a stored session still belongs in memory for the current
+    /// snapshot.
+    ///
+    /// A session whose captured pool is entirely hidden by Limited Photos access
+    /// has no visible cursor, no decisions and no Tumbler plan, so
+    /// `PersistedSession.isResumable` alone would drop it. Dropping it would
+    /// also drop the replacement confirmation, and a new start would then
+    /// overwrite the hidden pool and position without asking.
+    private func shouldResume(_ session: PersistedSession) -> Bool {
+        guard !session.isResumable else { return true }
+        guard authorization.isLimited else { return false }
+        return SessionEngine.restored(
+            from: session,
+            order: order,
+            marks: storedState.marks,
+            libraryAccessIsLimited: true
+        ).hasHiddenUndecidedWork
     }
 
     // MARK: - Entry points
@@ -774,7 +793,7 @@ final class AppModel: ObservableObject {
             }
 
             storedState = state
-            if let session = state.session, session.isResumable {
+            if let session = state.session, shouldResume(session) {
                 let restored = SessionEngine.restored(
                     from: session,
                     order: refreshedOrder,

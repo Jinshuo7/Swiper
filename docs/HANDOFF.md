@@ -23,30 +23,36 @@
 
 ## Current ticket
 
-- **None in progress.** **#70** (V1-06a: keep marked photos through Limited
-  Photos access) landed in **PR #74** under the delegated approval rule: an
-  unseen identifier under Limited access is hidden, not gone, so nothing is
-  dropped, credited as an external removal or reported as a deletion, and the
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — code
+  complete in **PR #74**, which is open and labelled `owner-blocked` for the
+  owner. Under Limited access an unseen identifier is hidden, not gone: nothing
+  is dropped, credited as an external removal or reported as a deletion, and the
   captured pool, decisions, Undo entries and Tumbler plan survive until access
-  widens. A neutral notice offers the system picker, and a revoked snapshot no
-  longer empties the stored list. `SWIPRAppTests` covers
-  mark → Limited → relaunch → widen end to end.
+  widens (a neutral notice offers the system picker, a revoked snapshot no longer
+  empties the stored list, an Undo whose photo is hidden is refused rather than
+  applied half-way, and a session whose whole pool is hidden keeps its
+  replacement confirmation). Review rounds stopped after the sixth round's P1
+  fix because the owner's workflow caps a risky PR at five rounds; a
+  `needs-owner` issue asks for one validation round on head `396e14d`+.
 - The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
   split into subtickets #76–#79; **#73** (the migrated Tumbler plan's vanished
   cursor) is still parked.
 
 ## Open PRs
 
+- **#74 — fix: keep marked photos through Limited Photos access (#70)**
+  (`driver/70-limited-marks`). Risky (`SWIPRKit/AssetReconciler.swift`,
+  `SWIPRKit/SessionEngine.swift`, `SWIPR/ViewModels/AppModel.swift`,
+  `SWIPR/Views/RootView.swift`, `SWIPR/PhotoLibrary/FakePhotoLibrary.swift`),
+  `needs-strong-review` + `owner-blocked`: every check is green and the code is
+  complete, but the sixth Codex round's P1 fix has no review of its own head, so
+  it waits for the owner's go-ahead rather than merging unvalidated.
 - **#37 — Add deterministic ticket controller** (author Jinshuo7):
   **prohibited — do not use, merge, or base work on it** (owner rule 8:
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
 
-- **#74 — fix: keep marked photos through Limited Photos access (#70)** — the
-  Limited-access reconciliation mode, the hidden-marks notice and its system
-  picker action, the test seams in `FakePhotoLibrary`, and the app/kit tests;
-  closes **#70**.
 - **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
   launch/terminate handoff helpers, the scoped UI queries and the rules in
   `docs/TESTING.md`; closes **#81**.
@@ -79,16 +85,18 @@
   merged as `67967ad`).
 - **#69 — V1-08a: Re-enable the skipped AX5 large-text UI test** — done (PR #72,
   merged as `8efd39e`). The AX5 case runs on every PR.
-- **#70 — V1-06a: Keep marked photos through Limited Photos access** — done
-  (PR #74).
+- **#70 — V1-06a: Keep marked photos through Limited Photos access** — code
+  complete in PR #74, which is open and `owner-blocked` (see above).
 - **#73 — V1-03e: Keep the Tumbler order when a migrated plan's cursor has
   vanished** — not started.
 
 ## What is next
 
-1. Implement **#73** (the migrated Tumbler plan's vanished cursor) and the
+1. Get the owner's go-ahead for one validation review round on **PR #74**, then
+   merge it and close **#70**.
+2. Implement **#73** (the migrated Tumbler plan's vanished cursor) and the
    **V1-04** subtickets #76–#79.
-2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the UI suite's launch handoff (#81)
 

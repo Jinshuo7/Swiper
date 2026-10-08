@@ -24,8 +24,8 @@
 > every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). The
 > damaged-save-file fix that was open for review is merged as PR #66, and PR #72
 > merged too (merge commits `c2af5f5` and `8efd39e`). **PR #74** (marked photos
-> through Limited Photos access, #70) merged under the delegated approval rule,
-> so no risky PR is left open.
+> through Limited Photos access, #70) is code complete with green checks and is
+> open as `owner-blocked`, waiting for one validation review round.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -170,7 +170,7 @@
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all fixed | Yes (#72, merge `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 5 | 1 | 5 | Yes — rounds 1–5 found 8 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs, stale seeded cursor); the round-5 cursor-order fix is small and rare, so the owner accepted a follow-up (#73) instead of blocking | Yes (#66, merge `c2af5f5`) |
 | [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
-| [#70 — V1-06a: Keep marked photos through Limited Photos access](https://github.com/Jinshuo7/Swiper/issues/70) | 5 | 1 | 4 | Yes — rounds 1–3 as logged; round 4: a hidden Tumbler cursor stayed in `handled` (returned to the plan now), `reloadLibrary` could reconcile a new Limited subset with stale `.authorized`, and the hidden-mark notice could overwrite an unrelated save error. Round 5: merged `origin/main`, added the mark → Limited → relaunch → widen end-to-end app test, and stopped a revoked snapshot from emptying the stored list. Round 5 also found one P1 — Undo could consume a hidden entry and drop its mark without returning to the photo — now refused while the asset is invisible. All fixed | Yes (PR #74) |
+| [#70 — V1-06a: Keep marked photos through Limited Photos access](https://github.com/Jinshuo7/Swiper/issues/70) | 6 | 1 | 5 | Yes — rounds 1–3 as logged; round 4: a hidden Tumbler cursor stayed in `handled` (returned to the plan now), `reloadLibrary` could reconcile a new Limited subset with stale `.authorized`, and the hidden-mark notice could overwrite an unrelated save error. Round 5: merged `origin/main`, added the mark → Limited → relaunch → widen end-to-end app test, stopped a revoked snapshot from emptying the stored list, and refused an Undo whose photo is hidden (the round-5 P1). Round 6 (the supervisor's authorised extra round) found two more: a sequential session whose whole pool was hidden lost its resumability and could be replaced without the confirmation, and a later save error could still be buried under the hidden-marks notice; both fixed with mutation-checked tests. All reported issues fixed | No — PR #74 is open and `owner-blocked`: every check is green, but the round-6 fix has no review of its own head and the risky-PR workflow caps a PR at five rounds |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >
