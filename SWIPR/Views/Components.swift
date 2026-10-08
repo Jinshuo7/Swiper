@@ -140,9 +140,9 @@ struct CircleControl: View {
 /// action, and the only colour is the faint desaturated edge glow shared with
 /// the side layout's controls.
 ///
-/// The pill takes the width the tray gives it — the tray is fixed, so the dock
-/// never resizes with its content — and the label stops growing rather than
-/// truncating.
+/// The pill takes the width the tray gives it — the tray is fixed for its screen
+/// width, so the dock never resizes with its content or its state — and the label
+/// stops growing rather than truncating.
 struct DecisionPill: View {
     /// The dock is a fixed-geometry control (docs/SPEC.md §5), so its own label
     /// grows a little with Dynamic Type and then stops: a wider pill is not an

@@ -476,7 +476,20 @@ the chrome of both is neutral:
   separate Undo control drawn smaller beside it;
 - at a **side**, three separate icon controls a non-action gap apart.
 
-The labelled **Delete/Keep pair is the dock's anchor in both layouts**: `ControlClusterLayout.centre` is the pair's centre at every position, and `slotRect(for:in:undoSide:)` grows off that anchor by the one control and gap the separate Undo adds — to the side it took at the bottom, above it at a side. Changing which end Undo takes therefore moves only the Undo end of the dock, and never shifts Delete and Keep under the thumb: "Before actions" (Undo left of the bottom pair, above a side pair) and "After actions" mirror each other with one mapping, asserted in both layouts before and after flipping the setting. The dock's size is fixed per layout (286 × 68 at the bottom, 56 × 196 at a side) so the media never moves for chrome (ADR-0006) and the dock never resizes.
+The labelled **Delete/Keep pair is the dock's anchor in both layouts**:
+`ControlClusterLayout.centre` is the pair's centre at every position, and
+`slotRect(for:in:undoSide:)` grows off that anchor by the one control and gap the
+separate Undo adds — to the side it took at the bottom, above it at a side.
+Changing which end Undo takes therefore moves only the Undo end of the dock, and
+never shifts Delete and Keep under the thumb: "Before actions" (Undo left of the
+bottom pair, above a side pair) and "After actions" mirror each other with one
+mapping, asserted in both layouts before and after flipping the setting.
+
+The dock's size is fixed **for a given screen width**, never by its content or
+its state: 286 × 68 at the bottom and 56 × 196 at a side on a standard phone,
+where the media never moves for chrome (ADR-0006). The one thing a screen width
+changes is the bottom pills' width, one bullet below — so on a 320 pt layout that
+same bottom dock is 248 × 68, still anchored on its pair.
 
 Sharp edges for the next change here:
 
@@ -498,7 +511,8 @@ Sharp edges for the next change here:
   320 pt layout, which is the narrowest iOS 17 one (and what Display Zoom
   produces on a small phone). There they shrink to 85 pt, with a 76 pt floor, so
   the pair keeps its anchor and Undo keeps its full target. This is the one place
-  the screen decides the dock's geometry.
+  the screen decides the dock's geometry: the dock is fixed for a given width, and
+  the media never moves for chrome (ADR-0006).
 - **The pill labels stop growing on purpose.** The dock's geometry is pinned, so
   `DecisionPill` caps its scaled font at 20 pt and never truncates an action —
   the AX5 screenshots show both labels whole. The full action name is always the
