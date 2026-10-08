@@ -110,8 +110,8 @@
 > touching no photo. Kit maths: 188 tests, 0 failures. `SWIPRAppTests`: 42
 > tests, 0 failures. The AX5 `-skip-testing` line is untouched.
 >
-> **#81 update (2026-10-07):** the UI suite's launch/terminate handoff is now
-> deterministic, and the remaining flake is parked. Every #81 report is a launch
+> **#81 update (2026-10-07):** the UI suite's launch/terminate handoff is
+> deterministic and every UI query is scoped to the collection it looks in. Every #81 report is a launch
 > or terminate handoff going wrong: `Failed to terminate
 > com.zhangjinshuo.swipr:<pid>: Failed to terminate com.zhangjinshuo.swipr:0`
 > from `XCUIApplication.launch()`, a Home that never appeared after a launch, a
@@ -128,16 +128,26 @@
 > shortened, loosened or retried, and
 > `testEveryLaunchRunsTheArgumentsItWasGiven` pins the invariant.
 >
-> **Still open, parked as `needs-owner`.** The CI runner still loses its
-> automation session with the app about one run in three. Both signatures are
-> XCTest's own — the terminate wait above, and `Failed to get matching snapshots:
-> Timed out while evaluating UI query` after three 30 s snapshot retries — and
-> neither reproduces locally (four full suites and ~800 launches/terminates on
-> `SWIPR iPhone 11 Pro` are clean), while the CI runner hits it about once every
-> 75 handoffs. That is the rate #81 recorded *before* this work, so the harness
-> fix removes the deterministic defects and not the stall itself. Retrying or
-> skipping it is exactly what the ticket forbids, so it waits for the owner.
-> The reproduction loop and the rule are in `docs/TESTING.md`.
+> **Second reduction: every UI query names its collection.** The suite asked for
+> elements with `app.descendants(matching: .any)[identifier]`, which fetches the
+> whole accessibility tree and filters it, and that was the query the runner
+> timed out on (`Failed to get matching snapshots: Timed out while evaluating UI
+> query`). Every lookup is now `app.buttons[…]`, `app.staticTexts[…]`,
+> `app.images[…]`, `app.otherElements[…]` or `app.switches[…]`, with the mapping
+> read off `app.debugDescription` rather than guessed. Two families are the
+> deliberate exception — the viewer canvas and the grid cells, whose element kind
+> follows whether their thumbnail has rendered yet — and they are found by
+> identifier, which is the state a `waitForExistence` is waiting out.
+>
+> **Result.** After the second reduction: four consecutive CI runs green (336
+> tests each, 0 failures) and three consecutive local full suites green on
+> `SWIPR iPhone 11 Pro`. The two stalls recorded before it (a 68 s terminate wait;
+> three 30 s snapshot retries) did not recur. The one failure in between,
+> `testPlayEntryScreenInEveryState` waiting 30 s for a viewer, stopped when the
+> canvas and the cells went back to being found by identifier; whether that was
+> the runner stall or only the lookup is not proved, so both readings stay in
+> `needs-owner` #84. Nothing was retried, skipped or loosened to get there.
+> The reproduction loop and the rules are in `docs/TESTING.md`.
 
 ---
 
@@ -158,7 +168,7 @@
 | [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
-| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 1 | No — the harness defects are fixed, but the CI runner still loses its automation session about one run in three; parked as `needs-owner` | No (PR #83 open, `owner-blocked`) |
+| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >

@@ -23,24 +23,18 @@
 
 ## Current ticket
 
-- **#81 — V1-12a: Stabilise the flaky UI app-termination test** —
-  (`driver/81-flaky-ui`, PR #83, `owner-blocked`). The launch/terminate handoff
-  is fixed in the test harness (`SWIPRUITests/AppLaunchHandoff.swift`), but the
-  CI runner still loses its automation session with the app about one full run in
-  three, in XCTest's own terminate and snapshot timeouts. That is the rate the
-  issue recorded before the work and it does not reproduce locally, so it is
-  parked for the owner with the evidence rather than retried or skipped. See
-  `docs/TESTING.md` and the `needs-owner` issue filed for it.
-- The next milestone after this is **V1-04 (#26, the neutral direct-move
-  decision dock)**, split into subtickets #76–#79.
+- **None in progress.** **#81** (the flaky UI suite) landed in **PR #83**: the
+  launch/terminate handoff is deterministic and every UI query names the
+  collection it looks in. Four consecutive CI runs and three consecutive local
+  full suites are green. `docs/TESTING.md` has the rules, the reproduction loop
+  and the one deliberate exception (the viewer canvas and the grid cells are
+  found by identifier, because their element kind follows whether their
+  thumbnail has rendered yet).
+- The next milestone is **V1-04 (#26, the neutral direct-move decision dock)**,
+  split into subtickets #76–#79.
 
 ## Open PRs
 
-- **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)**
-  (`driver/81-flaky-ui`, head `c6d8e7c`). Test-only plus docs, so it is not a
-  risky path. Two consecutive CI runs were green (38m20s, 43m39s) and the third
-  hit the residual XCTest snapshot timeout, so it is labelled `owner-blocked` and
-  **not merged**. Decide whether to take it and how to handle the residual.
 - **#74 — fix: keep marked photos through Limited Photos access (#70)**
   (`driver/70-limited-marks`, head `ff118ee`). Risky, `needs-strong-review`,
   open, **waiting for the owner**. Do not add `strong-review-passed` without the
@@ -51,6 +45,9 @@
 
 ## Recently merged
 
+- **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
+  launch/terminate handoff helpers, the scoped UI queries and the rules in
+  `docs/TESTING.md`; closes **#81**.
 - **#82 — docs: record full autonomy until V1 and delegated risky-PR approval**
   (merge commit `1d73a1b`).
 - **#80 — feat: add pure direct-move dock geometry (#75)** (merge commit
@@ -85,12 +82,9 @@
 
 ## What is next
 
-1. Decide **#81**: PR #83 is green on the harness fix, but the CI runner still
-   stalls the automation session about one run in three; the `needs-owner` issue
-   has the evidence and the options.
-2. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
+1. Implement **#73** (the migrated Tumbler plan's vanished cursor), then the
    **V1-04** subtickets #76–#79.
-3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
+2. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
 ### Note: the UI suite's launch handoff (#81)
 
@@ -101,12 +95,19 @@ stopped through the one `XCUIApplication` that launched it, a stop blocks until
 the system reports the process gone, and a launch or a starting point returns
 only once the screen it promises is on screen.
 
-They do not remove the runner-level stall. The CI runner still loses its
-automation session with the app about one full run in three, as XCTest's own
-`Failed to terminate …:0` (a 68 s terminate wait) or `Failed to get matching
-snapshots: Timed out while evaluating UI query` (three 30 s snapshot retries).
-Those are the flakes #81 was opened for, and they did not reproduce in four full
-local suites and ~800 launches/terminates on `SWIPR iPhone 11 Pro`.
+Every lookup names the collection the element lives in, too:
+`app.buttons[…]`, `app.staticTexts[…]`, `app.images[…]`, `app.otherElements[…]`,
+`app.switches[…]` rather than `app.descendants(matching: .any)[…]`, which fetched
+the whole accessibility tree for every query. Two families are the deliberate
+exception — the viewer canvas (`viewer.photo`) and the grid cells
+(`choosePhoto.cell.<id>`), whose element kind follows whether their thumbnail has
+rendered yet — and they are found by identifier. Dump `app.debugDescription` to
+see what kind an identifier turns into before typing a new query.
+
+The stalls #81 was opened for (a 68 s terminate wait; three 30 s snapshot
+retries) did not recur after that: four consecutive CI runs and three consecutive
+local full suites are green. Whether the runner is now clean or simply quieter is
+not proved; `needs-owner` #84 keeps the evidence and the options.
 
 ### Note: the AX5 skip is gone (#69)
 
