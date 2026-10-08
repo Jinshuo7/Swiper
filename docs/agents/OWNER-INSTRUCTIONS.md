@@ -99,9 +99,10 @@ DeepSeek must add fake-library tests proving that nothing is deleted without the
 step and that saved progress survives. Codex does one extra review focused only on that risky
 part. List it under "Risky changes" in the next milestone report.
 
-Agents must never add the `strong-review-passed` label or remove the `needs-strong-review`
-label; only the owner does. The `strong-review` workflow labels any PR that touches a path in
-`.github/risky-paths.txt` and fails until the owner adds `strong-review-passed`.
+Agents never remove the `needs-strong-review` label. Under the delegated approval below, the
+agent may add `strong-review-passed` and merge only when every condition holds; otherwise only
+the owner does. The `strong-review` workflow labels any PR that touches a path in
+`.github/risky-paths.txt` and fails until `strong-review-passed` is present.
 
 ### Risky PR review rounds (Codex)
 
@@ -114,11 +115,27 @@ This is the standing workflow for any PR labeled `needs-strong-review`.
    owner.
 3. If Codex reports problems, fix them in the same PR, push without force, wait for green
    checks, and comment `@codex review` again.
-4. Stop after 3 review rounds, or as soon as Codex reports no problems. Then post the owner a
-   short summary: what changed, what Codex found, and what you fixed.
-5. Never add `strong-review-passed` and never merge a risky PR. The owner says "approve #N"
-   when ready.
-6. Never comment `@codex` with anything other than `review`. Only DeepSeek writes code.
+4. If Codex reports problems, fix them in the same PR, push without force, wait for green
+   checks, and comment `@codex review` again. Up to 5 rounds per PR.
+5. If a **P1** remains after 5 rounds, leave the PR open, add the `owner-blocked` label, and
+   move on. Never merge with an open P1.
+6. **Delegated approval.** The owner has delegated `strong-review-passed` to the agent. Add it
+   and merge (`--match-head-commit`, full SHA) only when ALL hold: checks green on the current
+   head; a Codex review of that exact head reports **no P1**; no test, workflow,
+   `risky-paths.txt` or gate was removed, skipped, weakened or loosened. P2 findings: fix quick
+   ones, otherwise open a follow-up ticket and merge.
+7. Never comment `@codex` with anything other than `review`. Only DeepSeek writes code.
+
+### Full autonomy until V1
+
+The owner has delegated approval for the rest of V1 (#26–#36). Work without asking. Stop only
+when V1 is code-complete and green on `main`, or when the only work left needs the owner: an
+Apple Developer account, App Store Connect, signing, the final icon, a native Chinese review,
+or a real-device test. Then open a GitHub issue titled "Owner: V1 ready" (or "Owner: action
+needed") that @mentions @Jinshuo7, in plain language. Never sit idle on one PR; if Codex does
+not respond, keep working and retry hourly. Flaky tests get a ticket and a root-cause fix;
+skipping is never allowed. Hard safety rules still apply (system-confirmed deletion only,
+never weaken tests/CI/gate, never force-push, never touch the owner's folder, #37 prohibited).
 
 Codex reviews must flag, as blocking: anything that can delete a photo without the explicit
 user confirmation step; anything that can add an unmarked photo to, or drop a marked photo
