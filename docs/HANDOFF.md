@@ -27,22 +27,12 @@
 
 ## Current ticket
 
-- **#76 — V1-04b: Wire direct dock movement into the viewer** (branch
-  `driver/76-direct-dock`, PR #86). The legacy grip/puck/phantom-slot control is
-  replaced by direct whole-dock movement: a drag may begin on any control or in
-  any gap, roughly 9 pt cancels the pending tap for good, the dock becomes a
-  compact neutral token, three subtle markers (the dock's own shape) show the
-  only destinations, a valid release lands and an invalid one restores the
-  source. `dockMoved` outlives the gesture by one main-queue turn, which is what
-  makes "a move never decides" true rather than likely. Destination markers and
-  the token are neutral (no saturated colour); the labelled/icon chrome and the
-  side-layout wording are #77's, and the persisted preferences are #78's.
-  Milestone screenshots: `docs/screenshots/milestones/v1-04/` (12: bottom/left/
-  right/moving × light/dark/AX5). Full local suite green — 225 kit + 50 app + 71
-  UI = 346 tests, 0 failures on `SWIPR iPhone 11 Pro`.
-- The next V1-04 subtickets are **#77** (neutral dock chrome and side layouts,
-  blocked by #76), **#78** (persist the four control preferences) and **#79**.
-  **#73** (a migrated Tumbler plan whose cursor vanished) is still not started.
+- **None in progress.** **#76** is delivered and merged (see *Recently merged*
+  below). The next V1-04 subtickets are **#77** (neutral dock chrome and side
+  layouts, the labelled Delete/Keep pair and the side-layout gap) and **#78**
+  (persist Control Position, Show Buttons, Haptics and Undo Position); **#79**
+  follows them. **#73** (a migrated Tumbler plan whose cursor vanished) is still
+  not started.
 
 ## Open PRs
 
@@ -60,6 +50,25 @@
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
+
+- **#76 — V1-04b: Wire direct dock movement into the viewer** (PR #86, merge
+  commit `2e56f87`). The legacy grip/puck/phantom-slot control is replaced by
+  direct whole-dock movement: a drag may begin on any control or in any gap,
+  roughly 9 pt of movement cancels the pending tap for good, the dock becomes a
+  compact neutral token, three subtle markers drawn in the dock's own shape show
+  the only destinations, a valid release lands and an invalid one restores the
+  source. `dockMoved` outlives the gesture by one main-queue turn (what makes "a
+  move never decides" true rather than likely), and a drop on the place the dock
+  already occupies goes through `AppModel.moveDock(to:)`, which refuses a
+  position that has not changed — writing the preferences re-pins the session's
+  direction from the saved default. `DockGeometry.capture` now holds a captured
+  destination until its release radius is left. Two Codex rounds: round 1 found
+  exactly those two problems, both fixed in `9680607` with tests verified by
+  breaking the fix; round 2, on that head, reported no findings. Full local
+  suite green — 225 kit + 50 app + 71 UI = 346 tests, 0 failures on
+  `SWIPR iPhone 11 Pro`; CI `checks` green. Screenshots:
+  `docs/screenshots/milestones/v1-04/` (12: bottom/left/right/moving ×
+  light/dark/AX5).
 
 - **#83 — test: stabilise the flaky UI launch/terminate handoff (#81)** — the
   launch/terminate handoff helpers, the scoped UI queries and the rules in
@@ -101,8 +110,8 @@
 
 ## What is next
 
-1. **#77** (neutral dock chrome and side layouts — labelled Delete/Keep pair at
-   the bottom, icon controls with a non-action gap at the sides) is now
+1. **#77** (neutral dock chrome and side layouts — the labelled Delete/Keep pair
+   at the bottom, icon controls with a non-action gap at the sides) is now
    unblocked by #76; then **#78** (persist Control Position, Show Buttons,
    Haptics, Undo Position) and **#79**.
 2. **#73** (the migrated Tumbler plan's vanished cursor) is still not started.

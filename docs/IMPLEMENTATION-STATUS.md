@@ -173,7 +173,10 @@
 > too. Full local suite green on
 > `SWIPR iPhone 11 Pro`: **225 kit + 50 app + 71 UI = 346 tests, 0 failures**.
 > Twelve dock screenshots (bottom/left/right/moving × light/dark/AX5) are in
-> `docs/screenshots/milestones/v1-04/`.
+> `docs/screenshots/milestones/v1-04/`. Delivered and merged as **PR #86**
+> (merge commit `2e56f87`), after two Codex rounds: round 1 found the two
+> problems named above, both fixed in `9680607`, and round 2 — of that exact
+> head — reported no findings.
 >
 > The dock's labelled/icon chrome and the side layouts stay with **#77**, and the
 > persisted preferences (Control Position, Show Buttons, Haptics, Undo Position)
@@ -199,7 +202,7 @@
 | [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
 | [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
-| [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/Swiper/issues/76) | 1 | 1 | 0 | No | Yes (PR #86) |
+| [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/Swiper/issues/76) | 2 | 1 | 0 | Yes — round 1 found a preference write that could re-pin the session's direction, and a capture dropped inside its own release radius; both fixed in `9680607` with tests verified by breaking the fix, and round 2 reported no findings | Yes (PR #86, `2e56f87`) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >
