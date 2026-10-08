@@ -160,10 +160,18 @@
 > is 228 × 88 — the number the spec pins the three positions to). Sharp edge: a
 > control's own action fires on the same touch-up that ends a drag, and SwiftUI
 > gives no order between the two, so `dockMoved` outlives the gesture by one
-> main-queue turn. That is what makes "a move never decides" true rather than
-> likely, and it is asserted from every control. Taps and swipes are unchanged
-> and are tested at a side position too. Full local suite green on
-> `SWIPR iPhone 11 Pro`: **224 kit + 49 app + 71 UI = 344 tests, 0 failures**.
+> main-queue turn, and a drop back on the destination the dock already occupies
+> goes through `AppModel.moveDock(to:)`, which refuses a position that has not
+> changed: writing the preferences re-pins the session's direction from the saved
+> default, so an unguarded write would silently reverse a walk the user started
+> with an explicit "Newest first" or "Oldest first". That is what makes "a move
+> never decides" true rather than likely, and it is asserted from every control.
+> `DockGeometry.capture` was also corrected to check the destination already
+> captured against its release radius before considering a nearer one, so a
+> diagonal drag between the bottom row and a side column no longer drops the
+> capture early. Taps and swipes are unchanged and are tested at a side position
+> too. Full local suite green on
+> `SWIPR iPhone 11 Pro`: **225 kit + 50 app + 71 UI = 346 tests, 0 failures**.
 > Twelve dock screenshots (bottom/left/right/moving × light/dark/AX5) are in
 > `docs/screenshots/milestones/v1-04/`.
 >

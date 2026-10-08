@@ -437,6 +437,15 @@ Sharp edges for the next change here (`ViewerView.swift`):
   SwiftUI gives no order between the two. `dockMoved` therefore outlives the
   gesture by one main-queue turn (`finishDockTouch()`), which is what makes "a
   move never decides" true rather than likely;
+- a drop back on the destination the dock already occupies goes through
+  `AppModel.moveDock(to:)`, which refuses a position that has not changed. Writing
+  the preferences re-pins the session's direction from the *saved default*, so an
+  unguarded write would silently reverse a walk started with an explicit "Newest
+  first" or "Oldest first";
+- `DockGeometry.capture` checks the destination already captured against
+  `releaseRadius` **before** considering a nearer one, because mid-way between the
+  bottom row and a side column the nearest destination flips while the finger is
+  still well inside the captured one's release radius;
 - the visual state is `@State` and the cancellation reset is keyed off a
   `@GestureState`, so an interrupted gesture restores the source.
 
@@ -446,7 +455,14 @@ three destinations, plus a drag that begins in the tray's padding),
 `testNormalTapsStillDecideAtEveryPosition`, `testAShortDragCancelsTheTapWithoutDeciding`,
 `testAReleaseOverNoDestinationRestoresTheSource`, `testAPlainSwipeNeverMovesTheCluster`,
 `testTheDockIsATokenWhileItIsBeingMoved` (mid-hold media frame) and
-`testThePhotoFrameIsIdenticalAtEveryControlPosition`. The play suite adds
+`testThePhotoFrameIsIdenticalAtEveryControlPosition`. `SWIPRAppTests` covers the
+model seam with `testMovingTheDockSavesItsPlaceImmediately` and
+`testDroppingTheDockOnItsOwnPlaceLeavesTheSessionAlone`, and `DockGeometryTests`
+adds `testEverySourceCanReachEveryDestination`,
+`testAReleaseBackOnTheSourceLandsOnTheSource`,
+`testAReleaseOverNoDestinationRestoresTheSource`,
+`testTheNearestDestinationResolvesAnOverlap` and
+`testACapturedDestinationHoldsUntilItsReleaseRadiusIsPassed`. The play suite adds
 `testPlayEveryControlPosition` and `testDestinationMarkersWhileMovingTheDock`.
 `testCaptureTheDockAtEveryPositionInEveryAppearance` produces the v1-04
 dock-* screenshots in light, dark and at the largest text size.

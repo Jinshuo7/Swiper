@@ -583,17 +583,19 @@ struct ViewerView: View {
     /// captured none. The whole dock is one view, so every control comes back
     /// together: there is nothing to stagger and nothing to wait for.
     private func land(_ destination: ControlPosition?) {
-        if let destination {
-            landingHaptics.impactOccurred()
-            var preferences = model.preferences
-            preferences.position = destination
-            withAnimation(landingAnimation) {
-                model.updatePreferences(preferences)
-                dockMove = .idle
-            }
-        } else {
+        guard let destination else {
             // An invalid release says nothing and changes nothing.
             withAnimation(landingAnimation) { dockMove = .idle }
+            activityToken += 1
+            return
+        }
+        landingHaptics.impactOccurred()
+        withAnimation(landingAnimation) {
+            // `moveDock` refuses a destination the dock already occupies, so a
+            // drop back on the source writes nothing and leaves the session's
+            // direction alone.
+            model.moveDock(to: destination)
+            dockMove = .idle
         }
         activityToken += 1
     }
@@ -629,9 +631,7 @@ struct ViewerView: View {
 
     /// Steps the position round the three stops, for anyone who cannot drag.
     private func cycleControlPosition() {
-        var preferences = model.preferences
-        preferences.position = preferences.position.next
-        model.updatePreferences(preferences)
+        model.moveDock(to: model.preferences.position.next)
     }
 
     private var finishedOverlay: some View {

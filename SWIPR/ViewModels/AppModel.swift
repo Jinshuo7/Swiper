@@ -646,6 +646,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Moves the dock to `position`, where it is dragged to or stepped to from
+    /// Settings.
+    ///
+    /// A position the dock already occupies is not a move: nothing is written,
+    /// and in particular the session's direction is left alone. Writing the
+    /// preferences re-pins that direction from the saved default, which would
+    /// silently reverse a walk the user started with an explicit "Newest first"
+    /// or "Oldest first".
+    func moveDock(to position: ControlPosition) {
+        guard position != preferences.position else { return }
+        var preferences = self.preferences
+        preferences.position = position
+        updatePreferences(preferences)
+    }
+
     // MARK: - Deletion
 
     func confirmDeletion() async {

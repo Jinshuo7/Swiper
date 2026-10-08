@@ -1303,10 +1303,10 @@ final class AppModelTests: XCTestCase {
         let (model, _, store) = await bootstrapped()
         XCTAssertEqual(model.preferences.position, .bottom)
 
-        var preferences = model.preferences
-        preferences.position = .trailing
-        model.updatePreferences(preferences)
+        model.moveDock(to: .trailing)
+        await model.settle()
 
+        XCTAssertEqual(model.preferences.position, .trailing)
         XCTAssertEqual(
             store.loadPreferences().position,
             .trailing,
@@ -1321,5 +1321,36 @@ final class AppModelTests: XCTestCase {
         await relaunched.bootstrap()
         await relaunched.settle()
         XCTAssertEqual(relaunched.preferences.position, .trailing, "the position must come back")
+    }
+
+    /// Dropping the dock back on the place it already occupies is not a move.
+    ///
+    /// This is the guard that keeps a drag harmless: writing the preferences also
+    /// re-pins the session's direction from the *saved default*, so a drag the
+    /// user made only to nudge the dock would silently reverse a walk started
+    /// with an explicit "Newest first", and save that reversal.
+    func testDroppingTheDockOnItsOwnPlaceLeavesTheSessionAlone() async {
+        let (model, _, store) = await bootstrapped()
+        var preferences = model.preferences
+        preferences.defaultDirection = .newer
+        model.updatePreferences(preferences)
+        // "Newest first" pins the walk toward older, whatever the saved default is.
+        model.startNewest()
+        await model.settle()
+        XCTAssertEqual(model.engine?.direction, .older, "the named traversal pins its direction")
+        let savesBefore = store.savedStates.count
+        let storedBefore = store.state
+
+        model.moveDock(to: .bottom)
+        await model.settle()
+
+        XCTAssertEqual(model.preferences.position, .bottom)
+        XCTAssertEqual(
+            model.engine?.direction,
+            .older,
+            "a drop on the source must not re-pin the session's direction"
+        )
+        XCTAssertEqual(store.savedStates.count, savesBefore, "a drop on the source must not save anything")
+        XCTAssertEqual(store.state, storedBefore, "a drop on the source must not rewrite the stored session")
     }
 }

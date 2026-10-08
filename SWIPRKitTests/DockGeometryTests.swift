@@ -48,6 +48,45 @@ final class DockGeometryTests: XCTestCase {
         )
     }
 
+    /// A drag between the bottom row and a side column passes closer to the side
+    /// destination before it has left the bottom one's release radius, so the
+    /// nearest destination flips while the capture must not. Losing it there
+    /// would flicker the highlighted marker off and drop a release the user had
+    /// every right to expect would land.
+    func testACapturedDestinationHoldsUntilItsReleaseRadiusIsPassed() {
+        // The safe area of the phone the screenshots and the local suite run on.
+        let safeArea = CGSize(width: 375, height: 763)
+        let bottom = DockGeometry.centre(for: .bottom, in: safeArea)
+        let leading = DockGeometry.centre(for: .leading, in: safeArea)
+        let separation = hypot(leading.x - bottom.x, leading.y - bottom.y)
+        // Just inside the bottom's release radius, and already nearer the leading
+        // column: the flip the realistic geometry produces.
+        let along = DockGeometry.releaseRadius - 1
+        let point = CGPoint(
+            x: bottom.x + (leading.x - bottom.x) / separation * along,
+            y: bottom.y + (leading.y - bottom.y) / separation * along
+        )
+        XCTAssertGreaterThan(
+            separation - along,
+            DockGeometry.captureRadius,
+            "the leading column is not yet close enough to be captured itself"
+        )
+        XCTAssertNil(
+            DockGeometry.capture(at: point, in: safeArea, currentlyCaptured: nil),
+            "nothing is captured out there from a standing start"
+        )
+        XCTAssertEqual(
+            DockGeometry.capture(at: point, in: safeArea, currentlyCaptured: .bottom),
+            .bottom,
+            "the capture holds until its own release radius is left"
+        )
+        XCTAssertEqual(
+            DockGeometry.destination(forReleaseAt: point, in: safeArea, captured: .bottom),
+            .bottom,
+            "releasing there still lands on the captured destination"
+        )
+    }
+
     // MARK: - Release
 
     func testAReleaseInsideTheReleaseRadiusLands() {

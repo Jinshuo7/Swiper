@@ -38,8 +38,8 @@
   the token are neutral (no saturated colour); the labelled/icon chrome and the
   side-layout wording are #77's, and the persisted preferences are #78's.
   Milestone screenshots: `docs/screenshots/milestones/v1-04/` (12: bottom/left/
-  right/moving × light/dark/AX5). Full local suite green — 224 kit + 49 app + 71
-  UI = 344 tests, 0 failures on `SWIPR iPhone 11 Pro`.
+  right/moving × light/dark/AX5). Full local suite green — 225 kit + 50 app + 71
+  UI = 346 tests, 0 failures on `SWIPR iPhone 11 Pro`.
 - The next V1-04 subtickets are **#77** (neutral dock chrome and side layouts,
   blocked by #76), **#78** (persist the four control preferences) and **#79**.
   **#73** (a migrated Tumbler plan whose cursor vanished) is still not started.
