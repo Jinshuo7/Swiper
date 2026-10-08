@@ -53,15 +53,31 @@ struct AdaptiveButtonStyle: ButtonStyle {
     }
 }
 
-/// The only red and green in the viewer: a faint, desaturated edge glow on the
-/// Delete and Keep chrome (docs/SPEC.md §4.3). Saturation never carries the
-/// meaning — the symbol, the word, the stroke and the weight do — so these two
-/// values stay barely visible on purpose.
+/// The only red and green in the viewer: a faint, desaturated glow along a
+/// control's own edges (docs/SPEC.md §4.3). It is drawn at the same strength in
+/// every state, because saturation never carries a meaning — the symbol, the
+/// word, the stroke weight and the scale do — so these two values stay barely
+/// visible on purpose.
 enum DockEdgeTint {
     /// Delete: a dusty, desaturated red that never reads as an alarm.
     static let delete = Color(red: 0.74, green: 0.48, blue: 0.45)
     /// Keep: the matching desaturated green.
     static let keep = Color(red: 0.47, green: 0.60, blue: 0.49)
+}
+
+/// The edge illumination itself: the tint at the leading and trailing rim, and
+/// nothing in between, so the middle of a control always stays neutral glass.
+private func dockEdgeGlow(_ tint: Color) -> LinearGradient {
+    LinearGradient(
+        stops: [
+            .init(color: tint.opacity(0.16), location: 0),
+            .init(color: tint.opacity(0), location: 0.3),
+            .init(color: tint.opacity(0), location: 0.7),
+            .init(color: tint.opacity(0.16), location: 1),
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
 }
 
 /// The neutral chrome one dock control wears: glass, a hairline white edge, and
@@ -79,22 +95,7 @@ struct DockControlBackground<Shape: InsettableShape>: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 if let edgeTint {
-                    shape
-                        .fill(
-                            LinearGradient(
-                                // Only the rim: the middle of the control stays
-                                // neutral glass, so the glow can never be read as
-                                // a red or green button.
-                                stops: [
-                                    .init(color: edgeTint.opacity(0.16), location: 0),
-                                    .init(color: edgeTint.opacity(0), location: 0.3),
-                                    .init(color: edgeTint.opacity(0), location: 0.7),
-                                    .init(color: edgeTint.opacity(0.16), location: 1),
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    shape.fill(dockEdgeGlow(edgeTint))
                 }
             }
             .overlay(
@@ -202,27 +203,24 @@ struct TopBarButton: View {
     }
 }
 
-/// The translucent material behind a swipe outcome well. It arms — brighter
-/// stroke, heavier weight and a little scale — the moment the drag crosses the
-/// commit threshold, so the threshold is visible as well as felt.
+/// The translucent material behind a swipe outcome well. It arms — heavier
+/// stroke, a little scale and the drag's own opacity — the moment the drag
+/// crosses the commit threshold, so the threshold is visible as well as felt.
 ///
-/// `tint` is one of the faint desaturated `DockEdgeTint` values, never a
-/// saturated system colour: the well's symbol and its wording carry the
-/// outcome (docs/SPEC.md §4.3).
+/// `tint` is one of the faint desaturated `DockEdgeTint` values, and it stays a
+/// rim at the same strength in both states: the well's symbol and its wording
+/// carry the outcome, and its outline carries the threshold (docs/SPEC.md §4.3).
 struct WellBackground: View {
     let tint: Color
     let armed: Bool
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        shape
             .fill(.ultraThinMaterial)
+            .overlay(shape.fill(dockEdgeGlow(tint)))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(tint.opacity(armed ? 0.34 : 0.12))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(armed ? 0.9 : 0.25), lineWidth: armed ? 3 : 1)
+                shape.stroke(Color.white.opacity(armed ? 0.9 : 0.25), lineWidth: armed ? 3 : 1)
             )
             .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
     }

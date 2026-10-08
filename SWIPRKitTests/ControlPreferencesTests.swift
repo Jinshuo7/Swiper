@@ -121,13 +121,12 @@ final class ControlClusterLayoutTests: XCTestCase {
     /// A 375 pt wide phone with a 763 pt safe area (iPhone 11 Pro after the bars).
     private let safeArea = CGSize(width: 375, height: 763)
 
-    /// The tray an Undo at `undoSide` leaves for the labelled Delete/Keep pair,
-    /// in the same coordinates as `slotRect`. At a side position the pair is two
-    /// of the three separate controls, and there is no tray at all.
-    private func pairRect(for position: ControlPosition, undoSide: UndoSide) -> CGRect {
-        let box = ControlClusterLayout.slotRect(for: position, in: safeArea, undoSide: undoSide)
+    /// The bottom tray an Undo at `undoSide` leaves for the labelled Delete/Keep
+    /// pair, in the same coordinates as `slotRect`.
+    private func trayRect(undoSide: UndoSide) -> CGRect {
+        let box = ControlClusterLayout.slotRect(for: .bottom, in: safeArea, undoSide: undoSide)
         return CGRect(
-            x: box.minX + (undoSide == .leading && !position.isVertical
+            x: box.minX + (undoSide == .leading
                 ? ControlClusterLayout.undoControlSize + ControlClusterLayout.undoGap
                 : 0),
             y: box.minY,
@@ -167,9 +166,9 @@ final class ControlClusterLayoutTests: XCTestCase {
         XCTAssertEqual(ControlClusterLayout.clusterSize(for: .trailing), column, "both sides are the same column")
     }
 
-    /// The spec's geometry: a row centred on the width 20 pt above the bottom
-    /// safe edge; columns centred at 75% of the safe height, 20 pt inside the
-    /// edge.
+    /// The spec's geometry: the labelled pair centred on the width 20 pt above the
+    /// bottom safe edge; a side pair centred at 75 % of the safe height, 20 pt
+    /// inside the edge.
     func testTheThreePositionsMatchTheSpec() {
         let bottomSize = ControlClusterLayout.clusterSize(for: .bottom)
         let bottom = ControlClusterLayout.centre(for: .bottom, in: safeArea)
@@ -209,12 +208,50 @@ final class ControlClusterLayoutTests: XCTestCase {
         }
     }
 
+    /// The pair is the dock's anchor in both layouts: changing which end Undo
+    /// takes moves only the separate Undo end of the dock, by one control and one
+    /// gap, and never shifts Delete and Keep under the thumb.
+    func testThePairKeepsTheAnchorWhicheverEndUndoTakes() {
+        for position in ControlPosition.allCases {
+            let leading = ControlClusterLayout.slotRect(for: position, in: safeArea, undoSide: .leading)
+            let trailing = ControlClusterLayout.slotRect(for: position, in: safeArea, undoSide: .trailing)
+            let anchor = ControlClusterLayout.centre(for: position, in: safeArea)
+            let shift = position.isVertical
+                ? ControlClusterLayout.controlSize + ControlClusterLayout.controlSpacing
+                : ControlClusterLayout.undoControlSize + ControlClusterLayout.undoGap
+
+            if position.isVertical {
+                let pairSpan = ControlClusterLayout.controlSize * 2 + ControlClusterLayout.controlSpacing
+                XCTAssertEqual(trailing.minY - leading.minY, shift, accuracy: 0.5, "\(position): only Undo's end moves")
+                XCTAssertEqual(leading.minX, trailing.minX, accuracy: 0.5, "\(position): a column does not move sideways")
+                XCTAssertEqual(
+                    leading.minY + shift + pairSpan / 2,
+                    anchor.y,
+                    accuracy: 0.5,
+                    "\(position): the pair keeps the anchor while Undo leads the column"
+                )
+                XCTAssertEqual(
+                    trailing.minY + pairSpan / 2,
+                    anchor.y,
+                    accuracy: 0.5,
+                    "\(position): the pair keeps the anchor while Undo follows the column"
+                )
+            } else {
+                let pairHalf = ControlClusterLayout.traySize.width / 2
+                XCTAssertEqual(trailing.minX - leading.minX, shift, accuracy: 0.5, "only Undo's end moves")
+                XCTAssertEqual(leading.minY, trailing.minY, accuracy: 0.5, "the bottom row does not move vertically")
+                XCTAssertEqual(leading.maxX - pairHalf, anchor.x, accuracy: 0.5, "Undo leads the centred pair")
+                XCTAssertEqual(trailing.minX + pairHalf, anchor.x, accuracy: 0.5, "Undo follows the centred pair")
+            }
+        }
+    }
+
     /// The bottom pair keeps its anchor: it is the labelled Delete/Keep pair
     /// that is centred on the width, and changing which end Undo takes moves
     /// only Undo. Its action must never shift under the thumb.
     func testTheBottomPairStaysCentredWhenUndoChangesEnd() {
         for undoSide in UndoSide.allCases {
-            let tray = pairRect(for: .bottom, undoSide: undoSide)
+            let tray = trayRect(undoSide: undoSide)
             XCTAssertEqual(
                 tray.midX,
                 safeArea.width / 2,
@@ -226,12 +263,12 @@ final class ControlClusterLayoutTests: XCTestCase {
 
         // The separate Undo sits outside the pair, on the end the user chose.
         let leading = ControlClusterLayout.slotRect(for: .bottom, in: safeArea, undoSide: .leading)
-        let leadingTray = pairRect(for: .bottom, undoSide: .leading)
+        let leadingTray = trayRect(undoSide: .leading)
         XCTAssertEqual(leading.minX, leadingTray.minX - ControlClusterLayout.undoGap - ControlClusterLayout.undoControlSize, accuracy: 0.5)
         XCTAssertLessThan(leading.minX, leadingTray.minX, "Undo leads the pair")
 
         let trailing = ControlClusterLayout.slotRect(for: .bottom, in: safeArea, undoSide: .trailing)
-        let trailingTray = pairRect(for: .bottom, undoSide: .trailing)
+        let trailingTray = trayRect(undoSide: .trailing)
         XCTAssertEqual(trailing.maxX, trailingTray.maxX + ControlClusterLayout.undoGap + ControlClusterLayout.undoControlSize, accuracy: 0.5)
         XCTAssertGreaterThan(trailing.maxX, trailingTray.maxX, "Undo follows the pair")
 

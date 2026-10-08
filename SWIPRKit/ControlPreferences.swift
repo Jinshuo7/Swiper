@@ -129,12 +129,11 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
 /// The dock has no grip: it is dragged by its whole surface, which is exactly
 /// the controls plus the padding and gaps around them. Two layouts share the
 /// three positions — at the bottom a labelled Delete/Keep pair in a tray with a
-/// separate smaller Undo, at a side three separate icon controls with Undo as one
-/// of them. The bottom pair keeps its own anchor whichever end Undo takes; a side
-/// column is anchored as a whole, so Undo takes its top or bottom and the pair
-/// sits above or below it (docs/SPEC.md §5.6). Kept in the framework rather than
-/// only inside the SwiftUI view so the geometry the spec pins down is directly
-/// testable on macOS.
+/// separate smaller Undo, at a side three separate icon controls — and in both the
+/// labelled **Delete/Keep pair is the anchor**: Undo hangs off it, so changing
+/// which end Undo takes never moves Delete and Keep (docs/SPEC.md §5.6). Kept in
+/// the framework rather than only inside the SwiftUI view so the geometry the spec
+/// pins down is directly testable on macOS.
 public enum ControlClusterLayout {
     /// One side-layout icon control, and the height of one bottom pill.
     public static let controlSize: CGFloat = 56
@@ -179,16 +178,14 @@ public enum ControlClusterLayout {
             : CGSize(width: undoControlSize + undoGap + traySize.width, height: traySize.height)
     }
 
-    /// The anchor the dock occupies in a safe area of `size`.
+    /// The anchor the dock's labelled Delete/Keep pair occupies in a safe area of
+    /// `size`: the bottom pair centred on the width, a side pair centred at 75 %
+    /// of the height 20 pt inside its edge.
     ///
-    /// At the bottom the anchor is the labelled Delete/Keep pair's own centre:
-    /// the separate Undo control hangs off one end of it, so changing which end
-    /// Undo takes never moves Delete and Keep. At a side the anchor is the whole
-    /// column's centre, and Undo is one of its three controls: it takes the top
-    /// or the bottom of the column — above or below the pair, which is how the
-    /// spec describes the two Undo ends — so the pair moves with the column
-    /// rather than around Undo. Delete and Keep never move relative to each other
-    /// in either layout (docs/SPEC.md §5.1 and §5.6).
+    /// The pair is the anchor in both layouts, and the separate Undo control hangs
+    /// off it. Changing which end Undo takes therefore never moves Delete and
+    /// Keep: `slotRect(for:in:undoSide:)` is what moves, by the one control and
+    /// gap Undo adds above or beside the pair (docs/SPEC.md §5.1 and §5.6).
     public static func centre(for position: ControlPosition, in size: CGSize) -> CGPoint {
         let cluster = clusterSize(for: position)
         switch position {
@@ -227,8 +224,8 @@ public enum ControlClusterLayout {
     ///
     /// At the bottom the pair keeps its anchor and the frame grows to the side
     /// Undo took, so the dock is never centred *with* Undo — the pair is. A side
-    /// column is the same rect whichever end Undo takes, because it holds all
-    /// three of its controls.
+    /// column grows the same way, by the one control and gap Undo adds above the
+    /// pair, so the pair stays at 75 % of the height whichever end Undo takes.
     public static func slotRect(
         for position: ControlPosition,
         in size: CGSize,
@@ -238,9 +235,15 @@ public enum ControlClusterLayout {
         let anchor = centre(for: position, in: size)
         let origin: CGPoint
         if position.isVertical {
-            // The column holds all three controls, Undo included, so the whole
-            // column is the thing that is centred in the safe area.
-            origin = CGPoint(x: anchor.x - cluster.width / 2, y: anchor.y - cluster.height / 2)
+            // The column holds all three controls, Undo included. Its origin is
+            // measured from the pair's own span so that the pair — and never the
+            // column as a whole — is what stays on the anchor.
+            let pairTop = order(for: undoSide).first == .undo ? controlSize + controlSpacing : 0
+            let pairSpan = controlSize * 2 + controlSpacing
+            origin = CGPoint(
+                x: anchor.x - cluster.width / 2,
+                y: anchor.y - pairTop - pairSpan / 2
+            )
         } else {
             let pairHalf = traySize.width / 2
             let leading = undoSide == .leading

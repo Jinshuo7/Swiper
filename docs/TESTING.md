@@ -476,24 +476,16 @@ the chrome of both is neutral:
   separate Undo control drawn smaller beside it;
 - at a **side**, three separate icon controls a non-action gap apart.
 
-The pair is the dock's anchor **at the bottom**: `ControlClusterLayout.centre`
-is the pair's centre there, and `slotRect(for:in:undoSide:)` grows off that
-anchor to the side Undo took, so Undo moving from one end to the other never
-moves Delete and Keep. At a **side** the anchor is the whole column — Undo is one
-of its three controls — so it takes the top or the bottom of the column, above or
-below the pair, which is how the spec describes the two Undo ends; the pair moves
-with the column rather than around Undo, and Delete and Keep never move relative
-to each other in either layout (docs/SPEC.md §5.6). The dock's size is fixed per
-layout (286 × 68 at the bottom, 56 × 196 at a side) so the media never moves for
-chrome (ADR-0006) and the dock never resizes.
+The labelled **Delete/Keep pair is the dock's anchor in both layouts**: `ControlClusterLayout.centre` is the pair's centre at every position, and `slotRect(for:in:undoSide:)` grows off that anchor by the one control and gap the separate Undo adds — to the side it took at the bottom, above it at a side. Changing which end Undo takes therefore moves only the Undo end of the dock, and never shifts Delete and Keep under the thumb: "Before actions" (Undo left of the bottom pair, above a side pair) and "After actions" mirror each other with one mapping, asserted in both layouts before and after flipping the setting. The dock's size is fixed per layout (286 × 68 at the bottom, 56 × 196 at a side) so the media never moves for chrome (ADR-0006) and the dock never resizes.
 
 Sharp edges for the next change here:
 
 - **No state rests on colour.** The only red and green in the viewer are the
-  `DockEdgeTint` rims — desaturated, 0.16 opacity, drawn only at a control's
-  outer edges — plus the swipe wells' fill. The symbol, the word, the stroke and
-  the weight carry every outcome, and `WellBackground`'s armed state is a heavier
-  stroke and a scale change rather than a stronger fill.
+  `DockEdgeTint` rims — desaturated, 0.16 opacity, drawn only at a control's own
+  edges and at the same strength in every state — plus the swipe wells' rim. The
+  symbol, the word, the stroke and the weight carry every outcome, and
+  `WellBackground`'s armed state is a heavier stroke (1 → 3 pt) and the drag's
+  own opacity rather than a stronger fill.
 - **The drag handle is the whole box.** `contentShape` is a lightly rounded
   rectangle (12 pt) over the dock's frame, so the 12 pt gap beside the separate
   Undo control and the tray's own padding both move the dock, and a drag that
@@ -506,12 +498,13 @@ Sharp edges for the next change here:
   control's accessibility label.
 
 `SWIPRUITests` covers it with `testTheDockLayoutsAndTheOneUndoMapping` (both
-layouts, the pill/circle shapes, the pair centred, Undo outside it and smaller,
-Undo leading both layouts, then After actions mirrored), and the dock tests above
-now assert the row's pair is centred rather than the whole dock. When the column
-is on screen, `assertClusterIsAColumn` also asserts the non-action gap and the
-safe-area inset. `ControlClusterLayoutTests` adds
+layouts, the pill/circle shapes, the centred pair, Undo outside it and smaller,
+Undo leading both layouts, then After actions moving only the Undo end), and the
+dock tests above now assert the row's pair is centred rather than the whole dock.
+When the column is on screen, `assertClusterIsAColumn` also asserts the
+non-action gap and the safe-area inset. `ControlClusterLayoutTests` adds
 `testTheTwoLayoutsHaveTheirOwnFixedSize`,
+`testThePairKeepsTheAnchorWhicheverEndUndoTakes`,
 `testTheBottomPairStaysCentredWhenUndoChangesEnd`,
 `testTheSideLayoutSeparatesItsControlsWithANonActionGap` and
 `testEveryDestinationDrawsTheWholeDockAtItsOwnSize`; `DockGeometryTests` now

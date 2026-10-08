@@ -369,10 +369,9 @@ final class PlaySessionUITests: XCTestCase {
     }
 
     /// The point a destination sits at in window coordinates: the labelled pair
-    /// centred on the width 20 pt above the bottom safe edge, and columns of
-    /// separate icon controls 20 pt inside the edge at 75 % of the safe height,
-    /// which in portrait is 48 pt from the window edge for the 56 pt-wide
-    /// column.
+    /// centred on the width 20 pt above the bottom safe edge, and side columns
+    /// whose pair is 20 pt inside the edge at 75 % of the safe height, which in
+    /// portrait is 48 pt from the window edge for the 56 pt-wide column.
     private func bottomTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         return CGPoint(x: window.midX, y: window.height * 0.88)

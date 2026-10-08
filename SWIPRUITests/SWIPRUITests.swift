@@ -708,12 +708,11 @@ final class SWIPRUITests: XCTestCase {
     /// The point a destination sits at, in window coordinates.
     ///
     /// `DockGeometry` pins the three: the labelled Delete/Keep pair centred on
-    /// the width 20 pt above the bottom safe edge, and columns of separate icon
-    /// controls centred at 75 % of the safe height 20 pt inside the edge.
-    /// Portrait leaves no leading or trailing safe inset, so a column's centre
-    /// is 48 pt from the window edge — its 20 pt margin plus half its 56 pt
-    /// width. The destinations are far enough apart that a finger well inside
-    /// one captures it.
+    /// the width 20 pt above the bottom safe edge, and side columns whose pair is
+    /// centred at 75 % of the safe height 20 pt inside the edge. Portrait leaves
+    /// no leading or trailing safe inset, so a side pair is 48 pt from the window
+    /// edge — its 20 pt margin plus half its 56 pt width. The destinations are far
+    /// enough apart that a finger well inside one captures it.
     private func destinationTarget(_ position: String, in app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         switch position {
@@ -912,9 +911,10 @@ final class SWIPRUITests: XCTestCase {
         capture("Controls — left, separate icon controls")
 
         // After actions mirrors both layouts. At a side that moves Undo past
-        // the pair — the column stays where it is and the pair keeps its own
-        // order and spacing; at the bottom it puts Undo after the centred pair.
-        let columnAtTheColumn = undo.frame.union(actionPairFrame(app))
+        // the pair — the pair keeps its place and its own order and spacing, and
+        // only the column's Undo end moves; at the bottom it puts Undo after the
+        // centred pair.
+        let pairAtTheColumn = actionPairFrame(app)
         let pairSpacing = keep.frame.midY - delete.frame.midY
         app.buttons["viewer.close"].tap()
         app.buttons["entry.settings"].tap()
@@ -926,18 +926,18 @@ final class SWIPRUITests: XCTestCase {
 
         _ = startViewer(app)
         XCTAssertTrue(undo.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(undo.frame.midY, keep.frame.midY, "Undo follows the column: After actions")
+        XCTAssertGreaterThan(undo.frame.midY, keep.frame.midY, "Undo follows the pair down the column: After actions")
         XCTAssertEqual(
-            undo.frame.union(actionPairFrame(app)).midY,
-            columnAtTheColumn.midY,
+            actionPairFrame(app).midX,
+            pairAtTheColumn.midX,
             accuracy: 1,
-            "moving Undo moved the column"
+            "moving Undo moved Delete and Keep"
         )
         XCTAssertEqual(
-            undo.frame.union(actionPairFrame(app)).midX,
-            columnAtTheColumn.midX,
+            actionPairFrame(app).midY,
+            pairAtTheColumn.midY,
             accuracy: 1,
-            "moving Undo moved the column"
+            "moving Undo moved Delete and Keep"
         )
         XCTAssertEqual(
             keep.frame.midY - delete.frame.midY,
