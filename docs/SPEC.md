@@ -25,12 +25,14 @@ on real hardware without changing the contract.
 
 ## 2. Home, entry and filters
 
-1. Home uses the approved **Orange & Porcelain** composition: Settings and a
-   round 44 pt **Review** trash button in stable mirrored top-corner positions,
-   photographic **Everything**, **Photos** and **Videos** choices, a conditional
-   **Continue sorting** action, and a quiet conditional **Your impact** section.
-   The Review button shows a small red count badge once anything is marked, and
-   no badge at zero; it never spells out "Review".
+1. Home uses the approved **Orange & Porcelain** composition: a compact orange
+   **SWIPR** wordmark leads the top bar and the Settings gear trails it, with a
+   round 44 pt **Review** trash button inside the gear once anything is marked.
+   Below sit photographic **Everything** (three overlapping photo prints),
+   **Photos** and **Videos** square cards, a conditional **Continue sorting**
+   action, and a quiet conditional **Your impact** section. The Review button
+   shows a small red count badge once anything is marked, and no badge at zero;
+   it never spells out "Review".
 2. **Continue sorting** (resume) is distinct from starting a new session, and
    **Review marked items** is distinct from both; reviewing never changes a
    session.

@@ -1315,4 +1315,32 @@ final class PlaySessionUITests: XCTestCase {
             XCTAssertLessThan(area, 1, "the swipe feedback must not cover \(identifier)")
         }
     }
+
+    // MARK: - Playtest round 3 Home capture (seeded sample library)
+
+    /// Captures the real Home on the Simulator's seeded sample library, in the
+    /// light and dark appearances, with no progress and with progress plus
+    /// marks. It deliberately does not pass `-uiTestingFakeLibrary`, so the
+    /// cards show the natural sample photos; every other test keeps the fake
+    /// library. It only reads the library and marks in the app — it never
+    /// deletes a photo or asks PhotoKit to change the library.
+    func testPlaytestRound3HomeCapture() {
+        captureSeededHome(appearance: ["-uiTestingForceLight"], suffix: "light")
+        captureSeededHome(appearance: ["-uiTestingForceDark"], suffix: "dark")
+    }
+
+    private func captureSeededHome(appearance: [String], suffix: String) {
+        let app = XCUIApplication()
+        app.launchArguments += appearance
+        AppLaunchHandoff.launch(app, firstScreen: app.buttons["entry.settings"])
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        captureRound("round3-home-empty-\(suffix)", app: app)
+
+        _ = startViewer(app)
+        canvas(app).swipeRight()   // keep one and advance
+        markCurrent(app)           // mark the next, so Continue + Review are present
+        goHome(app)
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
+        captureRound("round3-home-progress-\(suffix)", app: app)
+    }
 }

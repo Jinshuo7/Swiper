@@ -106,7 +106,12 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
     func thumbnail(for id: String, targetSize: CGSize) async -> UIImage? {
         guard let asset = asset(withID: id) else { return nil }
         let options = PHImageRequestOptions()
-        options.deliveryMode = .fastFormat
+        // `.highQualityFormat` rather than `.fastFormat`: the fast single-choice
+        // request can fail with PHPhotosErrorDomain 3303 ("No resource found
+        // matching image request spec") for ordinary stills, which left the Home
+        // cards on their placeholder gradient. The high-quality request is
+        // resized to the requested target, so it stays a thumbnail.
+        options.deliveryMode = .highQualityFormat
         options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
         return await requestImage(asset: asset, targetSize: targetSize, options: options)

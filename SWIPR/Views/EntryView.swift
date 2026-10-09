@@ -1,12 +1,27 @@
 import SWIPRKit
 import SwiftUI
 
+/// The exact Orange & Porcelain hex values, so the code carries the approved
+/// tokens literally rather than an approximation.
+private extension Color {
+    init(hex: UInt32) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: 1
+        )
+    }
+}
+
 /// Orange & Porcelain semantic colours for the Home and filter screens.
 ///
 /// Explicit light and dark values, rather than system colours, keep the
 /// porcelain look identical on every iOS version and let a screen render in
-/// either appearance on demand. Both appearances share one warm orange accent
-/// and one cream/near-black ground.
+/// either appearance on demand. The seven tokens the design board pins are
+/// exactly `#F8F8F6`, `#FFFFFF`, `#C05A20`, `#272724`, `#191A18`, `#2C2D29`
+/// and `#F2A66B`.
 struct PorcelainPalette {
     let background: Color
     let surface: Color
@@ -19,26 +34,26 @@ struct PorcelainPalette {
     let onAccent: Color
 
     static let light = PorcelainPalette(
-        background: Color(red: 0.988, green: 0.965, blue: 0.937), // #FCF6EF
-        surface: Color(red: 1.0, green: 1.0, blue: 1.0),
-        elevated: Color(red: 0.949, green: 0.925, blue: 0.894),   // #F2ECE4
-        foreground: Color(red: 0.106, green: 0.106, blue: 0.106), // #1B1B1B
-        secondary: Color(red: 0.431, green: 0.416, blue: 0.392),  // #6E6A64
-        border: Color(red: 0.890, green: 0.863, blue: 0.824),     // #E3DCD2
-        accent: Color(red: 0.737, green: 0.325, blue: 0.078),     // #BC5314
-        accentSoft: Color(red: 0.992, green: 0.694, blue: 0.443), // #FDB171
+        background: Color(hex: 0xF8F8F6),
+        surface: Color(hex: 0xFFFFFF),
+        elevated: Color(hex: 0xF1F0EC),
+        foreground: Color(hex: 0x272724),
+        secondary: Color(hex: 0x6E6A64),
+        border: Color(hex: 0xE4E2DC),
+        accent: Color(hex: 0xC05A20),
+        accentSoft: Color(hex: 0xE8A06A),
         onAccent: Color.white
     )
 
     static let dark = PorcelainPalette(
-        background: Color(red: 0.078, green: 0.086, blue: 0.078), // #141614
-        surface: Color(red: 0.122, green: 0.129, blue: 0.118),    // #1F211E
-        elevated: Color(red: 0.165, green: 0.173, blue: 0.157),   // #2A2C28
-        foreground: Color(red: 0.961, green: 0.953, blue: 0.937), // #F5F3EF
-        secondary: Color(red: 0.706, green: 0.694, blue: 0.667),  // #B4B1AA
-        border: Color(red: 0.227, green: 0.235, blue: 0.220),     // #3A3C38
-        accent: Color(red: 0.878, green: 0.478, blue: 0.220),     // #E07A38
-        accentSoft: Color(red: 0.290, green: 0.180, blue: 0.090),
+        background: Color(hex: 0x191A18),
+        surface: Color(hex: 0x2C2D29),
+        elevated: Color(hex: 0x232421),
+        foreground: Color(hex: 0xF5F3EF),
+        secondary: Color(hex: 0xB4B1AA),
+        border: Color(hex: 0x3A3C38),
+        accent: Color(hex: 0xF2A66B),
+        accentSoft: Color(hex: 0x5A4632),
         onAccent: Color.white
     )
 
@@ -53,8 +68,8 @@ struct PorcelainPalette {
 /// The three media choices (Everything, Photos, Videos) each open editable
 /// filters rather than starting straight away, so what is included is always
 /// visible before a session captures its fixed pool. Continue sorting restores
-/// the saved session's own filters and pool; Review marked items never touches
-/// either.
+/// the saved session's own filters and pool; the round Review button is the way
+/// into marked items and never touches either.
 struct EntryView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
@@ -78,7 +93,6 @@ struct EntryView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 18) {
             topBar
-            wordmark
             heading
             presetCards
             if model.resumableSession != nil {
@@ -113,41 +127,43 @@ struct EntryView: View {
 
     // MARK: - Chrome
 
-    /// Settings and Review mirror the top corners, so their positions never move
-    /// as work appears and disappears.
+    /// The compact wordmark on the leading edge and the Settings gear on the
+    /// trailing edge, exactly as the approved board; the round Review button
+    /// (an owner decision) sits inside the gear when anything is marked.
     private var topBar: some View {
-        HStack {
-            Button {
-                model.route = .settings
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Settings")
-            .accessibilityIdentifier("entry.settings")
-
+        HStack(spacing: 6) {
+            wordmark
             Spacer(minLength: 0)
-
             reviewChip
+            settingsButton
         }
         .foregroundStyle(palette.foreground)
     }
 
-    /// The wordmark frames the top strip on its own centred line, so a wide
-    /// review count can never push it off-centre.
     private var wordmark: some View {
         Text("SWIPR")
-            .font(.system(size: 30, weight: .bold))
+            .font(.system(size: 18, weight: .bold))
             .foregroundStyle(palette.accent)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(height: 44)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("entry.wordmark")
     }
 
+    private var settingsButton: some View {
+        Button {
+            model.route = .settings
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 22, weight: .semibold))
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Settings")
+        .accessibilityIdentifier("entry.settings")
+    }
+
     private var heading: some View {
         Text("What are we cleaning today?")
-            .font(.largeTitle.weight(.bold))
+            .font(.system(size: 28, weight: .bold))
             .foregroundStyle(palette.foreground)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("entry.heading")
@@ -167,8 +183,6 @@ struct EntryView: View {
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)
             .accessibilityIdentifier("entry.review")
-        } else {
-            Color.clear.frame(width: 44, height: 44)
         }
     }
 
@@ -178,16 +192,16 @@ struct EntryView: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 12) {
-                    card(for: .everything, title: "Everything", identifier: "entry.preset.everything", symbol: "photo.stack")
-                    card(for: .photos, title: "Photos", identifier: "entry.preset.photos", symbol: "photo")
-                    card(for: .videos, title: "Videos", identifier: "entry.preset.videos", symbol: "video")
+                    everythingCard
+                    squareCard(for: .photos, title: "Photos", identifier: "entry.preset.photos", symbol: "photo")
+                    squareCard(for: .videos, title: "Videos", identifier: "entry.preset.videos", symbol: "video")
                 }
             } else {
                 VStack(spacing: 12) {
-                    card(for: .everything, title: "Everything", identifier: "entry.preset.everything", symbol: "photo.stack")
+                    everythingCard
                     HStack(spacing: 12) {
-                        card(for: .photos, title: "Photos", identifier: "entry.preset.photos", symbol: "photo")
-                        card(for: .videos, title: "Videos", identifier: "entry.preset.videos", symbol: "video")
+                        squareCard(for: .photos, title: "Photos", identifier: "entry.preset.photos", symbol: "photo")
+                        squareCard(for: .videos, title: "Videos", identifier: "entry.preset.videos", symbol: "video")
                     }
                 }
             }
@@ -195,7 +209,19 @@ struct EntryView: View {
         .disabled(!model.hasPhotos)
     }
 
-    private func card(
+    private var everythingCard: some View {
+        EverythingCard(
+            title: "Everything",
+            identifier: "entry.preset.everything",
+            assets: newestAssets(matching: .everything, count: 3),
+            palette: palette,
+            enabled: model.hasPhotos
+        ) {
+            model.showFilters(.everything)
+        }
+    }
+
+    private func squareCard(
         for preset: MediaFilter,
         title: String,
         identifier: String,
@@ -213,10 +239,14 @@ struct EntryView: View {
         }
     }
 
-    /// The newest asset the preset would include, used only as the card's
-    /// cover image; the pool itself is captured when a session starts.
+    /// The newest assets the preset would include, used only as the card's
+    /// cover images; the pool itself is captured when a session starts.
+    private func newestAssets(matching preset: MediaFilter, count: Int) -> [AssetDescriptor] {
+        Array(model.order.assets.reversed().filter { preset.includes($0) }.prefix(count))
+    }
+
     private func newestAsset(matching preset: MediaFilter) -> AssetDescriptor? {
-        model.order.assets.reversed().first { preset.includes($0) }
+        newestAssets(matching: preset, count: 1).first
     }
 
     // MARK: - Waiting work
@@ -226,9 +256,7 @@ struct EntryView: View {
             model.resumeSession()
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(palette.accent)
+                SessionThumbnail(asset: resumeAsset, palette: palette)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Continue sorting")
                         .fontWeight(.semibold)
@@ -244,11 +272,11 @@ struct EntryView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(palette.secondary)
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(palette.border, lineWidth: 1)
             )
         }
@@ -256,6 +284,14 @@ struct EntryView: View {
         .accessibilityLabel("Continue sorting")
         .accessibilityValue(resumableSubtitle)
         .accessibilityIdentifier("entry.resume")
+    }
+
+    /// The asset the waiting session will next show, used for the row's
+    /// thumbnail; nil falls back to the neutral clock tile.
+    private var resumeAsset: AssetDescriptor? {
+        guard let ids = model.resumableSession?.poolIDs else { return nil }
+        let wanted = Set(ids)
+        return model.order.assets.first { wanted.contains($0.id) }
     }
 
     /// What the waiting session will walk, named from its saved filters.
@@ -288,8 +324,129 @@ struct EntryView: View {
     }
 }
 
-/// A photographic media-choice card. It shows the newest asset the choice would
-/// include when one is available, and a warm symbol tile otherwise.
+/// The wide **Everything** card: three overlapping photo prints on a soft card,
+/// with the label over the prints, matching the approved composition.
+private struct EverythingCard: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let title: String
+    let identifier: String
+    let assets: [AssetDescriptor]
+    let palette: PorcelainPalette
+    let enabled: Bool
+    let action: () -> Void
+
+    @State private var images: [String: UIImage] = [:]
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 0) {
+                        fan.frame(height: 140)
+                        Text(title)
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(palette.foreground)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .background(palette.elevated)
+                } else {
+                    ZStack(alignment: .bottomLeading) {
+                        palette.elevated
+                        fan
+                        // A soft bottom scrim keeps the white label legible
+                        // over any photo, the way the square cards do.
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.55)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                        Text(title)
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(16)
+                    }
+                    .frame(height: 168)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(palette.border, lineWidth: 1)
+            )
+            .opacity(enabled ? 1 : 0.5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
+        .task(id: assets.map(\.id).joined(separator: ",")) {
+            var loaded: [String: UIImage] = [:]
+            for asset in assets {
+                if let image = await model.library.thumbnail(
+                    for: asset.id,
+                    targetSize: CGSize(width: 500, height: 400)
+                ) {
+                    loaded[asset.id] = image
+                }
+            }
+            images = loaded
+        }
+    }
+
+    private var fan: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width * 0.40
+            let height = geometry.size.height * 0.80
+            ZStack {
+                printCard(0, width, height)
+                    .rotationEffect(.degrees(-9))
+                    .offset(x: -geometry.size.width * 0.24, y: geometry.size.height * 0.16)
+                printCard(1, width, height)
+                    .rotationEffect(.degrees(2))
+                    .offset(x: 0, y: -geometry.size.height * 0.02)
+                printCard(2, width, height)
+                    .rotationEffect(.degrees(9))
+                    .offset(x: geometry.size.width * 0.24, y: geometry.size.height * 0.10)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
+
+    @ViewBuilder
+    private func printCard(_ index: Int, _ width: CGFloat, _ height: CGFloat) -> some View {
+        Group {
+            if assets.indices.contains(index), let image = images[assets[index].id] {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                LinearGradient(
+                    colors: [palette.accent, palette.accentSoft],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay(
+                    Image(systemName: "photo")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                )
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(Color(hex: 0xFFFFFF), lineWidth: 5))
+        .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
+    }
+}
+
+/// A square-ish photographic media-choice card (Photos / Videos). It shows the
+/// newest asset the choice would include when one is available, and a warm
+/// symbol tile otherwise.
 private struct PresetCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -323,12 +480,21 @@ private struct PresetCard: View {
                     }
                     .background(palette.surface)
                 } else {
+                    // A square card, the size the approved board uses.
                     Rectangle()
                         .fill(palette.elevated)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 128)
+                        .aspectRatio(1, contentMode: .fit)
                         .overlay { cover }
                         .overlay { linearGradient }
+                        .overlay {
+                            if asset?.kind == .video {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(13)
+                                    .background(.ultraThinMaterial, in: Circle())
+                            }
+                        }
                         .overlay(alignment: .bottomLeading) {
                             Text(title)
                                 .font(.headline.weight(.bold))
@@ -338,9 +504,9 @@ private struct PresetCard: View {
                         }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(palette.border, lineWidth: 1)
             )
             .opacity(enabled ? 1 : 0.5)
@@ -356,7 +522,7 @@ private struct PresetCard: View {
             }
             image = await model.library.thumbnail(
                 for: asset.id,
-                targetSize: CGSize(width: 600, height: 400)
+                targetSize: CGSize(width: 600, height: 600)
             )
         }
     }
@@ -388,5 +554,44 @@ private struct PresetCard: View {
             startPoint: .center,
             endPoint: .bottom
         )
+    }
+}
+
+/// The Continue sorting row's small square thumbnail, or a neutral clock tile
+/// while the session has no resolvable asset.
+private struct SessionThumbnail: View {
+    @EnvironmentObject private var model: AppModel
+    let asset: AssetDescriptor?
+    let palette: PorcelainPalette
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                palette.elevated
+                    .overlay(
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(palette.accent)
+                    )
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .task(id: asset?.id) {
+            guard let asset else {
+                image = nil
+                return
+            }
+            image = await model.library.thumbnail(
+                for: asset.id,
+                targetSize: CGSize(width: 200, height: 200)
+            )
+        }
     }
 }

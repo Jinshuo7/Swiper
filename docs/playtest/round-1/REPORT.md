@@ -911,3 +911,81 @@ neither exists.
 | SE AX5 — Viewer at 2 marks | viewer.review | 315, 26, 44, 44 | yes |
 | SE AX5 — Home at 0 marks | entry.review | — | absent (correct) |
 | SE AX5 — Home at 2 marks | entry.review | 315, 28, 44, 44 | yes |
+
+## Round 3 — Home matches the approved design
+
+Reference: `docs/design/orange-porcelain/01-setup.png` (Home is the top-left
+light phone and the bottom-left dark phone) and the 01-setup palette in
+`docs/design/orange-porcelain/PROMPTS.md`. Side-by-side comparison:
+[`round-3/home-compare.png`](round-3/home-compare.png). The Simulator was seeded
+with 16 generated sample photos plus a short beach video
+([`round-3/generate_samples.py`](round-3/generate_samples.py)); the test suites
+keep using the fake library.
+
+### Palette (sampled, not by eye)
+
+[`round-3/sample_colours.py`](round-3/sample_colours.py) reads a known region per
+token from the reference board and from the captured Home screenshots. Channels
+are quantised to multiples of 6, so a current value can land a couple of units
+from the code token.
+
+| Token | reference (sampled) | current before | current after | code token |
+| --- | --- | --- | --- | --- |
+| light background | #FAFAF9 | #FCF6EF | #F8F8F6 | `#F8F8F6` |
+| light surface | #F5F4F3 | #FCF6EF / #FFFFFF | #FFFFFF | `#FFFFFF` |
+| light wordmark | #C04812 | #BA4E12 | #C05A1E | `#C05A20` |
+| light heading | #000000 | #181818 | #242424 | `#272724` |
+| light accent | #EA8A42 | #BA4E12 | #C05A1E | `#C05A20` |
+| light secondary | #7E7E7E | #6C6660 | #6C6660 | `#6E6A64` |
+| dark background | #1A1B19 | #141614 | #191A18 | `#191A18` |
+| dark surface | #292927 | #1F211E | #2C2D29 | `#2C2D29` |
+| dark wordmark | #A85A1E | #DE7836 | #F0A266 | `#F2A66B` |
+| dark heading | #FCFCFC | #F0F0EA | #F0F0EA | `#F5F3EF` |
+| dark accent | #D29C5A | #DE7836 | #F0A266 | `#F2A66B` |
+| dark secondary | #A2A2A2 | #B4AEA8 | #B4AEA8 | `#B4B1AA` |
+
+The reference's ink renders near-black in light and near-white in dark in the
+mockup, so its heading sample is not the ink token; every other token lands on
+the approved colour. The seven tokens the board pins are exactly `#F8F8F6`,
+`#FFFFFF`, `#C05A20`, `#272724`, `#191A18`, `#2C2D29` and `#F2A66B`, and the
+code now uses those literals (the `Color(hex:)` initialiser in
+`SWIPR/Views/EntryView.swift`).
+
+### Structure against the reference
+
+Matches: the compact orange **SWIPR** wordmark on the leading edge and the gear on
+the trailing edge; the "What are we cleaning today?" heading; a wide
+**Everything** card carrying three overlapping photo prints; two square
+**Photos** and **Videos** cards with real thumbnails (Videos shows a play badge);
+the **Continue sorting** row with a photo thumbnail; **Your impact**.
+
+### Fixed
+
+1. Palette: all seven approved tokens, replacing the old warm-cream/orange set.
+2. Wordmark: moved from a 30 pt centred line to the compact 18 pt leading wordmark.
+3. Heading: 34 pt `largeTitle` to 28 pt bold.
+4. Everything card: one 128 pt photo to a 168 pt card with three overlapping,
+   white-bordered and rotated photo prints, with a bottom scrim under the label.
+5. Photos/Videos cards: 128 pt banners to square (1:1) cards with real
+   thumbnails; a video gets a play badge.
+6. Corner radius 18 to 20; the Continue sorting leading glyph is replaced by the
+   session's own photo thumbnail.
+7. A supporting fix so the cards could show the photos at all:
+   `PhotoKitLibrary.thumbnail` requested `.fastFormat`, which fails with
+   `PHPhotosErrorDomain 3303` ("No resource found matching image request spec")
+   on ordinary stills and left every card on its placeholder. It now requests
+   `.highQualityFormat`. This is image loading only — not deletion, saved state
+   or any flow.
+
+### Not fixed (owner decision or out of scope)
+
+- The reference's **"Review 12 marked items"** row is not built. The round-2
+  round 44 x 44 trash button with the red count badge is the review entry (owner
+  decision); it sits next to the gear.
+- **Your impact** is absent from the capture because the seeded library has no
+  confirmed deletions yet; it appears once a deletion is confirmed.
+- The reference's stock photos are replaced by the generated samples, and its
+  "Photos · September" subtitle is the real saved filter name ("Everything").
+- The no-progress Home is captured separately in
+  `round-3/current-*-home-empty-*.png`; the reference only shows the
+  progress-plus-marks state.

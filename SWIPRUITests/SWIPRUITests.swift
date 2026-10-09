@@ -1910,18 +1910,24 @@ final class SWIPRUITests: XCTestCase {
 
     /// The wordmark is centred on the screen, framed by the gear and the review
     /// chip, in every combination of waiting work.
-    func testWordmarkIsCentredBetweenTheGearAndTheChip() {
+    /// The Home top bar is the board's: the compact wordmark leads, the gear
+    /// trails, and the round Review button sits between them.
+    func testWordmarkLeadsAndTheGearTrails() {
         let app = launchApp()
         let photo = startViewer(app)
         photo.swipeLeft()
         app.buttons["viewer.close"].tap()
 
-        let window = app.windows.firstMatch.frame
         let wordmark = app.staticTexts["entry.wordmark"]
         XCTAssertTrue(wordmark.waitForExistence(timeout: 10))
-        XCTAssertEqual(wordmark.frame.midX, window.midX, accuracy: 1, "the wordmark must be centred on the phone")
-        XCTAssertLessThan(app.buttons["entry.settings"].frame.midX, wordmark.frame.midX)
-        XCTAssertGreaterThan(app.buttons["entry.review"].frame.midX, wordmark.frame.midX)
+        let gear = app.buttons["entry.settings"]
+        let review = app.buttons["entry.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+
+        XCTAssertLessThan(wordmark.frame.midX, review.frame.midX, "the wordmark leads the top bar")
+        XCTAssertLessThan(review.frame.midX, gear.frame.midX, "the Review button sits before the gear")
+        XCTAssertLessThan(wordmark.frame.maxX, gear.frame.minX, "the wordmark never reaches the gear")
+        XCTAssertEqual(wordmark.frame.midY, gear.frame.midY, accuracy: 2, "the wordmark shares the gear's centre line")
     }
 
     /// Opening Choose a photo leaves a resumable session alone; choosing a photo
