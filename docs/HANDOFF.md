@@ -27,12 +27,11 @@
 
 ## Current ticket
 
-- **None in progress.** **#76** is delivered and merged (see *Recently merged*
-  below). The next V1-04 subtickets are **#77** (neutral dock chrome and side
-  layouts, the labelled Delete/Keep pair and the side-layout gap) and **#78**
-  (persist Control Position, Show Buttons, Haptics and Undo Position); **#79**
-  follows them. **#73** (a migrated Tumbler plan whose cursor vanished) is still
-  not started.
+- **None in progress.** **#77** is delivered and merged (see *Recently merged*
+  below). The remaining V1-04 subtickets are **#78** (persist Control Position,
+  Show Buttons, Haptics and Undo Position) and **#79** (accessibility,
+  screenshots and real-device tuning for the dock). **#73** (a migrated Tumbler
+  plan whose cursor vanished) is still not started.
 
 ## Open PRs
 
@@ -50,6 +49,31 @@
   `Scripts/ticket_controller.py` and PR #37 are off-limits).
 
 ## Recently merged
+
+- **#77 — V1-04c: Neutral decision-dock chrome and side layouts** (PR #88, merge
+  commit `7654936`). The dock now has its two neutral layouts: the labelled
+  **Delete/Keep pair** inside one stadium tray with a **separate smaller Undo**
+  (44 pt) beside it at the bottom, and three **separate icon controls** a 14 pt
+  non-action gap apart at the sides. The labelled pair is the dock's anchor in
+  both layouts — `ControlClusterLayout.centre` is the pair's centre and
+  `slotRect(for:in:undoSide:)` grows off it by the control and gap Undo adds — so
+  "Before actions" (Undo left of the bottom pair, above a side pair) and "After
+  actions" mirror each other and Delete and Keep never shift under the thumb. The
+  red Trash and green Keep buttons are gone: the only red and green left are
+  `DockEdgeTint` rims (desaturated, 0.16 opacity, a control's own edges, the same
+  strength in every state), the swipe wells wear the same rim and arm by stroke
+  weight rather than a tinted fill, and symbols, wording, stroke and weight carry
+  every outcome. The dock is a fixed size for a given screen width — the pills
+  narrow to 85 pt on a 320 pt layout so the whole dock stays on screen — and the
+  media still never moves for chrome (ADR-0006). Five Codex rounds: four P2s
+  found (a pair-anchor/doc mismatch, a saturated well fill, the clipped 320 pt
+  dock, a stale "fixed size" claim), all fixed on the PR; round 5, of the merged
+  head `5da18ea`, reported no findings. Full local suite green on
+  `SWIPR iPhone 11 Pro`: 229 kit + 50 app + 72 UI = 351 tests, 0 failures; CI
+  `checks` green (one run on that head failed with the known launch stall in #84
+  before any assertion, and the re-run was green). Screenshots:
+  `docs/screenshots/milestones/v1-04/` (12, re-captured: bottom/left/right/moving
+  × light/dark/AX5).
 
 - **#76 — V1-04b: Wire direct dock movement into the viewer** (PR #86, merge
   commit `2e56f87`). The legacy grip/puck/phantom-slot control is replaced by
@@ -110,10 +134,10 @@
 
 ## What is next
 
-1. **#77** (neutral dock chrome and side layouts — the labelled Delete/Keep pair
-   at the bottom, icon controls with a non-action gap at the sides) is now
-   unblocked by #76; then **#78** (persist Control Position, Show Buttons,
-   Haptics, Undo Position) and **#79**.
+1. **#78** (persist Control Position, Show Buttons, Haptics and Undo Position,
+   with the Setting wording "Before actions" / "After actions" and the Haptics
+   preference), then **#79** (VoiceOver placement actions, Reduce
+   Motion/Transparency, contrast, real-device tuning).
 2. **#73** (the migrated Tumbler plan's vanished cursor) is still not started.
 3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 

@@ -157,7 +157,8 @@
 > drawn in the dock's own shape (never in saturated colour); a valid release
 > lands, an invalid one restores the source. `SWIPRKit/DockGeometry` (#75) owns
 > the arithmetic and `ControlClusterLayout` lost the grip/slot geometry (its dock
-> is 228 × 88 — the number the spec pins the three positions to). Sharp edge: a
+> was 228 × 88 then; **#77** replaced that with the labelled pair at the bottom —
+> 286 × 68 — and 56 × 196 columns at the sides). Sharp edge: a
 > control's own action fires on the same touch-up that ends a drag, and SwiftUI
 > gives no order between the two, so `dockMoved` outlives the gesture by one
 > main-queue turn, and a drop back on the destination the dock already occupies
@@ -181,6 +182,39 @@
 > The dock's labelled/icon chrome and the side layouts stay with **#77**, and the
 > persisted preferences (Control Position, Show Buttons, Haptics, Undo Position)
 > with **#78**.
+>
+> **#77 update (2026-10-09):** the dock now has its two neutral layouts. At the
+> bottom, Delete and Keep are **labelled pills inside one stadium tray** and Undo
+> is a **separate, smaller control** (44 pt) beside them; at a side, all three are
+> **separate icon controls** with a 14 pt non-action gap. The labelled pair is the
+> anchor in both layouts: `ControlClusterLayout.centre` is the pair's centre at
+> every position and `slotRect(for:in:undoSide:)` grows off it by the one control
+> and gap the separate Undo adds — to the side it took at the bottom, above it at
+> a side — so “Before actions” (Undo left of the bottom pair, above a side pair)
+> and “After actions” mirror each other and Delete and Keep never shift under the
+> thumb. The chrome is neutral: the red and green buttons are gone, and the only
+> red and green left are `DockEdgeTint` rims at 0.16 opacity on a control's own
+> edges, at the same strength in every state. The swipe wells wear the same rim
+> and nothing else, arming by stroke weight (1 → 3 pt) and the drag's own opacity
+> rather than a tinted fill, so no saturation carries a meaning anywhere. The dock
+> is a fixed size for a given screen width, never by its content or state, so the
+> media still never moves or resizes for chrome (ADR-0006); the one thing a screen
+> width changes is the bottom pills' width — 85 pt instead of 104 pt on a 320 pt
+> layout, with a 76 pt floor, so the whole dock including Undo stays on screen —
+> and the pill labels stop growing at 20 pt rather than truncate, which is what
+> the AX5 screenshots show. Full local suite green on
+> `SWIPR iPhone 11 Pro`: **229 kit + 50 app + 72 UI = 351 tests, 0 failures**.
+> The twelve v1-04 dock screenshots (bottom/left/right/moving × light/dark/AX5)
+> were re-captured under `docs/screenshots/milestones/v1-04/`. Delivered and
+> merged as **PR #88** (merge commit `7654936`), after five Codex rounds: rounds
+> 1–4 found four P2s (comments claiming the pair anchored the side layouts too, a
+> well that tinted its whole surface, a bottom dock that clipped Undo by 11 pt on
+> a 320 pt layout, and a stale “fixed size” claim in `docs/TESTING.md`), each
+> fixed on the PR before the final head, and round 5 on the merged head
+> `5da18ea` reported no findings. One CI run on that head failed before any
+> assertion with the known `Failed to launch … Timed out while launching
+> application via Xcode` stall (#84); the re-run was green, and no retry flag,
+> skip or loosened assertion was added.
 
 ---
 
@@ -203,6 +237,7 @@
 | [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
 | [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
 | [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/Swiper/issues/76) | 2 | 1 | 0 | Yes — round 1 found a preference write that could re-pin the session's direction, and a capture dropped inside its own release radius; both fixed in `9680607` with tests verified by breaking the fix, and round 2 reported no findings | Yes (PR #86, `2e56f87`) |
+| [#77 — V1-04c: Neutral decision-dock chrome and side layouts](https://github.com/Jinshuo7/Swiper/issues/77) | 5 | 1 | 4 | Yes — round 1: comments claimed one pair anchor across both layouts while a side column was anchored whole (wording fixed, `8ca20d5`); round 2: that same comment plus an outcome well that tinted its whole surface and strengthened the fill when armed (the pair became the anchor in the side layouts too, and the well tint became a rim at constant strength, `a3b0257`); round 3: the fixed 286 pt bottom dock clipped Undo by 11 pt on a 320 pt layout (fitted pill width, `395916e`); round 4: `docs/TESTING.md` still called that width fixed (wording corrected, `5da18ea`); round 5 on the merged head reported no findings | Yes (PR #88, `7654936`) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >
