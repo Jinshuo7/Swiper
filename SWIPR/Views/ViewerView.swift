@@ -253,7 +253,7 @@ struct ViewerView: View {
     }
 
     private func outcomeTint(_ direction: SessionAction) -> Color {
-        direction == .queueDeletion ? .red : .green
+        direction == .queueDeletion ? DockEdgeTint.delete : DockEdgeTint.keep
     }
 
     private func outcomeWell(
@@ -376,22 +376,23 @@ struct ViewerView: View {
     private func dockLayer(in size: CGSize, origin: CGPoint) -> some View {
         if model.preferences.showButtons {
             let position = model.preferences.position
-            let cluster = ControlClusterLayout.clusterSize(for: position)
-            let centre = DockGeometry.centre(for: position, in: size)
-            let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
+            let undoSide = model.preferences.undoSide
+            let rect = ControlClusterLayout.slotRect(for: position, in: size, undoSide: undoSide)
 
             ZStack {
                 if dockMove.isMoving {
-                    dockToken(in: size, centre: centre)
+                    dockToken(in: size, centre: CGPoint(x: rect.midX, y: rect.midY))
                 } else {
-                    dockControls(vertical: position.isVertical)
+                    dockControls(position: position, undoSide: undoSide, in: size)
                 }
             }
-            .frame(width: cluster.width, height: cluster.height)
+            .frame(width: rect.width, height: rect.height)
             // The whole frame, gaps included, is the drag surface: `contentShape`
-            // is what puts the tray's empty corners and the space between two
-            // controls under the finger as well.
-            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            // is what puts the space between two controls under the finger as
+            // well. Its corners are only slightly rounded, so every point inside
+            // the dock's frame — including the tray's padding and the gap either
+            // side of the separate Undo control — belongs to the handle.
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .opacity(isClusterIdle && !dockMove.isMoving ? 0.7 : 1)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isClusterIdle)
             // Recorded before `.offset` so a gesture that begins in a gap is
@@ -412,27 +413,91 @@ struct ViewerView: View {
             // `.position` wraps the view in a full-screen container, which both
             // mis-reports the dock's frame and stopped its gesture from ever
             // being recognised.
-            .offset(x: centre.x - cluster.width / 2, y: centre.y - cluster.height / 2)
+            .offset(x: rect.minX, y: rect.minY)
         }
     }
 
-    private func dockControls(vertical: Bool) -> some View {
-        let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
-        let controls = ControlClusterLayout.order(for: model.preferences.undoSide)
-        let stack = vertical
-            ? AnyLayout(VStackLayout(spacing: ControlClusterLayout.controlSpacing))
-            : AnyLayout(HStackLayout(spacing: ControlClusterLayout.controlSpacing))
-
-        return ZStack {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                )
-            stack {
-                ForEach(controls) { decisionControl($0) }
+    /// The two layouts of the neutral dock.
+    ///
+    /// At the bottom the labelled Delete/Keep pair is centred with the separate
+    /// smaller Undo control outside it; at a side three separate icon controls
+    /// stand apart with a non-action gap between them. In both, Undo takes an
+    /// outer end — the left of the row, the top of the column — so "Before
+    /// actions" means the same thing whichever layout is on screen, and Delete
+    /// and Keep never move relative to each other.
+    @ViewBuilder
+    private func dockControls(position: ControlPosition, undoSide: UndoSide, in size: CGSize) -> some View {
+        if position.isVertical {
+            VStack(spacing: ControlClusterLayout.controlSpacing) {
+                ForEach(ControlClusterLayout.order(for: undoSide)) { control in
+                    decisionControl(control)
+                }
             }
+        } else {
+            HStack(spacing: ControlClusterLayout.undoGap) {
+                if undoLeads(undoSide) { undoControl }
+                bottomTray(in: size)
+                if !undoLeads(undoSide) { undoControl }
+            }
+        }
+    }
+
+    /// Whether Undo takes the leading end of the layout axis, which is what
+    /// "Before actions" means: the left of the bottom row, the top of a column.
+    /// It is read off the one order the two layouts share, so the mapping cannot
+    /// drift between them.
+    private func undoLeads(_ undoSide: UndoSide) -> Bool {
+        ControlClusterLayout.order(for: undoSide).first == .undo
+    }
+
+    /// The bottom tray: the two labelled pills together, so the pair reads as
+    /// one centred unit with its own quiet edge, drawn at the one frame the
+    /// geometry gives the pair. On a narrow screen the pills narrow with it — the
+    /// pair keeps its anchor and the whole dock stays on screen.
+    private func bottomTray(in size: CGSize) -> some View {
+        let tray = ControlClusterLayout.traySize(in: size)
+        return HStack(spacing: ControlClusterLayout.pillSpacing) {
+            DecisionPill(
+                systemImage: "trash",
+                title: "Delete",
+                edgeTint: DockEdgeTint.delete,
+                identifier: "control.delete"
+            ) {
+                clusterAction { model.apply(.queueDeletion) }
+            }
+            DecisionPill(
+                systemImage: "checkmark",
+                title: "Keep",
+                edgeTint: DockEdgeTint.keep,
+                identifier: "control.keep"
+            ) {
+                clusterAction { model.apply(.keep) }
+            }
+        }
+        .padding(ControlClusterLayout.trayInset)
+        .frame(width: tray.width, height: tray.height)
+        .background(
+            DockControlBackground(
+                shape: RoundedRectangle(
+                    cornerRadius: tray.height / 2,
+                    style: .continuous
+                ),
+                edgeTint: nil
+            )
+        )
+    }
+
+    /// The separate, smaller Undo of the bottom layout. Undo is the only
+    /// reversible decision and the least frequent one, so it stays a step apart
+    /// from the pair and never between Delete and Keep.
+    private var undoControl: some View {
+        CircleControl(
+            systemImage: "arrow.uturn.backward",
+            label: "Undo",
+            visualSize: ControlClusterLayout.undoControlSize,
+            hitSize: ControlClusterLayout.undoControlSize
+        ) {
+            clusterAction { model.apply(.undo) }
         }
     }
 
@@ -469,15 +534,20 @@ struct ViewerView: View {
     @ViewBuilder
     private func destinationMarkers(in size: CGSize) -> some View {
         if model.preferences.showButtons && dockMove.isMoving {
-            let radius = ControlClusterLayout.controlSize / 2 + ControlClusterLayout.trayInset
             ZStack {
                 ForEach(ControlPosition.allCases) { position in
-                    let rect = ControlClusterLayout.slotRect(for: position, in: size)
+                    let rect = ControlClusterLayout.slotRect(
+                        for: position,
+                        in: size,
+                        undoSide: model.preferences.undoSide
+                    )
                     let captured = dockMove.captured == position
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    // The marker is the dock's own shape at the dock's own size,
+                    // so what it covers is exactly what the dock will cover.
+                    RoundedRectangle(cornerRadius: min(rect.width, rect.height) / 2, style: .continuous)
                         .fill(Color.white.opacity(captured ? 0.10 : 0.04))
                         .overlay(
-                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            RoundedRectangle(cornerRadius: min(rect.width, rect.height) / 2, style: .continuous)
                                 .stroke(
                                     Color.white.opacity(captured ? 0.95 : 0.30),
                                     lineWidth: captured ? 2.5 : 1
@@ -495,27 +565,18 @@ struct ViewerView: View {
     @ViewBuilder
     private func decisionControl(_ control: ControlClusterLayout.ClusterControl) -> some View {
         switch control {
-        case .trash: trashControl
-        case .keep: keepControl
-        case .undo: undoControl
-        }
-    }
-
-    private var trashControl: some View {
-        CircleControl(systemImage: "trash", label: "Delete", tint: .red) {
-            clusterAction { model.apply(.queueDeletion) }
-        }
-    }
-
-    private var keepControl: some View {
-        CircleControl(systemImage: "checkmark", label: "Keep", tint: .green) {
-            clusterAction { model.apply(.keep) }
-        }
-    }
-
-    private var undoControl: some View {
-        CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
-            clusterAction { model.apply(.undo) }
+        case .trash:
+            CircleControl(systemImage: "trash", label: "Delete", edgeTint: DockEdgeTint.delete) {
+                clusterAction { model.apply(.queueDeletion) }
+            }
+        case .keep:
+            CircleControl(systemImage: "checkmark", label: "Keep", edgeTint: DockEdgeTint.keep) {
+                clusterAction { model.apply(.keep) }
+            }
+        case .undo:
+            CircleControl(systemImage: "arrow.uturn.backward", label: "Undo") {
+                clusterAction { model.apply(.undo) }
+            }
         }
     }
 

@@ -368,10 +368,10 @@ final class PlaySessionUITests: XCTestCase {
         return control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
     }
 
-    /// The point a destination sits at in window coordinates: a row centred on
-    /// the width 20 pt above the bottom safe edge, columns 20 pt inside the edge
-    /// at 75 % of the safe height, which in portrait is 64 pt from the window
-    /// edge for the 88 pt-wide column.
+    /// The point a destination sits at in window coordinates: the labelled pair
+    /// centred on the width 20 pt above the bottom safe edge, and side columns
+    /// whose pair is 20 pt inside the edge at 75 % of the safe height, which in
+    /// portrait is 48 pt from the window edge for the 56 pt-wide column.
     private func bottomTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
         return CGPoint(x: window.midX, y: window.height * 0.88)
@@ -379,12 +379,12 @@ final class PlaySessionUITests: XCTestCase {
 
     private func leftTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.minX + 64, y: window.height * 0.73)
+        return CGPoint(x: window.minX + 48, y: window.height * 0.73)
     }
 
     private func rightTarget(_ app: XCUIApplication) -> CGPoint {
         let window = app.windows.firstMatch.frame
-        return CGPoint(x: window.maxX - 64, y: window.height * 0.73)
+        return CGPoint(x: window.maxX - 48, y: window.height * 0.73)
     }
 
     /// Captures the destination markers while the dock is held mid-move, because
