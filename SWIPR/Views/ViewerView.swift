@@ -114,6 +114,7 @@ struct ViewerView: View {
         .task(id: currentID) {
             updatePrefetch()
             model.presentTutorialIfNeeded()
+            applyFrozenSwipeIfRequested()
             activityToken += 1
         }
         .onDisappear { clearPrefetch() }
@@ -210,6 +211,21 @@ struct ViewerView: View {
             }
     }
 
+    /// UI-test seam: freezes the swipe part-way so the mid-drag feedback can be
+    /// screenshotted without a held finger. Only the explicit
+    /// `-uiTestingFreezeSwipe left|right` argument triggers it, so the shipping
+    /// app never reaches it.
+    private func applyFrozenSwipeIfRequested() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-uiTestingFreezeSwipe"),
+              arguments.indices.contains(flag + 1) else { return }
+        switch arguments[flag + 1] {
+        case "left": dragOffset = CGSize(width: -commitThreshold * 0.6, height: 0)
+        case "right": dragOffset = CGSize(width: commitThreshold * 0.6, height: 0)
+        default: break
+        }
+    }
+
     // MARK: - Drag feedback
 
     /// Feedback only: the corner wells are revealed by the drag and are not
@@ -235,8 +251,7 @@ struct ViewerView: View {
                 )
                 .ignoresSafeArea()
 
-                VStack {
-                    Spacer()
+                VStack(spacing: 0) {
                     HStack {
                         if direction == .queueDeletion {
                             outcomeWell(
@@ -244,7 +259,8 @@ struct ViewerView: View {
                                 title: "Delete",
                                 tint: outcomeTint(direction),
                                 armed: armed,
-                                progress: progress
+                                progress: progress,
+                                identifier: "viewer.dragFeedback.delete"
                             )
                         }
                         Spacer(minLength: 0)
@@ -254,17 +270,22 @@ struct ViewerView: View {
                                 title: "Keep",
                                 tint: outcomeTint(direction),
                                 armed: armed,
-                                progress: progress
+                                progress: progress,
+                                identifier: "viewer.dragFeedback.keep"
                             )
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 104)
+                    // Upper third, clear of the whole top bar — even the tallest
+                    // AX5 Live/Video badge — so a thumb on the photo can never
+                    // cover the outcome it is choosing.
+                    .padding(.top, 80)
+                    Spacer(minLength: 0)
                 }
             }
-            // Feedback must never swallow the drag it is describing.
+            // Feedback must never swallow the drag it is describing. It stays in
+            // the accessibility tree so a UI test can measure where it lands.
             .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
     }
 
@@ -277,7 +298,8 @@ struct ViewerView: View {
         title: String,
         tint: Color,
         armed: Bool,
-        progress: CGFloat
+        progress: CGFloat,
+        identifier: String
     ) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
@@ -293,6 +315,9 @@ struct ViewerView: View {
         .background(WellBackground(tint: tint, armed: armed))
         .scaleEffect(reduceMotion ? 1 : (armed ? 1.06 : 0.94 + 0.06 * progress))
         .opacity(0.3 + 0.7 * progress)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Chrome
@@ -301,27 +326,26 @@ struct ViewerView: View {
     /// into review. None of it moves when the cluster moves, because it is
     /// anchored independently at the top.
     private var topBar: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             closeControl
             Spacer(minLength: 0)
-            // The media kind sits on the trailing edge, directly beneath the way
-            // into Review, so the two read as one quiet column.
-            VStack(alignment: .trailing, spacing: 8) {
-                reviewControl
-                mediaKindBadge
-            }
+            // The media kind and the way into Review share the top bar row, so
+            // the badge's centre line is Close's centre line, not a second row
+            // beneath Review.
+            mediaKindBadge
+            reviewControl
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
     }
 
-    /// A small neutral glass capsule naming what is on screen: Photo, Live or
-    /// Video. The symbol *and* the word carry the meaning, so nothing rests on
-    /// colour alone, and a plain photo is named as plainly as a Live Photo or a
-    /// video. It sits beneath Review on the trailing edge.
+    /// A small neutral glass capsule naming what is on screen: Live or Video.
+    /// A plain photo carries no badge — there is nothing to distinguish — while
+    /// the symbol *and* the word carry the meaning for the kinds that do. It
+    /// sits in the top bar row, centred with Close.
     @ViewBuilder
     private var mediaKindBadge: some View {
-        if let asset = model.currentAsset {
+        if let asset = model.currentAsset, asset.kind != .photo {
             let presentation = MediaKindPresentation(kind: asset.kind)
             HStack(spacing: 4) {
                 Image(systemName: presentation.symbol)
@@ -357,30 +381,24 @@ struct ViewerView: View {
         }
     }
 
-    /// A compact, always-reachable way into deletion review. It states the
-    /// agreed wording — photos are *marked*, nothing has been deleted.
+    /// A round 44 pt trash control, the same glass circle as Close, that is
+    /// always reachable once anything is marked. The count sits in a small red
+    /// badge; the spoken label carries the same count, and the button never
+    /// says "Review".
     @ViewBuilder
     private var reviewControl: some View {
         if model.queueCount > 0 {
-            Button {
+            CircleControl(
+                systemImage: "trash",
+                label: DeletionWording.markedForDeletion(model.queueCount),
+                identifier: "viewer.review",
+                visualSize: 34,
+                hitSize: 44,
+                badgeCount: model.queueCount
+            ) {
                 model.goToReview(from: .viewer)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "trash")
-                    Text(DeletionWording.reviewCompact(model.queueCount))
-                }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(.ultraThinMaterial, in: Capsule())
-                .foregroundStyle(.white)
-                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-                // The chip stays compact; the tap target matches Close's 44 pt.
-                .frame(minHeight: 44)
             }
-            .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)
-            .accessibilityIdentifier("viewer.review")
         }
     }
 

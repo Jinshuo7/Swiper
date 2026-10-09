@@ -830,3 +830,84 @@ Screen size: **375 x 667 pt**.
 | `chevron.right` | 329.0 | 1257.0 | 7.0 | 11.5 | — |
 | `Default direction` | 20.0 | 1339.5 | 124.0 | 14.5 | — |
 | `settings.direction` | 38.0 | 1384.0 | 299.0 | 31.0 | <44, bottom, off-screen |
+
+## Round 2
+
+Round 2 changes only the owner's three items. Screenshots live in
+[`round-2/`](round-2) and the single matrix contact sheet is
+[`round-2-sheet.png`](round-2-sheet.png). Frames are measured from the same
+accessibility dumps as round 1.
+
+### Fix 1 — the media badge is only for Live Photo and Video
+
+A plain photo has no `viewer.mediaBadge` element at all. The badge lives in
+the top bar row, so its centre y equals `viewer.close`'s.
+
+| Screen | Badge x, y, w, h | Close x, y, w, h | Centre Δy |
+| --- | --- | --- | --- |
+| 11 Pro light — Live Photo | 299, 58, 60, 27 | 16, 50, 44, 44 | +0.2 |
+| 11 Pro dark — Live Photo | 299, 58, 60, 27 | 16, 50, 44, 44 | +0.2 |
+| 11 Pro AX5 — Live Photo | 209, 50, 150, 65 | 16, 60, 44, 44 | -0.2 |
+| SE light — Live Photo | 299, 34, 60, 28 | 16, 26, 44, 44 | +0.2 |
+| SE dark — Live Photo | 299, 34, 60, 28 | 16, 26, 44, 44 | +0.2 |
+| SE AX5 — Live Photo | 209, 26, 150, 65 | 16, 36, 44, 44 | +0.0 |
+| 11 Pro light — plain photo | no badge (measured absent) | — | — |
+| 11 Pro dark — plain photo | no badge (measured absent) | — | — |
+| 11 Pro AX5 — plain photo | no badge (measured absent) | — | — |
+| SE light — plain photo | no badge (measured absent) | — | — |
+| SE dark — plain photo | no badge (measured absent) | — | — |
+| SE AX5 — plain photo | no badge (measured absent) | — | — |
+
+### Fix 2 — swipe feedback in the upper third
+
+The Delete/Keep feedback that appears while dragging now sits just below
+the top bar. It never reaches the bottom half and never overlaps a top-bar
+control.
+
+| Screen | Well | x, y, w, h | Mid-y | Screen h | Upper third |
+| --- | --- | --- | ---: | ---: | --- |
+| 11 Pro light — swipe left | viewer.dragFeedback.delete | 21, 124, 107, 50 | 149 | 812 | yes |
+| 11 Pro light — swipe right | viewer.dragFeedback.keep | 256, 124, 98, 45 | 146 | 812 | yes |
+| 11 Pro dark — swipe left | viewer.dragFeedback.delete | 21, 124, 107, 50 | 149 | 812 | yes |
+| 11 Pro dark — swipe right | viewer.dragFeedback.keep | 256, 124, 98, 45 | 146 | 812 | yes |
+| 11 Pro AX5 — swipe left | viewer.dragFeedback.delete | 22, 125, 240, 94 | 172 | 812 | yes |
+| 11 Pro AX5 — swipe right | viewer.dragFeedback.keep | 141, 125, 211, 82 | 165 | 812 | yes |
+| SE light — swipe left | viewer.dragFeedback.delete | 21, 100, 108, 50 | 125 | 667 | yes |
+| SE light — swipe right | viewer.dragFeedback.keep | 256, 100, 99, 44 | 122 | 667 | yes |
+| SE dark — swipe left | viewer.dragFeedback.delete | 21, 100, 108, 50 | 125 | 667 | yes |
+| SE dark — swipe right | viewer.dragFeedback.keep | 256, 100, 99, 44 | 122 | 667 | yes |
+| SE AX5 — swipe left | viewer.dragFeedback.delete | 22, 101, 241, 95 | 148 | 667 | yes |
+| SE AX5 — swipe right | viewer.dragFeedback.keep | 141, 101, 212, 81 | 141 | 667 | yes |
+
+### Fix 3 — round 44 x 44 Review button
+
+Both Review entries are round 44 x 44 trash controls matching the control
+beside them, with a red count badge and no "Review" text. At zero marks
+neither exists.
+
+| Screen | Element | x, y, w, h | Present |
+| --- | --- | --- | --- |
+| 11 Pro light — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| 11 Pro light — Viewer at 2 marks | viewer.review | 315, 50, 44, 44 | yes |
+| 11 Pro light — Home at 0 marks | entry.review | — | absent (correct) |
+| 11 Pro light — Home at 2 marks | entry.review | 315, 52, 44, 44 | yes |
+| 11 Pro dark — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| 11 Pro dark — Viewer at 2 marks | viewer.review | 315, 50, 44, 44 | yes |
+| 11 Pro dark — Home at 0 marks | entry.review | — | absent (correct) |
+| 11 Pro dark — Home at 2 marks | entry.review | 315, 52, 44, 44 | yes |
+| 11 Pro AX5 — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| 11 Pro AX5 — Viewer at 2 marks | viewer.review | 315, 50, 44, 44 | yes |
+| 11 Pro AX5 — Home at 0 marks | entry.review | — | absent (correct) |
+| 11 Pro AX5 — Home at 2 marks | entry.review | 315, 52, 44, 44 | yes |
+| SE light — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| SE light — Viewer at 2 marks | viewer.review | 315, 26, 44, 44 | yes |
+| SE light — Home at 0 marks | entry.review | — | absent (correct) |
+| SE light — Home at 2 marks | entry.review | 315, 28, 44, 44 | yes |
+| SE dark — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| SE dark — Viewer at 2 marks | viewer.review | 315, 26, 44, 44 | yes |
+| SE dark — Home at 0 marks | entry.review | — | absent (correct) |
+| SE dark — Home at 2 marks | entry.review | 315, 28, 44, 44 | yes |
+| SE AX5 — Viewer at 0 marks | viewer.review | — | absent (correct) |
+| SE AX5 — Viewer at 2 marks | viewer.review | 315, 26, 44, 44 | yes |
+| SE AX5 — Home at 0 marks | entry.review | — | absent (correct) |
+| SE AX5 — Home at 2 marks | entry.review | 315, 28, 44, 44 | yes |

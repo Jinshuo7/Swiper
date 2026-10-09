@@ -242,15 +242,21 @@ final class PlaySessionUITests: XCTestCase {
     }
 
     /// Advances the fake library until a Live Photo is on screen, so the top
-    /// strip is carrying everything it ever carries.
+    /// strip is carrying everything it ever carries. A plain photo now carries
+    /// no badge at all, so the loop waits for the badge to appear rather than
+    /// reading the label of an element that does not exist.
     private func advanceToALivePhoto(_ app: XCUIApplication) {
         let badge = app.otherElements["viewer.mediaBadge"]
         var steps = 0
-        while badge.label != "Live Photo" && steps < 8 {
+        while steps < 8 {
+            if badge.exists, badge.label == "Live Photo" { break }
             keepCurrent(app)
             steps += 1
         }
-        XCTAssertEqual(badge.label, "Live Photo", "never reached a Live Photo to put a badge in the top strip")
+        XCTAssertTrue(
+            badge.exists && badge.label == "Live Photo",
+            "never reached a Live Photo to put a badge in the top strip"
+        )
     }
 
     // MARK: - Invariants
@@ -1191,5 +1197,122 @@ final class PlaySessionUITests: XCTestCase {
         app.buttons["review.delete"].tap()
         assertReachable(app, "result.done", in: app.buttons, "playtest round 1 result", scrollUpTo: 4)
         captureRound("23-result-ax5", app: app)
+    }
+
+    // MARK: - Playtest round 2 capture
+
+    /// The launch argument the app uses to read the mixed three-kind showcase.
+    private let mixedMediaLaunchArgument = "-uiTestingMixedMediaLibrary"
+
+    func testPlaytestRound2Light() {
+        runRound2(suffix: "light", appearance: ["-uiTestingForceLight"])
+    }
+
+    func testPlaytestRound2Dark() {
+        runRound2(suffix: "dark", appearance: ["-uiTestingForceDark"])
+    }
+
+    func testPlaytestRound2Accessibility() {
+        runRound2(
+            suffix: "ax5",
+            appearance: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        )
+    }
+
+    private func runRound2(suffix: String, appearance: [String]) {
+        captureRound2Main(suffix, appearance)
+        captureRound2Swipe("left", suffix, appearance)
+        captureRound2Swipe("right", suffix, appearance)
+    }
+
+    /// One launch covers the badge kinds, both Review-button states, the three
+    /// dock positions, and Home with marks waiting.
+    private func captureRound2Main(_ suffix: String, _ appearance: [String]) {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: appearance + [mixedMediaLaunchArgument]
+        )
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        captureRound("round2-review-0-home-\(suffix)", app: app)
+        XCTAssertFalse(app.buttons["entry.review"].exists, "no marks means no Review button on Home")
+
+        _ = startViewer(app)   // the mixed showcase opens on the plain photo
+        XCTAssertFalse(
+            app.otherElements["viewer.mediaBadge"].waitForExistence(timeout: 2),
+            "a plain photo must not carry a media badge"
+        )
+        captureRound("round2-plain-photo-\(suffix)", app: app)
+        captureRound("round2-review-0-viewer-\(suffix)", app: app)
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "no marks means no Review button in the viewer")
+
+        canvas(app).swipeRight()
+        let badge = app.otherElements["viewer.mediaBadge"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the Live Photo must be named")
+        XCTAssertEqual(badge.label, "Live Photo")
+        captureRound("round2-live-photo-\(suffix)", app: app)
+
+        canvas(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the video must be named")
+        XCTAssertEqual(badge.label, "Video")
+        captureRound("round2-video-\(suffix)", app: app)
+
+        captureRound("round2-dock-bottom-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: leftTarget(app))
+        captureRound("round2-dock-left-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: rightTarget(app))
+        captureRound("round2-dock-right-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: bottomTarget(app))
+        captureRound("round2-dock-bottom-again-\(suffix)", app: app)
+
+        markCurrent(app)
+        markCurrent(app)
+        let viewerReview = app.buttons["viewer.review"]
+        XCTAssertTrue(viewerReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(viewerReview.label, "2 photos marked for deletion")
+        XCTAssertEqual(viewerReview.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(viewerReview.frame.height, 44, accuracy: 1)
+        captureRound("round2-review-2-viewer-\(suffix)", app: app)
+
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        let homeReview = app.buttons["entry.review"]
+        XCTAssertTrue(homeReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(homeReview.label, "2 photos marked for deletion")
+        XCTAssertEqual(homeReview.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(homeReview.frame.height, 44, accuracy: 1)
+        captureRound("round2-review-2-home-\(suffix)", app: app)
+    }
+
+    /// Freezes the swipe at 60 % of the commit threshold and captures the
+    /// Delete/Keep feedback without a held finger.
+    private func captureRound2Swipe(_ direction: String, _ suffix: String, _ appearance: [String]) {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: appearance + [mixedMediaLaunchArgument, "-uiTestingFreezeSwipe", direction]
+        )
+        _ = startViewer(app)
+
+        let identifier = direction == "left" ? "viewer.dragFeedback.delete" : "viewer.dragFeedback.keep"
+        let well = app.otherElements[identifier]
+        XCTAssertTrue(well.waitForExistence(timeout: 5), "the frozen \(direction) swipe should show its feedback")
+        assertDragFeedbackIsInTheUpperThird(app, well: well)
+        captureRound("round2-swipe-\(direction)-\(suffix)", app: app)
+    }
+
+    /// The drag feedback must sit in the upper third, below the top bar and
+    /// clear of its buttons, so a thumb on the photo can never cover it.
+    private func assertDragFeedbackIsInTheUpperThird(_ app: XCUIApplication, well: XCUIElement) {
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(well.frame.midY, window.height / 3, "the swipe feedback must sit in the upper third")
+        XCTAssertLessThan(well.frame.maxY, window.height / 2, "the swipe feedback must never enter the bottom half")
+        for identifier in ["viewer.close", "viewer.review", "viewer.mediaBadge"] {
+            let fixed = app.descendants(matching: .any)[identifier]
+            guard fixed.exists else { continue }
+            let overlap = well.frame.intersection(fixed.frame)
+            let area = overlap.isNull ? 0 : overlap.width * overlap.height
+            XCTAssertLessThan(area, 1, "the swipe feedback must not cover \(identifier)")
+        }
     }
 }

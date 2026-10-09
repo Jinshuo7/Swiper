@@ -25,11 +25,12 @@ on real hardware without changing the contract.
 
 ## 2. Home, entry and filters
 
-1. Home uses the approved **Orange & Porcelain** composition: Settings and Review
-   in stable mirrored top-corner positions, photographic **Everything**,
-   **Photos** and **Videos** choices, a conditional **Continue sorting** action,
-   a separate conditional **Review marked items** action, and a quiet conditional
-   **Your impact** section.
+1. Home uses the approved **Orange & Porcelain** composition: Settings and a
+   round 44 pt **Review** trash button in stable mirrored top-corner positions,
+   photographic **Everything**, **Photos** and **Videos** choices, a conditional
+   **Continue sorting** action, and a quiet conditional **Your impact** section.
+   The Review button shows a small red count badge once anything is marked, and
+   no badge at zero; it never spells out "Review".
 2. **Continue sorting** (resume) is distinct from starting a new session, and
    **Review marked items** is distinct from both; reviewing never changes a
    session.
@@ -74,9 +75,10 @@ on real hardware without changing the contract.
    centred and as large as the display allows. It is never cropped to fill the
    screen; unused area is letterboxed. Chrome never changes the media's size,
    position or crop ([ADR-0006](adr/0006-photo-never-moves-for-chrome.md)).
-2. Overlays float over the media inside safe areas. A small neutral **Photo /
-   Live / Video** badge sits **beneath Review**. Home, Review, media labels,
-   playback controls and decisions stay inside safe touch bounds.
+2. Overlays float over the media inside safe areas. A small neutral **Live
+   Photo / Video** badge sits in the top bar row, vertically centred with Close;
+   a plain photo carries no badge. Home, Review, media labels, playback controls
+   and decisions stay inside safe touch bounds.
 3. The palette is adaptive **neutral glass/material** over the Orange & Porcelain
    application. Red and green are limited to extremely faint desaturated edge
    illumination; symbols, wording, stroke and weight carry meaning.
@@ -85,7 +87,9 @@ on real hardware without changing the contract.
    finger. **Dragging left past the threshold marks for deletion; dragging right
    past the threshold keeps.** The commit threshold is confirmed by strengthened
    outline/symbol weight rather than saturation, with one light haptic at the
-   crossing. Below-threshold, vertical and cancelled drags decide nothing.
+   crossing. The Delete/Keep feedback appears in the **upper third**, just below
+   the top bar, so the thumb doing the swipe never covers it. Below-threshold,
+   vertical and cancelled drags decide nothing.
 5. **Undo** reverses the most recent decision of this session, including removing
    a just-marked item from the deletion list, and returns to that item. Undo never
    deletes, and it is the only way to reverse an individual decision. Its position

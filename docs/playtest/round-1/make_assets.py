@@ -142,6 +142,66 @@ def _sheet(names: List[str], after_dir: str, out: str) -> str:
     return out
 
 
+ROUND2_SCENARIOS = [
+    ("plain-photo", "Plain photo — no badge"),
+    ("live-photo", "Live Photo — badge"),
+    ("video", "Video — badge"),
+    ("swipe-left", "Mid-swipe left"),
+    ("swipe-right", "Mid-swipe right"),
+    ("review-0-home", "Review 0 — Home"),
+    ("review-2-home", "Review 2 — Home"),
+    ("review-2-viewer", "Review 2 — Viewer"),
+    ("dock-bottom", "Dock bottom"),
+    ("dock-left", "Dock left"),
+    ("dock-right", "Dock right"),
+]
+ROUND2_CONFIGS = [
+    ("light", "", "11 Pro light"),
+    ("dark", "", "11 Pro dark"),
+    ("ax5", "", "11 Pro AX5"),
+    ("light", "-se", "SE light"),
+    ("dark", "-se", "SE dark"),
+    ("ax5", "-se", "SE AX5"),
+]
+
+
+def round2_sheet(src_dir: str, out: str, copy_dir: str) -> str:
+    """One matrix: scenarios as rows, device/appearance as columns."""
+    tile_w, tile_h = 190, 340
+    pad, header_h, label_w = 14, 54, 210
+    cols = len(ROUND2_CONFIGS)
+    rows = len(ROUND2_SCENARIOS)
+    width = label_w + cols * (tile_w + pad) + pad
+    height = header_h + rows * (tile_h + pad)
+    sheet = Image.new("RGB", (width, height), (24, 24, 26))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad, 16), "SWIPR playtest round 2 — fixes 1-3", fill=(245, 245, 245), font=_font(24))
+
+    for ci, (appearance, device, label) in enumerate(ROUND2_CONFIGS):
+        x = label_w + ci * (tile_w + pad)
+        draw.text((x, 30), label, fill=(255, 196, 120), font=_font(17))
+
+    for ri, (scenario, row_label) in enumerate(ROUND2_SCENARIOS):
+        y = header_h + ri * (tile_h + pad)
+        draw.text((pad, y + tile_h // 2 - 8), row_label, fill=(220, 220, 220), font=_font(17))
+        for ci, (appearance, device, _label) in enumerate(ROUND2_CONFIGS):
+            x = label_w + ci * (tile_w + pad)
+            name = f"round2-{scenario}-{appearance}{device}.png"
+            path = os.path.join(src_dir, name)
+            draw.rectangle([x - 1, y - 1, x + tile_w + 1, y + tile_h + 1], outline=(80, 80, 88))
+            if not os.path.exists(path):
+                draw.text((x + 12, y + tile_h // 2), "missing", fill=(200, 90, 90), font=_font(15))
+                continue
+            image = Image.open(path).convert("RGB")
+            ratio = min(tile_w / image.width, tile_h / image.height)
+            image = image.resize((round(image.width * ratio), round(image.height * ratio)), Image.LANCZOS)
+            sheet.paste(image, (x + (tile_w - image.width) // 2, y + (tile_h - image.height) // 2))
+    sheet.save(out, "PNG", optimize=True)
+    os.makedirs(copy_dir, exist_ok=True)
+    shutil.copy2(out, os.path.join(copy_dir, os.path.basename(out)))
+    return out
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -152,6 +212,8 @@ def main() -> None:
     elif cmd == "sheets":
         for path in sheets(sys.argv[2], sys.argv[3], sys.argv[4]):
             print(path)
+    elif cmd == "round2sheet":
+        print(round2_sheet(sys.argv[2], sys.argv[3], sys.argv[4]))
     else:
         print(f"unknown command {cmd}")
         sys.exit(1)

@@ -159,19 +159,10 @@ struct EntryView: View {
             Button {
                 model.goToReview(from: .entry)
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "trash")
-                    Text("Review · \(model.queueCount)")
-                }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(palette.surface, in: Capsule())
-                .foregroundStyle(palette.foreground)
-                .overlay(Capsule().stroke(palette.border, lineWidth: 1))
-                // The visible chip stays compact; the tap target matches the
-                // 44 pt Settings button beside it.
-                .frame(minHeight: 44)
+                Image(systemName: "trash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .overlay(alignment: .topTrailing) { CountBadge(count: model.queueCount) }
             }
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)

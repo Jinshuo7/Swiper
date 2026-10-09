@@ -86,6 +86,6 @@ Owner-approved five-frame Orange & Porcelain baseline, indexed by
 | Neutral viewer — **bottom** dock | `04-viewer-bottom-neutral.png` | 1125×2436; text labels |
 | Neutral viewer — **left** dock | `05-viewer-left-neutral.png` | 1125×2436; icon-only |
 | Neutral viewer — **right** dock | `06-viewer-right-neutral.png` | 1125×2436; icon-only |
-Bottom dock shows text labels; sides icon-only. The Photo/Live/Video badge beneath Review is
-  required though not shown; `02-viewer*.png` and the generation prompts are superseded, not
-  targets; new screens follow the same style, labelled `provisional-design`.
+Bottom dock shows text labels; sides icon-only. The Live/Video badge in the top bar, centred
+  with Close, is required; a plain photo shows no badge. `02-viewer*.png` and the generation
+  prompts are superseded, not targets; new screens follow the same style, labelled `provisional-design`.

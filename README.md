@@ -155,15 +155,17 @@ device).
 2. Drag **right** past the threshold — a check well arms with a light haptic and
    the photo is kept. Drag right only a little: nothing happens.
 3. Drag **left** past the threshold — a trash well arms and the photo is
-   **marked**, not deleted. The compact `Review · N` control appears.
+   **marked**, not deleted. The round trash **Review** button appears in the
+   top bar with a red count badge.
 4. Tap **Undo** — the last decision of this session is reversed and you return
    to that photo.
 
 **Deletion review and safety**
 
-6. Mark a few photos and open review from the viewer (`Review · N`) or from home
-   (the `Review · N` chip in the top bar); review is reachable at any time, not
-   only at the end.
+6. Mark a few photos and open review from the viewer (the round trash button in
+   the top bar) or from home (the matching trash button in the top bar); review
+   is reachable at any time, not only at the end. The count sits in the button's
+   red badge, never in text.
 7. Tap a thumbnail to inspect it full-screen; tap **Restore photo** to remove it
    from the list.
 8. Tap **Select**, then drag across thumbnails to select a batch and tap
@@ -177,8 +179,9 @@ device).
 **Persistence, marks and recovery**
 
 11. During a session, force-quit SWIPR mid-way and relaunch. The entry screen
-    offers **Resume** at the saved position, and the `Review · N` chip for the
-    marks, which survive opening Choose a photo and its other traversals too.
+    offers **Resume** at the saved position, and the round trash **Review**
+    button for the marks, which survive opening Choose a photo and its other
+    traversals too.
 12. Marked photos are skipped while sorting. Restoring one lets a later session
     present it again.
 
