@@ -62,12 +62,14 @@ struct DeletionReviewView: View {
             if markedIDs.isEmpty {
                 Color.clear.frame(width: 44, height: 44)
             } else {
-                Button(isSelecting ? "Done" : "Select") {
+                Button {
                     isSelecting.toggle()
                     if !isSelecting { selected.removeAll() }
+                } label: {
+                    Text(isSelecting ? "Done" : "Select")
+                        .frame(width: 60, height: 44)
                 }
                 .font(.subheadline.weight(.semibold))
-                .frame(width: 60, height: 44)
                 .accessibilityIdentifier("review.selectToggle")
             }
         }

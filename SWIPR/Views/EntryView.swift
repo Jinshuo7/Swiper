@@ -169,6 +169,9 @@ struct EntryView: View {
                 .background(palette.surface, in: Capsule())
                 .foregroundStyle(palette.foreground)
                 .overlay(Capsule().stroke(palette.border, lineWidth: 1))
+                // The visible chip stays compact; the tap target matches the
+                // 44 pt Settings button beside it.
+                .frame(minHeight: 44)
             }
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)

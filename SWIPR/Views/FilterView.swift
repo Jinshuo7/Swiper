@@ -135,12 +135,14 @@ struct FilterView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.secondary)
             Spacer(minLength: 0)
-            Button("Clear") {
+            Button {
                 model.clearFilter()
+            } label: {
+                Text("Clear")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(model.filter.isEmpty ? palette.secondary : palette.accent)
-            .frame(minWidth: 44, minHeight: 44)
             .accessibilityIdentifier("filter.clear")
         }
     }
@@ -182,12 +184,14 @@ struct FilterView: View {
             .accessibilityLabel(title(for: category))
             .accessibilityValue(isSelected ? "Included" : "Excluded")
 
-            Button("Only") {
+            Button {
                 model.onlyFilterCategory(category)
+            } label: {
+                Text("Only")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .font(.footnote.weight(.semibold))
             .foregroundStyle(palette.accent)
-            .frame(minWidth: 44, minHeight: 44)
             .accessibilityIdentifier("filter.only.\(category.rawValue)")
             .accessibilityLabel("Only \(title(for: category))")
         }

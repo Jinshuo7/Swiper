@@ -201,6 +201,7 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.vertical, 6)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.position.\(position.rawValue)")
@@ -247,6 +248,7 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.vertical, 6)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.undoSide.\(side.rawValue)")

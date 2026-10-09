@@ -195,7 +195,7 @@ struct TopBarButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
                 .foregroundStyle(.white)
         }

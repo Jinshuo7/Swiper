@@ -375,6 +375,8 @@ struct ViewerView: View {
                 .background(.ultraThinMaterial, in: Capsule())
                 .foregroundStyle(.white)
                 .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                // The chip stays compact; the tap target matches Close's 44 pt.
+                .frame(minHeight: 44)
             }
             .accessibilityLabel(DeletionWording.markedForDeletion(model.queueCount))
             .accessibilityValue(DeletionWording.nothingDeletedYet)
