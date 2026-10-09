@@ -27,11 +27,10 @@
 
 ## Current ticket
 
-- **None in progress.** **#77** is delivered and merged (see *Recently merged*
-  below). The remaining V1-04 subtickets are **#78** (persist Control Position,
-  Show Buttons, Haptics and Undo Position) and **#79** (accessibility,
-  screenshots and real-device tuning for the dock). **#73** (a migrated Tumbler
-  plan whose cursor vanished) is still not started.
+- **None in progress.** **#78** is delivered and merged (see *Recently merged*
+  below); its closing issue **#78** is closed. The remaining V1-04 subticket is
+  **#79** (accessibility, screenshots and real-device tuning for the dock).
+  **#73** (a migrated Tumbler plan whose cursor vanished) is still not started.
 
 ## Open PRs
 
@@ -50,6 +49,34 @@
 
 ## Recently merged
 
+- **#78 — V1-04d: Persist Control Position, Show Buttons, Haptics, Undo
+  Position** (PR #90, merge commit `0151bf6`). The dock's four choices are now
+  one stored struct exposed in Settings, and the optional haptics are one pure
+  contract behind a new switch. `ControlPreferences.haptics` (default on) is an
+  additive key read with `decodeIfPresent(…, forKey: .haptics) ?? true`, so a
+  payload written before the setting existed loads with haptics on. **Undo
+  Position** is named the way `docs/SPEC.md` §5.6 names it — **Before actions**
+  (the default) or **After actions**, relative to the Delete/Keep pair instead of
+  Left/Right — while the persisted `undoSide` key and the dock geometry are
+  untouched. `SWIPRKit.HapticFeedback` owns every optional response (nothing on
+  pickup, one light on the first capture, nothing while a destination stays
+  captured, one soft on a valid landing, nothing on an invalid release or a
+  cancelled touch, one light for a threshold crossing and a control press), and
+  `ViewerView.giveHaptic(_:)` is the only place a haptic is played. Each Settings
+  choice row announces the current one through its accessibility value and the
+  selected trait, so placement never needs a drag. Two Codex rounds: round 1
+  found a real **P1** — every preference write re-pinned the running session's
+  direction from the saved default, so toggling the new switch would have
+  reversed a walk started with an explicit "Newest first"/"Oldest first" and
+  saved the reversal; `AppModel.updatePreferences` now re-pins and writes the
+  session only when `defaultDirection` itself changed (fixed in `78d2a92`, with
+  `testChangingAControlPreferenceNeverReversesTheRunningSession` failing four
+  times when the old re-pin is restored), and round 2 — of that exact head —
+  reported no issues. Full local suite green on `SWIPR iPhone 11 Pro`: 233 kit +
+  55 app + 75 UI = 363 tests, 0 failures; CI `checks` green. Screenshots:
+  `docs/screenshots/milestones/v1-04/` (6: controls and Undo position ×
+  light/dark/AX5; Settings is still pinned dark, so its light capture matches the
+  dark one).
 - **#77 — V1-04c: Neutral decision-dock chrome and side layouts** (PR #88, merge
   commit `7654936`). The dock now has its two neutral layouts: the labelled
   **Delete/Keep pair** inside one stadium tray with a **separate smaller Undo**
@@ -134,10 +161,11 @@
 
 ## What is next
 
-1. **#78** (persist Control Position, Show Buttons, Haptics and Undo Position,
-   with the Setting wording "Before actions" / "After actions" and the Haptics
-   preference), then **#79** (VoiceOver placement actions, Reduce
-   Motion/Transparency, contrast, real-device tuning).
+1. **#79** (VoiceOver placement actions, Reduce Motion/Transparency, contrast,
+   real-device tuning) is the last V1-04 subticket. It inherits one open finding
+   from #78: at the largest text size the Settings rows are taller than the
+   screen and the pre-existing "Reset control position" title hyphenates mid-word
+   (`docs/screenshots/milestones/v1-04/settings-undo-position-ax5.png`).
 2. **#73** (the migrated Tumbler plan's vanished cursor) is still not started.
 3. Keep `docs/IMPLEMENTATION-STATUS.md` and this file current after every ticket.
 
