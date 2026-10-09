@@ -635,25 +635,34 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Stores `preferences` and applies the one of them a running session is
+    /// built from.
+    ///
+    /// Only **Default direction** re-points the walk: it is the direction the
+    /// next session starts in, and a session already under way is turned to it
+    /// at once, so the choice takes effect immediately. The other preferences —
+    /// where the dock sits, whether it is drawn, which end Undo takes, whether
+    /// haptics are given — say nothing about the traversal, so writing one must
+    /// leave the running session alone. Re-pinning from the saved default would
+    /// silently reverse a walk the user began with an explicit "Newest first" or
+    /// "Oldest first", and save that reversal.
     func updatePreferences(_ preferences: ControlPreferences) {
+        let directionChanged = preferences.defaultDirection != self.preferences.defaultDirection
         self.preferences = preferences
         store.savePreferences(preferences)
-        if var engine {
-            engine.setDirection(preferences.defaultDirection)
-            self.engine = engine
-            storedState.session = engine.persisted()
-            Task { await self.persistQuietly(self.storedState) }
-        }
+        guard directionChanged, var engine else { return }
+        engine.setDirection(preferences.defaultDirection)
+        self.engine = engine
+        storedState.session = engine.persisted()
+        Task { await self.persistQuietly(self.storedState) }
     }
 
     /// Moves the dock to `position`, where it is dragged to or stepped to from
     /// Settings.
     ///
-    /// A position the dock already occupies is not a move: nothing is written,
-    /// and in particular the session's direction is left alone. Writing the
-    /// preferences re-pins that direction from the saved default, which would
-    /// silently reverse a walk the user started with an explicit "Newest first"
-    /// or "Oldest first".
+    /// A position the dock already occupies is not a move: nothing is written at
+    /// all, so a drag that ends where it started cannot disturb the saved
+    /// session.
     func moveDock(to position: ControlPosition) {
         guard position != preferences.position else { return }
         var preferences = self.preferences

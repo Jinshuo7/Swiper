@@ -1480,6 +1480,45 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertEqual(clusterDock(app), "Docked bottom")
     }
 
+    /// The four control choices #78 persists, on the screen that offers them:
+    /// the display and feedback toggles with the three places, then the Undo
+    /// position and the reset row, in both appearances and at the largest text
+    /// size, for the v1-04 milestone screenshots.
+    func testCaptureTheSettingsControlsInEveryAppearance() {
+        captureSettingsControls(extraArguments: ["-uiTestingForceLight"], suffix: "light")
+        captureSettingsControls(extraArguments: ["-uiTestingForceDark"], suffix: "dark")
+        captureSettingsControls(
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            ],
+            suffix: "ax5"
+        )
+    }
+
+    private func captureSettingsControls(extraArguments: [String], suffix: String) {
+        let app = launchApp(extraArguments: extraArguments)
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+
+        let haptics = app.switches["settings.haptics"]
+        XCTAssertTrue(haptics.waitForExistence(timeout: 10), "Haptics is missing from Settings")
+        for _ in 0..<6 where !haptics.isHittable { app.swipeUp() }
+        XCTAssertEqual(
+            app.buttons["settings.position.bottom"].value as? String,
+            "Selected",
+            "the screenshot has to show a position that is announced as current"
+        )
+        capture("settings-controls-\(suffix)")
+
+        // The whole Controls section does not fit under the toggles, so the
+        // second shot is the end of it: both Undo positions and the reset row.
+        let reset = app.buttons["settings.resetControls"]
+        for _ in 0..<6 where !reset.isHittable { app.swipeUp() }
+        XCTAssertTrue(reset.exists, "the reset row is missing from Settings")
+        XCTAssertTrue(app.buttons["settings.undoSide.trailing"].exists, "the Undo position is missing from Settings")
+        capture("settings-undo-position-\(suffix)")
+    }
+
     func testQueueForDeletionReachesReviewAndResult() {
         let app = launchApp()
         let photo = startViewer(app)
@@ -1777,7 +1816,65 @@ final class SWIPRUITests: XCTestCase {
             for _ in 0..<4 where !row.isHittable { app.swipeUp() }
             XCTAssertTrue(row.exists, "\(identifier) is missing from Settings")
         }
+        let haptics = app.switches["settings.haptics"]
+        for _ in 0..<4 where !haptics.isHittable { app.swipeUp() }
+        XCTAssertTrue(haptics.exists, "settings.haptics is missing from Settings")
         XCTAssertFalse(app.buttons["settings.preset.swipe"].exists, "the preset list is gone")
+    }
+
+    /// Placement never needs a drag, and VoiceOver says which place is current
+    /// rather than only listing the three. Undo is named relative to the pair.
+    func testSettingsAnnouncesTheCurrentPositionAndTheUndoPosition() {
+        let app = launchApp()
+        app.buttons["entry.settings"].tap()
+
+        let bottom = app.buttons["settings.position.bottom"]
+        let left = app.buttons["settings.position.leading"]
+        for row in [bottom, left] {
+            for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        }
+        XCTAssertTrue(bottom.exists)
+        XCTAssertEqual(bottom.value as? String, "Selected", "the current place is announced")
+        XCTAssertNotEqual(left.value as? String, "Selected", "and only the current one is")
+
+        for _ in 0..<4 where !left.isHittable { app.swipeUp() }
+        left.tap()
+        XCTAssertEqual(left.value as? String, "Selected", "the newly chosen place is announced")
+        XCTAssertNotEqual(bottom.value as? String, "Selected", "the previous one no longer is")
+
+        let before = app.buttons["settings.undoSide.leading"]
+        let after = app.buttons["settings.undoSide.trailing"]
+        for row in [before, after] {
+            for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        }
+        XCTAssertTrue(before.label.contains("Before actions"), "Undo is named relative to the pair, not a screen side")
+        XCTAssertTrue(after.label.contains("After actions"))
+        XCTAssertEqual(before.value as? String, "Selected", "Before actions is the announced default")
+        XCTAssertNotEqual(after.value as? String, "Selected")
+    }
+
+    /// The one control choice with no visible effect of its own is still a real
+    /// preference: it is offered in Settings and survives a relaunch like the
+    /// position and the direction do.
+    func testSettingsOffersHapticsAndRemembersIt() {
+        let app = launchApp(persistentStore: true, resetStore: true)
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        let haptics = app.switches["settings.haptics"]
+        XCTAssertTrue(haptics.waitForExistence(timeout: 10), "Haptics is missing from Settings")
+        XCTAssertEqual(haptics.value as? String, "1", "haptics start on")
+        for _ in 0..<4 where !haptics.isHittable { app.swipeUp() }
+        haptics.tap()
+        XCTAssertEqual(haptics.value as? String, "0")
+        app.buttons["Back"].firstMatch.tap()
+
+        AppLaunchHandoff.stopAppUnderTest()
+        let relaunched = launchApp(persistentStore: true)
+        XCTAssertTrue(relaunched.buttons["entry.settings"].waitForExistence(timeout: 10))
+        relaunched.buttons["entry.settings"].tap()
+        let remembered = relaunched.switches["settings.haptics"]
+        XCTAssertTrue(remembered.waitForExistence(timeout: 10))
+        XCTAssertEqual(remembered.value as? String, "0", "the Haptics choice must survive a relaunch")
     }
 
     /// The wordmark is centred on the screen, framed by the gear and the review

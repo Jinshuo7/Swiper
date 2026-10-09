@@ -1353,4 +1353,157 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(store.savedStates.count, savesBefore, "a drop on the source must not save anything")
         XCTAssertEqual(store.state, storedBefore, "a drop on the source must not rewrite the stored session")
     }
+
+    // MARK: - The four control preferences
+
+    /// The choices a fresh install starts with: the dock at the bottom, buttons
+    /// shown, haptics on, and Undo before the actions.
+    func testControlPreferencesStartAtTheDocumentedDefaults() async {
+        let (model, _, store) = await bootstrapped()
+
+        XCTAssertEqual(model.preferences.position, .bottom)
+        XCTAssertTrue(model.preferences.showButtons)
+        XCTAssertTrue(model.preferences.haptics)
+        XCTAssertEqual(model.preferences.undoSide, .leading)
+        XCTAssertEqual(
+            ControlClusterLayout.order(for: model.preferences.undoSide),
+            [.undo, .trash, .keep],
+            "Before actions is the default, so Undo leads the dock"
+        )
+        XCTAssertEqual(store.loadPreferences(), .default, "nothing is written before the user chooses")
+    }
+
+    /// Every control choice is saved as it changes, comes back on the next
+    /// launch, and leaving it alone never disturbs the saved session: the marked
+    /// photo, the position and Undo are where the user left them.
+    func testEveryControlPreferenceSurvivesRelaunchWithoutDisturbingSavedWork() async {
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(store: store)
+        model.startNewest()
+        await model.settle()
+        model.apply(.queueDeletion)
+        await model.settle()
+        let markedBefore = model.markedIDs
+        let currentBefore = model.currentAsset?.id
+        XCTAssertFalse(markedBefore.isEmpty)
+
+        var preferences = model.preferences
+        preferences.position = .trailing
+        preferences.showButtons = false
+        preferences.haptics = false
+        preferences.undoSide = .trailing
+        model.updatePreferences(preferences)
+        await model.settle()
+        XCTAssertEqual(store.loadPreferences(), preferences, "every choice is saved as it changes")
+
+        let relaunched = AppModel(
+            library: FakePhotoLibrary.demo(count: 8),
+            store: store,
+            defaults: isolatedDefaults()
+        )
+        await relaunched.bootstrap()
+        await relaunched.settle()
+
+        XCTAssertEqual(relaunched.preferences, preferences, "every choice comes back")
+        XCTAssertEqual(relaunched.markedIDs, markedBefore, "writing the preferences keeps every mark")
+        relaunched.resumeSession()
+        XCTAssertEqual(relaunched.currentAsset?.id, currentBefore, "writing the preferences keeps the position")
+    }
+
+    /// Each of the four choices is what the viewer reads: the place it is drawn
+    /// in, whether it is drawn at all, the order Undo takes, and whether any
+    /// optional response is given.
+    func testEveryControlPreferenceReachesTheViewer() async {
+        let (model, _, store) = await bootstrapped()
+        var preferences = model.preferences
+        preferences.position = .trailing
+        preferences.showButtons = false
+        preferences.haptics = false
+        preferences.undoSide = .trailing
+        model.updatePreferences(preferences)
+        await model.settle()
+
+        let safeArea = CGSize(width: 375, height: 763)
+        XCTAssertEqual(
+            ControlClusterLayout.centre(for: model.preferences.position, in: safeArea).x,
+            safeArea.width - ControlClusterLayout.edgeMargin - ControlClusterLayout.controlSize / 2,
+            accuracy: 0.5,
+            "the dock is drawn at the remembered position's slot"
+        )
+        XCTAssertFalse(model.preferences.showButtons, "the viewer draws the dock only while buttons are shown")
+        XCTAssertEqual(
+            ControlClusterLayout.order(for: model.preferences.undoSide),
+            [.trash, .keep, .undo],
+            "the remembered Undo end is the order the dock is drawn in"
+        )
+        XCTAssertEqual(
+            HapticFeedback.response(to: .landing, enabled: model.preferences.haptics),
+            .none,
+            "the remembered Haptics choice is the one the viewer asks for"
+        )
+        XCTAssertEqual(store.loadPreferences(), model.preferences, "the viewer reads the saved preferences")
+    }
+
+    /// The four control choices say nothing about the traversal, so changing one
+    /// must leave a running session where it is. Re-pinning the walk from the
+    /// saved default would silently reverse a session the user began with an
+    /// explicit "Newest first" or "Oldest first", and save that reversal.
+    func testChangingAControlPreferenceNeverReversesTheRunningSession() async {
+        let (model, _, store) = await bootstrapped()
+        model.startOldest()
+        await model.settle()
+        XCTAssertEqual(model.engine?.direction, .newer, "Oldest first pins its own direction")
+
+        let changes: [(String, (inout ControlPreferences) -> Void)] = [
+            ("haptics", { $0.haptics = false }),
+            ("show buttons", { $0.showButtons = false }),
+            ("control position", { $0.position = .leading }),
+            ("undo position", { $0.undoSide = .trailing }),
+        ]
+        for (name, change) in changes {
+            let sessionBefore = store.state?.session
+            var preferences = model.preferences
+            change(&preferences)
+            model.updatePreferences(preferences)
+            await model.settle()
+
+            XCTAssertEqual(model.engine?.direction, .newer, "changing \(name) must not reverse the walk")
+            XCTAssertEqual(
+                store.state?.session,
+                sessionBefore,
+                "changing \(name) must not rewrite the saved session"
+            )
+            XCTAssertEqual(store.loadPreferences(), preferences, "changing \(name) is still saved")
+        }
+    }
+
+    /// Default direction is the one control preference a running session is
+    /// built from, so changing it still takes effect at once and is saved.
+    func testChangingTheDefaultDirectionRePointsAndSavesTheRunningSession() async {
+        let (model, _, store) = await bootstrapped()
+        model.startNewest()
+        await model.settle()
+        XCTAssertEqual(model.engine?.direction, .older, "Newest first pins its own direction")
+
+        var preferences = model.preferences
+        preferences.defaultDirection = .newer
+        model.updatePreferences(preferences)
+        await model.settle()
+
+        XCTAssertEqual(model.engine?.direction, .newer, "the running walk turns to the new default")
+        XCTAssertEqual(store.loadPreferences().defaultDirection, .newer)
+        // The write that carries the turn into the session file is fired off the
+        // serial chain, so wait for it rather than racing it.
+        await waitForStoreToSettle { store.state?.session?.direction == .newer }
+        XCTAssertEqual(store.state?.session?.direction, .newer, "the turned walk is saved")
+    }
+
+    /// Waits for a write the model fires off its serial chain, so a test never
+    /// races a save it does not own.
+    private func waitForStoreToSettle(_ condition: () -> Bool) async {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
 }

@@ -51,8 +51,10 @@ public enum UndoSide: String, Codable, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
-    /// Spoken name, phrased for the bottom row the setting is usually read in.
-    public var title: String { self == .leading ? "Left" : "Right" }
+    /// Spoken name, read relative to the Delete/Keep pair in the current layout
+    /// rather than as a screen side, so the same wording is true of the bottom
+    /// row and of a side column (docs/SPEC.md §5.6).
+    public var title: String { self == .leading ? "Before actions" : "After actions" }
 }
 
 /// The user's persisted interaction preferences.
@@ -65,6 +67,9 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
     public var showButtons: Bool
     /// Which outer end of the cluster Undo occupies.
     public var undoSide: UndoSide
+    /// Whether the optional haptic responses are given at all. Off silences
+    /// every one of them (docs/SPEC.md §5.5).
+    public var haptics: Bool
     /// Direction a new session starts in. The user can change this and it is
     /// remembered.
     public var defaultDirection: TraversalDirection
@@ -73,11 +78,13 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         position: ControlPosition = .bottom,
         showButtons: Bool = true,
         undoSide: UndoSide = .leading,
+        haptics: Bool = true,
         defaultDirection: TraversalDirection = .older
     ) {
         self.position = position
         self.showButtons = showButtons
         self.undoSide = undoSide
+        self.haptics = haptics
         self.defaultDirection = defaultDirection
     }
 
@@ -87,6 +94,7 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         case position
         case showButtons
         case undoSide
+        case haptics
         case defaultDirection
         // Written by older builds that stored the three-way dock under `rail`.
         // Read so a stored choice is not thrown away; nothing writes it.
@@ -98,6 +106,9 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         defaultDirection = try container.decodeIfPresent(TraversalDirection.self, forKey: .defaultDirection) ?? .older
         showButtons = try container.decodeIfPresent(Bool.self, forKey: .showButtons) ?? true
         undoSide = try container.decodeIfPresent(UndoSide.self, forKey: .undoSide) ?? .leading
+        // Every payload written before the Haptics setting existed gets the
+        // documented default, on.
+        haptics = try container.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
 
         if let stored = try? container.decode(ControlPosition.self, forKey: .position) {
             position = stored
@@ -118,7 +129,53 @@ public struct ControlPreferences: Codable, Equatable, Sendable {
         try container.encode(position, forKey: .position)
         try container.encode(showButtons, forKey: .showButtons)
         try container.encode(undoSide, forKey: .undoSide)
+        try container.encode(haptics, forKey: .haptics)
         try container.encode(defaultDirection, forKey: .defaultDirection)
+    }
+}
+
+/// One optional haptic response the viewer can give, and what each interaction
+/// gets.
+///
+/// The contract is the spec's (docs/SPEC.md §§4.4, 5.5): nothing on pickup, one
+/// light response the first time a destination is captured, nothing while that
+/// destination stays captured, one soft response when a release lands on a
+/// destination, and nothing for a release that lands nowhere or a cancelled
+/// touch. A swipe past the commit threshold and a press on a control each get
+/// one light response. The stored **Haptics** preference is the single gate:
+/// with it off, every one of them is ``none``.
+public enum HapticFeedback: Equatable, Sendable {
+    case none
+    case light
+    case soft
+
+    /// One moment the viewer could respond to.
+    public enum Event: Equatable, Sendable {
+        /// The finger came down on the dock.
+        case pickup
+        /// A destination became captured where the finger had none.
+        case capture
+        /// The finger moved while its destination stayed captured.
+        case captureHeld
+        /// A release landed on a destination.
+        case landing
+        /// A release landed nowhere, or the touch was cancelled.
+        case invalidRelease
+        /// A swipe crossed the commit threshold.
+        case thresholdCrossing
+        /// A control on the dock was pressed.
+        case controlPress
+    }
+
+    /// The response `event` calls for, or ``none`` when the user's Haptics
+    /// preference is off.
+    public static func response(to event: Event, enabled: Bool) -> HapticFeedback {
+        guard enabled else { return .none }
+        switch event {
+        case .pickup, .captureHeld, .invalidRelease: return .none
+        case .capture, .thresholdCrossing, .controlPress: return .light
+        case .landing: return .soft
+        }
     }
 }
 
