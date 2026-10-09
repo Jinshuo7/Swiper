@@ -989,3 +989,65 @@ the **Continue sorting** row with a photo thumbnail; **Your impact**.
 - The no-progress Home is captured separately in
   `round-3/current-*-home-empty-*.png`; the reference only shows the
   progress-plus-marks state.
+
+## Round 4 — Home polish against the reference
+
+Owner review of `round-3/home-compare.png` asked for real photos, larger type
+and cards, a screen that fills to the bottom, the Continue row's month subtitle,
+a visible light-mode status bar and a seeded "Your impact". Artifacts live in
+[`round-4/`](round-4); [`round-4/home-compare.png`](round-4/home-compare.png) is
+the reference on the left and the current build on the right, light and dark.
+
+**Media.** Twenty real photos from [picsum.photos](https://picsum.photos) (fixed
+seeds) and one short ffmpeg clip, downloaded by
+[`round-4/fetch_media.sh`](round-4/fetch_media.sh) and seeded onto a clean
+`SWIPR iPhone 11 Pro` with `xcrun simctl addmedia`.
+[`round-4/seed_state.py`](round-4/seed_state.py) writes the screenshot store —
+`statistics.json` with 2.4 GB / 860 items and a 12-mark session — using the real
+asset identifiers from the simulator's Photos database, so the app's own
+reconciliation keeps them. The app's tests keep using `FakePhotoLibrary`.
+[`round-4/capture.sh`](round-4/capture.sh) installs, seeds and captures.
+
+### Fixed
+
+1. **Type and weight.** The wordmark is 22 pt bold orange with the heading
+   directly below it (no large gap); the heading is 30 pt bold with tighter
+   leading. Card labels are 22 pt bold white with a shadow/scrim, bottom-left;
+   the Continue row's title is 17 pt semibold over its footnote subtitle.
+2. **Filled layout.** The Everything card is 248 pt tall; its middle print is
+   the largest and sits in front, with white borders and slight rotations.
+   Photos and Videos stay square with 12 pt gaps, and the "Your impact" row now
+   closes the page, so there is no large empty band on the 812 pt phone.
+3. **Real photos and thumbnails.** The card covers are real photographs, and
+   each thumbnail is now requested at the card size in points × `displayScale`
+   with `PHImageContentMode.aspectFill`, so nothing is upscaled. (The viewer
+   keeps its aspect-fit display request.)
+4. **Continue sorting.** A 48 pt rounded thumbnail, the subtitle
+   `"<filter> · <month>"` (`Everything · October` here; the month comes from the
+   photo the session will next show), and a filled surface with no outline.
+5. **Status bar.** The window scheme is now decided in `RootView`
+   (`statusBarScheme`): the porcelain Home and filters render dark text on light
+   and the dark viewer chrome keeps light text. The shipped default is still
+   dark — only the `-uiTestingForceLight` / `-uiTestingForceDark` seam changes
+   it — and the debug-only dock prototype keeps its own dark scheme.
+6. **Your impact** appears with the seeded confirmed deletions, worded exactly
+   as the reference: "About 2.4 GB freed · 860 items deleted".
+
+### Not fixed (owner decision or out of scope)
+
+- The reference's **"Review 12 marked items"** row is not built; the round
+  44 × 44 trash button with the red badge remains the review entry (owner
+  decision from round 2).
+- The reference is a wider-aspect mockup with a Dynamic Island, while the
+  capture is a 375 × 812 iPhone 11 Pro with a notch, so the rows never line up
+  pixel for pixel.
+- The reference's stock photos are replaced by the picsum samples, and the
+  reference's September is the seeded asset's October.
+- Landscape, iPad, VoiceOver order and real-device haptics/motion remain untested
+  (see (c) above).
+
+### Result
+
+Full local suite green on `SWIPR iPhone 11 Pro`: **233 kit + 55 app + 83 UI =
+371 tests, 0 failures**, `** TEST SUCCEEDED **`. No test was skipped, weakened or
+removed, and none needed a new expectation.

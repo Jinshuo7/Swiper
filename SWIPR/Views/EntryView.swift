@@ -91,9 +91,11 @@ struct EntryView: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            topBar
-            heading
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                topBar
+                heading
+            }
             presetCards
             if model.resumableSession != nil {
                 continueSorting
@@ -142,7 +144,7 @@ struct EntryView: View {
 
     private var wordmark: some View {
         Text("SWIPR")
-            .font(.system(size: 18, weight: .bold))
+            .font(.system(size: 22, weight: .bold))
             .foregroundStyle(palette.accent)
             .frame(height: 44)
             .accessibilityAddTraits(.isHeader)
@@ -163,7 +165,8 @@ struct EntryView: View {
 
     private var heading: some View {
         Text("What are we cleaning today?")
-            .font(.system(size: 28, weight: .bold))
+            .font(.system(size: 30, weight: .bold))
+            .lineSpacing(-1)
             .foregroundStyle(palette.foreground)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("entry.heading")
@@ -259,7 +262,7 @@ struct EntryView: View {
                 SessionThumbnail(asset: resumeAsset, palette: palette)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Continue sorting")
-                        .fontWeight(.semibold)
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(palette.foreground)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(resumableSubtitle)
@@ -272,13 +275,10 @@ struct EntryView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(palette.secondary)
             }
-            .padding(12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(palette.border, lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Continue sorting")
@@ -289,17 +289,25 @@ struct EntryView: View {
     /// The asset the waiting session will next show, used for the row's
     /// thumbnail; nil falls back to the neutral clock tile.
     private var resumeAsset: AssetDescriptor? {
-        guard let ids = model.resumableSession?.poolIDs else { return nil }
+        guard let session = model.resumableSession else { return nil }
+        if let id = session.currentAssetID,
+           let current = model.order.assets.first(where: { $0.id == id }) {
+            return current
+        }
+        guard let ids = session.poolIDs else { return nil }
         let wanted = Set(ids)
         return model.order.assets.first { wanted.contains($0.id) }
     }
 
-    /// What the waiting session will walk, named from its saved filters.
+    /// What the waiting session will walk: its saved filter name and the month
+    /// of the photo it will show next, e.g. "Photos · September".
     private var resumableSubtitle: String {
-        guard let categories = model.resumableSession?.filterCategories else {
-            return "Saved session"
-        }
-        return MediaFilter(categories: categories).selectionName
+        let name = model.resumableSession?.filterCategories
+            .map { MediaFilter(categories: $0).selectionName } ?? "Saved session"
+        guard let date = resumeAsset?.creationDate else { return name }
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMMM")
+        return "\(name) · \(formatter.string(from: date))"
     }
 
     // MARK: - Your impact
@@ -313,7 +321,7 @@ struct EntryView: View {
             Label("Your impact", systemImage: "leaf")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.foreground)
-            Text("≈ \(ByteFormatter.string(fromBytes: model.statistics.lifetimeReclaimedBytes)) freed · \(model.statistics.lifetimeDeletedCount) items deleted")
+            Text("About \(ByteFormatter.string(fromBytes: model.statistics.lifetimeReclaimedBytes)) freed · \(model.statistics.lifetimeDeletedCount) items deleted")
                 .font(.footnote)
                 .foregroundStyle(palette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -329,6 +337,7 @@ struct EntryView: View {
 private struct EverythingCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.displayScale) private var displayScale
     let title: String
     let identifier: String
     let assets: [AssetDescriptor]
@@ -364,13 +373,13 @@ private struct EverythingCard: View {
                             endPoint: .bottom
                         )
                         Text(title)
-                            .font(.headline.weight(.bold))
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(16)
                     }
-                    .frame(height: 168)
+                    .frame(height: 248)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -385,12 +394,13 @@ private struct EverythingCard: View {
         .accessibilityLabel(title)
         .accessibilityIdentifier(identifier)
         .task(id: assets.map(\.id).joined(separator: ",")) {
+            // Cover the largest print at this screen's scale so a card image is
+            // never upscaled: the middle print is 46% x 88% of a ~343 x 248 pt
+            // card, the widest it gets on the supported layouts.
+            let target = CGSize(width: 170 * displayScale, height: 230 * displayScale)
             var loaded: [String: UIImage] = [:]
             for asset in assets {
-                if let image = await model.library.thumbnail(
-                    for: asset.id,
-                    targetSize: CGSize(width: 500, height: 400)
-                ) {
+                if let image = await model.library.thumbnail(for: asset.id, targetSize: target) {
                     loaded[asset.id] = image
                 }
             }
@@ -400,18 +410,23 @@ private struct EverythingCard: View {
 
     private var fan: some View {
         GeometryReader { geometry in
-            let width = geometry.size.width * 0.40
-            let height = geometry.size.height * 0.80
+            let side = geometry.size.width * 0.38
+            let sideHeight = geometry.size.height * 0.74
+            let middleWidth = geometry.size.width * 0.46
+            let middleHeight = geometry.size.height * 0.88
             ZStack {
-                printCard(0, width, height)
+                printCard(0, side, sideHeight)
                     .rotationEffect(.degrees(-9))
-                    .offset(x: -geometry.size.width * 0.24, y: geometry.size.height * 0.16)
-                printCard(1, width, height)
-                    .rotationEffect(.degrees(2))
-                    .offset(x: 0, y: -geometry.size.height * 0.02)
-                printCard(2, width, height)
+                    .offset(x: -geometry.size.width * 0.26, y: geometry.size.height * 0.14)
+                printCard(2, side, sideHeight)
                     .rotationEffect(.degrees(9))
-                    .offset(x: geometry.size.width * 0.24, y: geometry.size.height * 0.10)
+                    .offset(x: geometry.size.width * 0.26, y: geometry.size.height * 0.10)
+                // The middle print is the largest and sits in front, exactly as
+                // the approved board; its neighbours tuck behind it.
+                printCard(1, middleWidth, middleHeight)
+                    .rotationEffect(.degrees(1.5))
+                    .offset(y: -geometry.size.height * 0.02)
+                    .zIndex(1)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
@@ -450,6 +465,7 @@ private struct EverythingCard: View {
 private struct PresetCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.displayScale) private var displayScale
     let title: String
     let identifier: String
     let symbol: String
@@ -497,8 +513,9 @@ private struct PresetCard: View {
                         }
                         .overlay(alignment: .bottomLeading) {
                             Text(title)
-                                .font(.headline.weight(.bold))
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(14)
                         }
@@ -520,9 +537,12 @@ private struct PresetCard: View {
                 image = nil
                 return
             }
+            // The square card is ~166 pt on the narrowest layout; request it at
+            // pixel scale so it is never upscaled.
+            let side = 170 * displayScale
             image = await model.library.thumbnail(
                 for: asset.id,
-                targetSize: CGSize(width: 600, height: 600)
+                targetSize: CGSize(width: side, height: side)
             )
         }
     }
@@ -561,6 +581,7 @@ private struct PresetCard: View {
 /// while the session has no resolvable asset.
 private struct SessionThumbnail: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.displayScale) private var displayScale
     let asset: AssetDescriptor?
     let palette: PorcelainPalette
 
@@ -581,16 +602,17 @@ private struct SessionThumbnail: View {
                     )
             }
         }
-        .frame(width: 44, height: 44)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .frame(width: 48, height: 48)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .task(id: asset?.id) {
             guard let asset else {
                 image = nil
                 return
             }
+            let side = 48 * displayScale
             image = await model.library.thumbnail(
                 for: asset.id,
-                targetSize: CGSize(width: 200, height: 200)
+                targetSize: CGSize(width: side, height: side)
             )
         }
     }

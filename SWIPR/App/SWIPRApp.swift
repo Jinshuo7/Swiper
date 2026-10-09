@@ -44,11 +44,11 @@ struct SWIPRApp: App {
             if Self.viewerPrototypeEnabled {
                 #if DEBUG
                 ViewerDockPrototype()
+                    .preferredColorScheme(.dark)
                 #endif
             } else {
                 RootView()
                     .environmentObject(model)
-                    .preferredColorScheme(.dark)
             }
         }
     }

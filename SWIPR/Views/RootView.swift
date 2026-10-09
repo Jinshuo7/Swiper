@@ -20,6 +20,20 @@ struct RootView: View {
 
     private var effectiveColorScheme: ColorScheme { forcedColorScheme ?? systemColorScheme }
 
+    /// The status bar follows the screen that is actually on top: the porcelain
+    /// Home and filters use the appearance they render in, and every other
+    /// screen keeps the dark viewer chrome. Only the screenshot seam ever
+    /// forces a scheme, so the shipped dark default is unchanged.
+    private var statusBarScheme: ColorScheme? {
+        guard let forced = forcedColorScheme else { return nil }
+        switch model.route {
+        case .entry, .filters:
+            return forced
+        default:
+            return .dark
+        }
+    }
+
     var body: some View {
         ZStack {
             background
@@ -51,6 +65,7 @@ struct RootView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .preferredColorScheme(statusBarScheme ?? .dark)
     }
 
     /// The porcelain Home and filter screens sit on a cream/near-black ground;
