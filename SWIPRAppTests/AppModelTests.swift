@@ -1353,4 +1353,94 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(store.savedStates.count, savesBefore, "a drop on the source must not save anything")
         XCTAssertEqual(store.state, storedBefore, "a drop on the source must not rewrite the stored session")
     }
+
+    // MARK: - The four control preferences
+
+    /// The choices a fresh install starts with: the dock at the bottom, buttons
+    /// shown, haptics on, and Undo before the actions.
+    func testControlPreferencesStartAtTheDocumentedDefaults() async {
+        let (model, _, store) = await bootstrapped()
+
+        XCTAssertEqual(model.preferences.position, .bottom)
+        XCTAssertTrue(model.preferences.showButtons)
+        XCTAssertTrue(model.preferences.haptics)
+        XCTAssertEqual(model.preferences.undoSide, .leading)
+        XCTAssertEqual(
+            ControlClusterLayout.order(for: model.preferences.undoSide),
+            [.undo, .trash, .keep],
+            "Before actions is the default, so Undo leads the dock"
+        )
+        XCTAssertEqual(store.loadPreferences(), .default, "nothing is written before the user chooses")
+    }
+
+    /// Every control choice is saved as it changes, comes back on the next
+    /// launch, and leaving it alone never disturbs the saved session: the marked
+    /// photo, the position and Undo are where the user left them.
+    func testEveryControlPreferenceSurvivesRelaunchWithoutDisturbingSavedWork() async {
+        let store = InMemorySessionStore()
+        let (model, _, _) = await bootstrapped(store: store)
+        model.startNewest()
+        await model.settle()
+        model.apply(.queueDeletion)
+        await model.settle()
+        let markedBefore = model.markedIDs
+        let currentBefore = model.currentAsset?.id
+        XCTAssertFalse(markedBefore.isEmpty)
+
+        var preferences = model.preferences
+        preferences.position = .trailing
+        preferences.showButtons = false
+        preferences.haptics = false
+        preferences.undoSide = .trailing
+        model.updatePreferences(preferences)
+        await model.settle()
+        XCTAssertEqual(store.loadPreferences(), preferences, "every choice is saved as it changes")
+
+        let relaunched = AppModel(
+            library: FakePhotoLibrary.demo(count: 8),
+            store: store,
+            defaults: isolatedDefaults()
+        )
+        await relaunched.bootstrap()
+        await relaunched.settle()
+
+        XCTAssertEqual(relaunched.preferences, preferences, "every choice comes back")
+        XCTAssertEqual(relaunched.markedIDs, markedBefore, "writing the preferences keeps every mark")
+        relaunched.resumeSession()
+        XCTAssertEqual(relaunched.currentAsset?.id, currentBefore, "writing the preferences keeps the position")
+    }
+
+    /// Each of the four choices is what the viewer reads: the place it is drawn
+    /// in, whether it is drawn at all, the order Undo takes, and whether any
+    /// optional response is given.
+    func testEveryControlPreferenceReachesTheViewer() async {
+        let (model, _, store) = await bootstrapped()
+        var preferences = model.preferences
+        preferences.position = .trailing
+        preferences.showButtons = false
+        preferences.haptics = false
+        preferences.undoSide = .trailing
+        model.updatePreferences(preferences)
+        await model.settle()
+
+        let safeArea = CGSize(width: 375, height: 763)
+        XCTAssertEqual(
+            ControlClusterLayout.centre(for: model.preferences.position, in: safeArea).x,
+            safeArea.width - ControlClusterLayout.edgeMargin - ControlClusterLayout.controlSize / 2,
+            accuracy: 0.5,
+            "the dock is drawn at the remembered position's slot"
+        )
+        XCTAssertFalse(model.preferences.showButtons, "the viewer draws the dock only while buttons are shown")
+        XCTAssertEqual(
+            ControlClusterLayout.order(for: model.preferences.undoSide),
+            [.trash, .keep, .undo],
+            "the remembered Undo end is the order the dock is drawn in"
+        )
+        XCTAssertEqual(
+            HapticFeedback.response(to: .landing, enabled: model.preferences.haptics),
+            .none,
+            "the remembered Haptics choice is the one the viewer asks for"
+        )
+        XCTAssertEqual(store.loadPreferences(), model.preferences, "the viewer reads the saved preferences")
+    }
 }

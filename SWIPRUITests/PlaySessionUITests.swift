@@ -994,6 +994,7 @@ final class PlaySessionUITests: XCTestCase {
         capture("Play — settings at the largest text size")
         let settingsControls: [(String, XCUIElementQuery)] = [
             ("settings.showButtons", app.switches),
+            ("settings.haptics", app.switches),
             ("settings.position.bottom", app.buttons),
             ("settings.undoSide.leading", app.buttons),
             ("settings.resetControls", app.buttons),

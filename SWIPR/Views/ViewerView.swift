@@ -9,7 +9,7 @@ struct ViewerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragOffset: CGSize = .zero
     @State private var cachedIDs: [String] = []
-    @State private var haptics = UIImpactFeedbackGenerator(style: .light)
+    @State private var lightHaptics = UIImpactFeedbackGenerator(style: .light)
 
     /// Where the dock move is: whether this touch became a move, which
     /// destination it captured, and where the finger is.
@@ -27,11 +27,21 @@ struct ViewerView: View {
     /// action on the very same touch-up: a move must never decide.
     @State private var dockMoved = false
 
-    /// One light response on entering capture and one soft response on a valid
-    /// landing. There is deliberately none on pickup, none on an invalid
-    /// release, and none while a destination stays captured.
-    private let captureHaptics = UIImpactFeedbackGenerator(style: .light)
-    private let landingHaptics = UIImpactFeedbackGenerator(style: .soft)
+    /// The two responses the optional haptics can give; which interaction gets
+    /// which is ``HapticFeedback``'s, and the stored Haptics preference is the
+    /// one gate over all of them.
+    private let softHaptics = UIImpactFeedbackGenerator(style: .soft)
+
+    /// Gives the response `event` calls for, or nothing when the user turned
+    /// Haptics off. Every optional response in the viewer goes through here, so
+    /// the preference cannot be honoured in one place and missed in another.
+    private func giveHaptic(_ event: HapticFeedback.Event) {
+        switch HapticFeedback.response(to: event, enabled: model.preferences.haptics) {
+        case .none: break
+        case .light: lightHaptics.impactOccurred()
+        case .soft: softHaptics.impactOccurred()
+        }
+    }
 
     /// The live state of one dock move. The compact token appears the moment
     /// `isMoving` turns true, which is exactly when the pending tap is cancelled
@@ -93,7 +103,11 @@ struct ViewerView: View {
             // where the token goes back to being the dock. A normal end has
             // already landed it and left this with nothing to do.
             .onChange(of: dockTouching) { _, touching in
-                guard !touching else { return }
+                guard !touching else {
+                    // The finger has just come down on the dock.
+                    giveHaptic(.pickup)
+                    return
+                }
                 finishDockTouch()
             }
         }
@@ -166,7 +180,7 @@ struct ViewerView: View {
                 dragOffset = value.translation
                 let nowPastThreshold = isPastThreshold
                 if nowPastThreshold && !wasPastThreshold {
-                    haptics.impactOccurred()
+                    giveHaptic(.thresholdCrossing)
                 }
             }
             .onEnded { value in
@@ -188,7 +202,9 @@ struct ViewerView: View {
                     }
                 }
                 if let committed {
-                    haptics.prepare()
+                    // The threshold crossing above already gave the response, so
+                    // this only readies the engine for the next one.
+                    if model.preferences.haptics { lightHaptics.prepare() }
                     model.apply(committed)
                 }
             }
@@ -586,7 +602,7 @@ struct ViewerView: View {
     private func clusterAction(_ action: () -> Void) {
         guard !dockMoved else { return }
         activityToken += 1
-        haptics.impactOccurred()
+        giveHaptic(.controlPress)
         action()
     }
 
@@ -620,12 +636,19 @@ struct ViewerView: View {
                     withAnimation(dockMorphAnimation) { dockMove.isMoving = true }
                 }
                 dockMove.pointer = point
-                let captured = DockGeometry.capture(at: point, in: size, currentlyCaptured: dockMove.captured)
-                guard captured != dockMove.captured else { return }
+                let wasCaptured = dockMove.captured
+                let captured = DockGeometry.capture(at: point, in: size, currentlyCaptured: wasCaptured)
                 dockMove.captured = captured
-                // One light response on entering capture, and none while a
-                // destination stays captured.
-                if captured != nil { captureHaptics.impactOccurred() }
+                if captured == wasCaptured {
+                    // A destination that stays captured is named too, so "no
+                    // repeats while captured" is the mapping's rule rather than
+                    // a guard that could drift from it.
+                    giveHaptic(.captureHeld)
+                } else if captured != nil {
+                    // One light response on entering capture. Moving off a
+                    // destination for the space between them says nothing.
+                    giveHaptic(.capture)
+                }
             }
             .onEnded { value in
                 guard dockMoved else { return }
@@ -646,11 +669,12 @@ struct ViewerView: View {
     private func land(_ destination: ControlPosition?) {
         guard let destination else {
             // An invalid release says nothing and changes nothing.
+            giveHaptic(.invalidRelease)
             withAnimation(landingAnimation) { dockMove = .idle }
             activityToken += 1
             return
         }
-        landingHaptics.impactOccurred()
+        giveHaptic(.landing)
         withAnimation(landingAnimation) {
             // `moveDock` refuses a destination the dock already occupies, so a
             // drop back on the source writes nothing and leaves the session's

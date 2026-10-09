@@ -7,12 +7,15 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.position, .bottom)
         XCTAssertTrue(preferences.showButtons)
         XCTAssertEqual(preferences.undoSide, .leading)
+        XCTAssertTrue(preferences.haptics)
         XCTAssertEqual(preferences.defaultDirection, .older)
     }
 
+    /// Undo is read relative to the pair, not as a screen side, so the wording is
+    /// true of the bottom row and of a side column alike (docs/SPEC.md §5.6).
     func testUndoSideNames() {
-        XCTAssertEqual(UndoSide.leading.title, "Left")
-        XCTAssertEqual(UndoSide.trailing.title, "Right")
+        XCTAssertEqual(UndoSide.leading.title, "Before actions")
+        XCTAssertEqual(UndoSide.trailing.title, "After actions")
     }
 
     func testPositionNamesAndOrientation() {
@@ -32,6 +35,7 @@ final class ControlPreferencesTests: XCTestCase {
             position: .leading,
             showButtons: false,
             undoSide: .trailing,
+            haptics: false,
             defaultDirection: .newer
         )
         let data = try JSONEncoder().encode(preferences)
@@ -64,6 +68,7 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertEqual(bottom.position, .bottom)
         XCTAssertTrue(bottom.showButtons)
         XCTAssertEqual(bottom.undoSide, .leading, "preferences written before the setting get the default")
+        XCTAssertTrue(bottom.haptics, "preferences written before the Haptics setting get the default, on")
     }
 
     /// Placement predates the rail and was horizontal-only, so it is a bottom
@@ -89,7 +94,7 @@ final class ControlPreferencesTests: XCTestCase {
 
     func testEncodedPreferencesWriteTheNewKeysAndNoLegacyOnes() throws {
         let data = try JSONEncoder().encode(
-            ControlPreferences(position: .trailing, showButtons: false)
+            ControlPreferences(position: .trailing, showButtons: false, haptics: false)
         )
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertNil(object["rail"])
@@ -99,6 +104,18 @@ final class ControlPreferencesTests: XCTestCase {
         XCTAssertNil(object["order"])
         XCTAssertEqual(object["position"] as? String, "trailing")
         XCTAssertEqual(object["showButtons"] as? Bool, false)
+        XCTAssertEqual(object["haptics"] as? Bool, false)
+    }
+
+    /// A payload from before the Haptics setting loads with that response on,
+    /// so an existing user hears the same feedback they always did.
+    func testPreferencesWithoutTheHapticsKeyDefaultToOn() throws {
+        let decoded = try JSONDecoder().decode(
+            ControlPreferences.self,
+            from: Data(#"{"position":"leading","showButtons":false,"undoSide":"trailing"}"#.utf8)
+        )
+        XCTAssertTrue(decoded.haptics)
+        XCTAssertFalse(decoded.showButtons, "the other stored choices still load with it")
     }
 
     /// A present-but-invalid stored rail is not guessed at; the store's
@@ -111,9 +128,47 @@ final class ControlPreferencesTests: XCTestCase {
     func testInMemoryStorePersistsPreferences() {
         let store = InMemorySessionStore()
         XCTAssertEqual(store.loadPreferences(), .default)
-        store.savePreferences(ControlPreferences(position: .trailing, showButtons: false))
+        store.savePreferences(ControlPreferences(position: .trailing, showButtons: false, haptics: false))
         XCTAssertEqual(store.loadPreferences().position, .trailing)
         XCTAssertFalse(store.loadPreferences().showButtons)
+        XCTAssertFalse(store.loadPreferences().haptics)
+    }
+}
+
+final class HapticFeedbackTests: XCTestCase {
+    /// The dock's move contract: silence on pickup, one light response the first
+    /// time a destination is captured, nothing while it stays captured, one soft
+    /// response on a valid landing, and nothing on an invalid release or a
+    /// cancelled touch (docs/SPEC.md §5.5).
+    func testTheDockMoveContract() {
+        XCTAssertEqual(HapticFeedback.response(to: .pickup, enabled: true), .none)
+        XCTAssertEqual(HapticFeedback.response(to: .capture, enabled: true), .light)
+        XCTAssertEqual(HapticFeedback.response(to: .captureHeld, enabled: true), .none)
+        XCTAssertEqual(HapticFeedback.response(to: .landing, enabled: true), .soft)
+        XCTAssertEqual(HapticFeedback.response(to: .invalidRelease, enabled: true), .none)
+    }
+
+    /// The two other optional moments: one light response for a swipe that
+    /// crosses the commit threshold (docs/SPEC.md §4.4) and one for a press on a
+    /// control.
+    func testTheOtherOptionalMomentsGetOneLightResponse() {
+        XCTAssertEqual(HapticFeedback.response(to: .thresholdCrossing, enabled: true), .light)
+        XCTAssertEqual(HapticFeedback.response(to: .controlPress, enabled: true), .light)
+    }
+
+    /// The stored preference is the single gate: off means every optional
+    /// response is off, whichever one it is.
+    func testTheHapticsPreferenceSilencesEveryEvent() {
+        for event in [
+            HapticFeedback.Event.pickup, .capture, .captureHeld, .landing,
+            .invalidRelease, .thresholdCrossing, .controlPress,
+        ] {
+            XCTAssertEqual(
+                HapticFeedback.response(to: event, enabled: false),
+                .none,
+                "\(event) must be silent while Haptics is off"
+            )
+        }
     }
 }
 

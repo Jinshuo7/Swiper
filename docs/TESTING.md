@@ -535,6 +535,75 @@ re-captured in light, dark and at the largest text size. The narrow-layout fit i
 framework-tested only: the suite's simulator is a 375 pt `SWIPR iPhone 11 Pro`,
 and no launch argument changes a device's point width.
 
+### The four control preferences (2026-10-09, #78) — current
+
+The dock's four choices are one stored struct, `SWIPRKit.ControlPreferences`, and
+a Settings section that sets each one without a drag:
+
+- **Control Position** — the three fixed places, as before;
+- **Show Buttons** — whether the dock is drawn at all, as before;
+- **Haptics** — new: `ControlPreferences.haptics`, default on, one switch;
+- **Undo Position** — the same two-value `undoSide`, now named the way the spec
+  names it: `UndoSide.title` is **Before actions** (the default, `.leading`) or
+  **After actions**, read relative to the Delete/Keep pair rather than as a screen
+  side, so the same wording is true of the bottom row and of a side column.
+
+`haptics` is an additive, backward-compatible key: `init(from:)` reads it with
+`decodeIfPresent(Bool.self, forKey: .haptics) ?? true`, so every payload written
+before the setting existed loads with haptics on and nothing is migrated,
+rewritten or lost. The key order in `encode(to:)` is unchanged in effect — every
+field is written by name.
+
+**Haptics are one pure mapping, one gate.** `HapticFeedback.response(to:enabled:)`
+answers for every optional moment — nothing on pickup, one light response the
+first time a destination is captured, nothing while it stays captured, one soft
+response on a valid landing, nothing on an invalid release or a cancelled touch,
+and one light response for a swipe crossing the commit threshold (docs/SPEC.md
+§4.4) and for a press on a control. `ViewerView` has one `giveHaptic(_:)` that
+asks that function with `model.preferences.haptics`, so "Haptics off" cannot be
+honoured at one call site and missed at another. A destination that stays
+captured is asked for **by name** (`.captureHeld`) rather than skipped by a
+`guard`, which is what keeps "no repeats while captured" the mapping's rule.
+
+**The current position is announced, not just listed.** Each Settings choice row
+carries `.accessibilityValue("Selected")` and the `.isSelected` trait when it is
+the current one, so VoiceOver says which place the dock is in and which Undo
+position is set, and placement never needs a drag. The dock itself still carries
+`accessibilityValue("Docked <place>")` and the "Move to the next position"
+action.
+
+Covered by `SWIPRKitTests.HapticFeedbackTests` (the move contract, the two other
+optional moments, and every event silenced when the preference is off),
+`ControlPreferencesTests` (defaults including `haptics` on, the round-trip with
+`haptics: false`, the Before/After names, and a payload with no `haptics` key
+defaulting to on), `SWIPRAppTests`
+(`testControlPreferencesStartAtTheDocumentedDefaults`,
+`testEveryControlPreferenceSurvivesRelaunchWithoutDisturbingSavedWork` — all four
+saved, all four back after a relaunch, and the marked photo, the position and
+Undo untouched by the write — and `testEveryControlPreferenceReachesTheViewer`),
+and `SWIPRUITests` (`testSettingsAnnouncesTheCurrentPositionAndTheUndoPosition`,
+`testSettingsOffersHapticsAndRemembersIt` across a relaunch, and the haptics row
+added to `testSettingsOffersTheThreePositionsAndAReset` and to the AX5
+reachability list). `testCaptureTheSettingsControlsInEveryAppearance` produces the
+v1-04 `settings-controls-*` and `settings-undo-position-*` screenshots.
+
+Sharp edges for the next change here:
+
+- **The row's mark and the row's spoken value are one comparison.**
+  `positionRow`/`undoPositionRow` compute `isCurrent` once and use it for the
+  filled mark, the accessibility value and the trait, so the picture and the
+  announcement cannot disagree.
+- **Haptics is asked for, never played directly.** Anything that would buzz goes
+  through `ViewerView.giveHaptic(_:)`; calling a `UIImpactFeedbackGenerator`
+  directly would bypass the one preference.
+- **Settings is a scrolling list.** New rows belong inside `settingSection` and,
+  if they are added near the bottom, must be added to the AX5 reachability list
+  in `PlaySessionUITests`, which only ever scrolls downward.
+
+These screenshots go to `docs/screenshots/milestones/v1-04/`. Settings is still
+pinned dark (the Appearance setting is a later ticket), so its light and dark
+captures render identically; the pair is kept because the milestone asks for both.
+
 ## Screenshots
 
 UI tests attach screenshots with `lifetime = .keepAlways`. They are written into
@@ -570,6 +639,7 @@ Attachments the suite produces, and what each one is for:
 | `Controls — moving, with the three destination markers` | `testTheDockIsATokenWhileItIsBeingMoved` | The compact token held at a destination and the three subtle markers, captured mid-gesture because they exist only while the finger is down |
 | `Design — destination markers mid-move` | `testDestinationMarkersWhileMovingTheDock` (play suite) | The same mid-move state next to the approved references |
 | `dock-<place>-<appearance>` (12) | `testCaptureTheDockAtEveryPositionInEveryAppearance` | The dock at bottom, left and right in light, dark and at the largest text size, plus the held mid-move state — committed under `docs/screenshots/milestones/v1-04/` |
+| `settings-controls-<appearance>` / `settings-undo-position-<appearance>` (6) | `testCaptureTheSettingsControlsInEveryAppearance` | The four control preferences in Settings — Show buttons, Haptics and the three places, then the Undo position and the reset row — in light, dark and at the largest text size, committed under `docs/screenshots/milestones/v1-04/` |
 | `Controls — close in the top left` | `testCloseIsSmallInTheTopLeftCorner` | The small X in the corner (`controls-close-top-left`) |
 | `Entry — nothing waiting` / `a session waiting` / `a session and marks waiting` | `testPlayEntryScreenInEveryState` | The three reachable entry states (`entry-01`–`03`) |
 | `Choose a photo — overview` / `oldest first` / `jumped to a month` | `testChoosePhotoExplainsItselfAndGroupsTheLibraryByMonth`, `testChoosePhotoCanJumpStraightToAMonth` | Explanation and traversals, oldest-first, and a jumped-to month (`choose-01`–`03`) |

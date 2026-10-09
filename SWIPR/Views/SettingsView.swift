@@ -19,8 +19,14 @@ struct SettingsView: View {
                             isOn: showButtonsBinding,
                             identifier: "settings.showButtons"
                         )
+                        toggleRow(
+                            title: "Haptics",
+                            subtitle: "A light tap when a move captures a place and a soft one when it lands. Off silences every optional tap.",
+                            isOn: hapticsBinding,
+                            identifier: "settings.haptics"
+                        )
                         positionChoices
-                        undoSideChoices
+                        undoPositionChoices
                         buttonRow(
                             systemImage: "hand.draw",
                             title: "Reset control position",
@@ -31,7 +37,7 @@ struct SettingsView: View {
                             preferences.position = .bottom
                             model.updatePreferences(preferences)
                         }
-                        Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at the end of the buttons, away from Trash and Keep, and you can put it on either side. Drag the buttons themselves — or the space between them — to move them to the bottom, left or right edge, and the photo never moves.")
+                        Text("Swipe gestures are always available: drag left to delete or right to keep. Undo sits at an end of the buttons, away from Delete and Keep, and you can put it before or after them. Drag the buttons themselves — or the space between them — to move them to the bottom, left or right edge, and the photo never moves.")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)
@@ -169,6 +175,7 @@ struct SettingsView: View {
     }
 
     private func positionRow(_ position: ControlPosition) -> some View {
+        let isCurrent = model.preferences.position == position
         let subtitle: String
         switch position {
         case .bottom: subtitle = "A row centred near the bottom edge."
@@ -181,8 +188,7 @@ struct SettingsView: View {
             model.updatePreferences(preferences)
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: model.preferences.position == position ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(model.preferences.position == position ? .blue : .white.opacity(0.4))
+                selectionMark(isCurrent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Buttons at the \(position.title)")
                         .fontWeight(.semibold)
@@ -198,36 +204,62 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.position.\(position.rawValue)")
+        .accessibilityValue(isCurrent ? "Selected" : "")
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
-    private var undoSideChoices: some View {
+    /// Where Undo sits, read relative to the Delete/Keep pair: **Before actions**
+    /// (the default) or **After actions** (docs/SPEC.md §5.6).
+    private var undoPositionChoices: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Undo side")
+            Text("Undo position")
                 .fontWeight(.semibold)
                 .foregroundStyle(.white)
             ForEach(UndoSide.allCases) { side in
-                undoSideRow(side)
+                undoPositionRow(side)
             }
         }
     }
 
-    private func undoSideRow(_ side: UndoSide) -> some View {
-        Button {
+    private func undoPositionRow(_ side: UndoSide) -> some View {
+        let isCurrent = model.preferences.undoSide == side
+        let subtitle: String
+        switch side {
+        case .leading: subtitle = "Undo comes before Delete and Keep. This is the default."
+        case .trailing: subtitle = "Undo comes after Delete and Keep."
+        }
+        return Button {
             var preferences = model.preferences
             preferences.undoSide = side
             model.updatePreferences(preferences)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: model.preferences.undoSide == side ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(model.preferences.undoSide == side ? .blue : .white.opacity(0.4))
-                Text("Undo on the \(side.title.lowercased())")
-                    .foregroundStyle(.white)
+            HStack(alignment: .top, spacing: 12) {
+                selectionMark(isCurrent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(side.title)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer()
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.undoSide.\(side.rawValue)")
+        .accessibilityValue(isCurrent ? "Selected" : "")
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
+    }
+
+    /// The chosen row of a group of choices. Visually the filled mark says which
+    /// one it is; `accessibilityValue` says the same thing to VoiceOver, which
+    /// is what announces the current position rather than just the options.
+    private func selectionMark(_ isSelected: Bool) -> some View {
+        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+            .foregroundStyle(isSelected ? .blue : .white.opacity(0.4))
     }
 
     private var showButtonsBinding: Binding<Bool> {
@@ -236,6 +268,17 @@ struct SettingsView: View {
             set: { newValue in
                 var preferences = model.preferences
                 preferences.showButtons = newValue
+                model.updatePreferences(preferences)
+            }
+        )
+    }
+
+    private var hapticsBinding: Binding<Bool> {
+        Binding(
+            get: { model.preferences.haptics },
+            set: { newValue in
+                var preferences = model.preferences
+                preferences.haptics = newValue
                 model.updatePreferences(preferences)
             }
         )
