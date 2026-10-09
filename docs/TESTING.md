@@ -438,10 +438,10 @@ Sharp edges for the next change here (`ViewerView.swift`):
   gesture by one main-queue turn (`finishDockTouch()`), which is what makes "a
   move never decides" true rather than likely;
 - a drop back on the destination the dock already occupies goes through
-  `AppModel.moveDock(to:)`, which refuses a position that has not changed. Writing
-  the preferences re-pins the session's direction from the *saved default*, so an
-  unguarded write would silently reverse a walk started with an explicit "Newest
-  first" or "Oldest first";
+  `AppModel.moveDock(to:)`, which refuses a position that has not changed, so a
+  drag that ends where it started writes nothing at all. (Writing preferences
+  no longer re-pins the session's direction: see the #78 section below, where
+  that re-pin became conditional on **Default direction** actually changing.)
 - `DockGeometry.capture` checks the destination already captured against
   `releaseRadius` **before** considering a nearer one, because mid-way between the
   bottom row and a side column the nearest destination flips while the finger is
@@ -572,6 +572,15 @@ position is set, and placement never needs a drag. The dock itself still carries
 `accessibilityValue("Docked <place>")` and the "Move to the next position"
 action.
 
+**Only Default direction re-points a running session.** `AppModel.updatePreferences`
+used to re-pin the engine's direction from the saved default on *every* preference
+write, and save that. That is harmless for a session walking the default way and a
+silent reversal for one the user began with an explicit **Newest first** or
+**Oldest first**, which is exactly what Codex round 1 caught on this PR: toggling
+the new Haptics switch would have turned the walk around. The write now re-pins
+only when `preferences.defaultDirection` itself changed, so the other four
+preferences leave the running session and the saved session alone.
+
 Covered by `SWIPRKitTests.HapticFeedbackTests` (the move contract, the two other
 optional moments, and every event silenced when the preference is off),
 `ControlPreferencesTests` (defaults including `haptics` on, the round-trip with
@@ -584,8 +593,15 @@ Undo untouched by the write — and `testEveryControlPreferenceReachesTheViewer`
 and `SWIPRUITests` (`testSettingsAnnouncesTheCurrentPositionAndTheUndoPosition`,
 `testSettingsOffersHapticsAndRemembersIt` across a relaunch, and the haptics row
 added to `testSettingsOffersTheThreePositionsAndAReset` and to the AX5
-reachability list). `testCaptureTheSettingsControlsInEveryAppearance` produces the
-v1-04 `settings-controls-*` and `settings-undo-position-*` screenshots.
+reachability list). `SWIPRAppTests` also covers the re-pin rule:
+`testChangingAControlPreferenceNeverReversesTheRunningSession` walks all four
+preferences past a session pinned to `.newer` and asserts the walk and the saved
+session do not move (verified by restoring the old unconditional re-pin, which
+fails it four times), and
+`testChangingTheDefaultDirectionRePointsAndSavesTheRunningSession` keeps the
+direction choice working. `testCaptureTheSettingsControlsInEveryAppearance`
+produces the v1-04 `settings-controls-*` and `settings-undo-position-*`
+screenshots.
 
 Sharp edges for the next change here:
 
