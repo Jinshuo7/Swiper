@@ -6,11 +6,10 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var systemColorScheme
 
-    /// Screenshot/test seam. The app is currently pinned to dark while the
-    /// viewer work lands, so a UI test can ask the Home and filter screens to
-    /// render in the other appearance without changing the shipped default.
-    /// The later appearance ticket replaces this with the System / Light / Dark
-    /// setting.
+    /// Screenshot/test seam. The app follows the iPhone's appearance by
+    /// default, so a UI test can ask the Home and filter screens to render in a
+    /// chosen appearance. The later appearance ticket adds the System / Light /
+    /// Dark setting.
     private var forcedColorScheme: ColorScheme? {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-uiTestingForceLight") { return .light }
@@ -21,14 +20,13 @@ struct RootView: View {
     private var effectiveColorScheme: ColorScheme { forcedColorScheme ?? systemColorScheme }
 
     /// The status bar follows the screen that is actually on top: the porcelain
-    /// Home and filters use the appearance they render in, and every other
-    /// screen keeps the dark viewer chrome. Only the screenshot seam ever
-    /// forces a scheme, so the shipped dark default is unchanged.
+    /// Home and filters use the appearance they render in — the iPhone's by
+    /// default, and only the screenshot seam overrides it — while every other
+    /// screen keeps its dark viewer chrome, whose status bar stays light.
     private var statusBarScheme: ColorScheme? {
-        guard let forced = forcedColorScheme else { return nil }
         switch model.route {
         case .entry, .filters:
-            return forced
+            return forcedColorScheme
         default:
             return .dark
         }
@@ -65,7 +63,7 @@ struct RootView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
-        .preferredColorScheme(statusBarScheme ?? .dark)
+        .preferredColorScheme(statusBarScheme)
     }
 
     /// The porcelain Home and filter screens sit on a cream/near-black ground;

@@ -219,12 +219,12 @@ left untouched.
 
 ### Note: appearance seam for the Home and filter screens
 
-The app is still pinned to dark in `SWIPRApp.swift` (a viewer-era choice outside
-the V1-03 file list). `RootView` therefore reads two UI-test launch arguments,
-`-uiTestingForceLight` / `-uiTestingForceDark`, which override the `colorScheme`
-environment for the porcelain Home and filter screens only. The light milestone
-screenshots were captured through that seam. A later appearance ticket replaces
-it with the System / Light / Dark setting.
+The app follows the iPhone's appearance by default. `RootView` reads two UI-test
+launch arguments, `-uiTestingForceLight` / `-uiTestingForceDark`, which override
+the `colorScheme` environment for the porcelain Home and filter screens. Every
+other screen keeps its dark viewer chrome, so only Home and filters follow the
+system. The milestone screenshots were captured through the seam. A later
+appearance ticket adds the System / Light / Dark setting.
 
 ### Note: the replacement confirmation
 

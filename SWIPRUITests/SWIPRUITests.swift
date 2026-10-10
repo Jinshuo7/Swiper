@@ -676,9 +676,9 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertNotEqual(photoElement(app).label, markedLabel, "a marked photo stays skipped")
     }
 
-    /// Captures the replacement confirmation in both appearances. The app is
-    /// pinned dark, so the light capture goes through the `-uiTestingForceLight`
-    /// seam; the porcelain card adapts to whichever appearance it is handed.
+    /// Captures the replacement confirmation in both appearances. Both captures
+    /// force their appearance through the seam so they never depend on the
+    /// simulator's setting; the porcelain card adapts to whichever it is handed.
     func testCaptureReplacementConfirmationInEveryAppearance() {
         captureReplacementConfirmation(extraArguments: ["-uiTestingForceLight"], name: "replace-session-light")
         captureReplacementConfirmation(extraArguments: ["-uiTestingForceDark"], name: "replace-session-dark")
