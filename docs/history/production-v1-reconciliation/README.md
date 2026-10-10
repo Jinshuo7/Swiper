@@ -1,8 +1,8 @@
 # Production-v1 reconciliation archive (historical, non-normative)
 
 This directory preserves byte-exact copies of documents as they were **before**
-the production-v1 reconciliation for [issue #25](https://github.com/Jinshuo7/Swiper/issues/25)
-/ [issue #24](https://github.com/Jinshuo7/Swiper/issues/24). Nothing here is
+the production-v1 reconciliation for [issue #25](https://github.com/Jinshuo7/SWIPR/issues/25)
+/ [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24). Nothing here is
 normative. It exists so user work and prior wording are not lost when the current
 documents change.
 

@@ -2,7 +2,7 @@
 
 > **Status: owner-approved production-v1 baseline as of 2026-10-01.**
 > The approved production-v1 visual baseline is described by
-> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) and the in-repo
+> [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) and the in-repo
 > [`docs/SPEC.md`](../../SPEC.md). The five references below are the approved
 > visual direction; issue #24 and `docs/SPEC.md` remain authoritative for
 > behaviour not shown in the images.
@@ -49,7 +49,7 @@ production target are listed in that file's banner.
 
 ## Reading order
 
-[Issue #24](https://github.com/Jinshuo7/Swiper/issues/24) → [`docs/SPEC.md`](../../SPEC.md)
+[Issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) → [`docs/SPEC.md`](../../SPEC.md)
 → [`docs/VISION.md`](../../VISION.md) → this index. The pre-reconciliation copies
 of changed design docs are archived under
 [`docs/history/production-v1-reconciliation/`](../../history/production-v1-reconciliation/README.md).
