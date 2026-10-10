@@ -108,7 +108,7 @@ Keep these in sync with behaviour: `docs/VISION.md`, `docs/SPEC.md`,
 
 ### Issue tracker
 
-Issues live as GitHub issues in `Jinshuo7/Swiper` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live as GitHub issues in `Jinshuo7/SWIPR` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

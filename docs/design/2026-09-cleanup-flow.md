@@ -1,7 +1,7 @@
 # Cleanup flow — settled production-v1 design summary
 
 > **Settled.** The design interview is closed. The decisions below are captured
-> normatively in [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) and
+> normatively in [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) and
 > [`docs/SPEC.md`](../SPEC.md); if anything here disagrees with them, #24 wins.
 > The original interview draft (rounds 1–8, owner feedback, open questions) is
 > archived at

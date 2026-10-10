@@ -12,7 +12,7 @@ do, DeepSeek or a script must do.** Codex only plans, reviews, and decides.
 - **Driver (this Pi session, deepseek-flash, effort high):** pick tickets, write ticket
   instructions, run the worker and reviewer, open PRs, and merge when allowed.
 - **Worker:** do the implementation in this session or a separate Pi run, always in a fresh worktree
-  under this folder. Never touch /Users/beastmini/GitHub/Jinshuo7/SWIPR (the owner's folder).
+  under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
 - **Reviewer:** for each ticket, a SEPARATE fresh Pi run of deepseek-flash at effort max, started as
   its own command (check `pi --help` for the non-interactive option). Give it only the ticket,
   PROJECT-BRIEF.md, `gh pr diff`, the check results, and screenshots next to the approved
@@ -35,8 +35,7 @@ do, DeepSeek or a script must do.** Codex only plans, reviews, and decides.
    Open a full doc only when a ticket needs that specific section.
 
 ## Safety rules (never break these)
-1. Never work in my main folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`. Use a fresh worktree
-   and branch for every ticket.
+1. Use a fresh worktree and branch for every ticket; never commit to `main` directly.
 2. Never reset, clean, stash, restore, rebase, or force-push. Delete only worktrees and branches
    you created, and only after their ticket is merged.
 3. Never push to `main`. Every change goes through a PR.
@@ -110,8 +109,8 @@ This is the standing workflow for any PR labeled `needs-strong-review`.
 
 1. When its checks are green, comment exactly `@codex review` using `gh pr comment`.
 2. Wait for Codex's review to appear. Check every 5 minutes with
-   `gh pr view <n> --comments`, `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and
-   `gh api repos/Jinshuo7/Swiper/issues/<n>/comments`. Give up after 60 minutes and tell the
+   `gh pr view <n> --comments`, `gh api repos/Jinshuo7/SWIPR/pulls/<n>/reviews`, and
+   `gh api repos/Jinshuo7/SWIPR/issues/<n>/comments`. Give up after 60 minutes and tell the
    owner.
 3. If Codex reports problems, fix them in the same PR, push without force, wait for green
    checks, and comment `@codex review` again.
@@ -135,7 +134,7 @@ or a real-device test. Then open a GitHub issue titled "Owner: V1 ready" (or "Ow
 needed") that @mentions @Jinshuo7, in plain language. Never sit idle on one PR; if Codex does
 not respond, keep working and retry hourly. Flaky tests get a ticket and a root-cause fix;
 skipping is never allowed. Hard safety rules still apply (system-confirmed deletion only,
-never weaken tests/CI/gate, never force-push, never touch the owner's folder, #37 prohibited).
+never weaken tests/CI/gate, never force-push, #37 prohibited).
 
 Codex reviews must flag, as blocking: anything that can delete a photo without the explicit
 user confirmation step; anything that can add an unmarked photo to, or drop a marked photo

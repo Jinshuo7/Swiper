@@ -5,7 +5,7 @@ agent needs to re-run them. Keep it in sync when the test setup changes.
 
 ## Current production-v1 testing contract (issue #24)
 
-Production v1 is specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+Production v1 is specified by [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24)
 and [`docs/SPEC.md`](SPEC.md). Testing follows its Testing Decisions: assert
 externally observable behaviour and durable invariants; use the application-model
 integration seam against fakes; extend fixtures to mixed photo/video, unavailable

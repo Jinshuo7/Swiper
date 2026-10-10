@@ -2,7 +2,7 @@
 
 > **Status: production-v1 target, not yet fully implemented.** This document
 > describes the product v1 the owner approved in
-> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24), which is the
+> [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24), which is the
 > **authoritative production-v1 specification**. Everywhere it conflicts with
 > older docs, ADRs or prototypes, #24 wins. See
 > [`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md) for what is actually
@@ -71,7 +71,7 @@ Home afterwards.
 
 | Document | Purpose |
 | --- | --- |
-| [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24) | **Authoritative production-v1 specification.** |
+| [Issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) | **Authoritative production-v1 specification.** |
 | [`CONTEXT.md`](../CONTEXT.md) | The project's domain glossary. |
 | [`docs/VISION.md`](VISION.md) | This document: product vision and v1 boundaries. |
 | [`docs/SPEC.md`](SPEC.md) | Behavioural contract v1 must satisfy (target, not as-built). |

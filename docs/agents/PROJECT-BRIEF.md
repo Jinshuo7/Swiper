@@ -1,6 +1,6 @@
 # Project brief — SWIPR production v1
 
-> Authoritative sources: [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) → [`docs/SPEC.md`](../SPEC.md) → [`docs/ROADMAP.md`](../ROADMAP.md) →
+> Authoritative sources: [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) → [`docs/SPEC.md`](../SPEC.md) → [`docs/ROADMAP.md`](../ROADMAP.md) →
 > [`docs/design/orange-porcelain/README.md`](../design/orange-porcelain/README.md).
 
 ## What v1 is

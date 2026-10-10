@@ -1,7 +1,7 @@
 # Ordinary videos are excluded from v1
 
 **Status: SUPERSEDED** by the production-v1 decision in
-[issue #24](https://github.com/Jinshuo7/Swiper/issues/24) (2026-10-01). Ordinary
+[issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) (2026-10-01). Ordinary
 video is now in scope for v1 and is sorted, played and reviewed alongside photos,
 Live Photos and screenshots. The exclusion below was correct for the earlier
 tracer bullet and is kept as history, not as a current rule. See

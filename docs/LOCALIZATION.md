@@ -1,8 +1,8 @@
 # Localisation survey and plan
 
-> **Production-v1 requirement.** [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+> **Production-v1 requirement.** [Issue #24](https://github.com/Jinshuo7/SWIPR/issues/24)
 > requires **English and Simplified Chinese to ship complete** (ticket
-> [#33](https://github.com/Jinshuo7/Swiper/issues/33)), with each layer using its
+> [#33](https://github.com/Jinshuo7/SWIPR/issues/33)), with each layer using its
 > own resource bundle and a fluent human reviewing the Simplified Chinese before
 > release. This document is the inventory, blocker list and single-pass plan for
 > that requirement. It records the as-built start point; it is a target, not a

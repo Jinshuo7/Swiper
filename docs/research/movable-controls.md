@@ -1,7 +1,7 @@
 # Movable controls research
 
 > **Historical research note.** The product questions this investigation left
-> open are now settled by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+> open are now settled by [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24)
 > and [`docs/SPEC.md`](../SPEC.md); those sources are authoritative.
 
 ## Question

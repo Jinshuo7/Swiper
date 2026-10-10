@@ -3,7 +3,7 @@
 > ## Read this first: two different things share this file
 >
 > **1. Required production v1** — specified by
-> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) and the in-repo
+> [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) and the in-repo
 > target contract [`SPEC.md`](SPEC.md), delivered by tickets
 > [#25–#36](ROADMAP.md). #24 is authoritative. **Almost none of the v1 target
 > behaviour below is implemented yet**: ordinary video, Home media choices,
@@ -24,7 +24,10 @@
 > every UI test, including AX5, with 0 failures (`** TEST SUCCEEDED **`). The
 > damaged-save-file fix that was open for review is merged as PR #66, and PR #72
 > merged too (merge commits `c2af5f5` and `8efd39e`). The one open risky PR left
-> is #74 (marked photos through Limited Photos access, `needs-strong-review`).
+> is **#74** (marked photos through Limited Photos access, `needs-strong-review`,
+> parked `owner-blocked` with issue **#85**); **#70** itself stays open. **PR
+> #37** (`Scripts/ticket_controller.py`) remains prohibited: do not use, merge
+> or base work on it.
 >
 > **#46 update (2026-10-02):** the Orange & Porcelain Home and editable filters
 > are now wired to the fixed filtered session. The full simulator suite was green
@@ -216,6 +219,40 @@
 > assertion with the known `Failed to launch … Timed out while launching
 > application via Xcode` stall (#84); the re-run was green, and no retry flag,
 > skip or loosened assertion was added.
+>
+> **#78 update (2026-10-09):** the dock's four choices are one stored struct,
+> exposed in Settings, and the optional haptics are one pure contract behind a
+> new switch. `ControlPreferences.haptics` (default on) is an **additive,
+> backward-compatible** key read with `decodeIfPresent(…, forKey: .haptics) ??
+> true`, so a payload written before the setting existed still loads with haptics
+> on and nothing is migrated, rewritten or lost. **Undo Position** is now named
+> the way `docs/SPEC.md` §5.6 names it — **Before actions** (the default) or
+> **After actions**, read relative to the Delete/Keep pair rather than as a screen
+> side — while the persisted `undoSide` key and the dock's geometry are
+> untouched. `SWIPRKit.HapticFeedback` owns every optional response (nothing on
+> pickup, one light on the first capture, nothing while a destination stays
+> captured, one soft on a valid landing, nothing on an invalid release or a
+> cancelled touch, one light for a swipe past the commit threshold and for a
+> press on a control), and `ViewerView.giveHaptic(_:)` is the only place a haptic
+> is played, so "Haptics off" cannot be honoured at one call site and missed at
+> another. Each Settings choice row announces the current one through its
+> accessibility value and the selected trait, so placement never needs a drag and
+> VoiceOver says where the dock is. Two Codex rounds: round 1 found a real **P1**
+> — `AppModel.updatePreferences` re-pinned the running engine's direction from the
+> saved default on *every* preference write, so toggling the new switch would
+> have reversed a walk started with an explicit "Newest first"/"Oldest first"
+> and saved the reversal; `updatePreferences` now re-pins and writes the session
+> only when `preferences.defaultDirection` itself changed (`78d2a92`), with
+> `testChangingAControlPreferenceNeverReversesTheRunningSession` failing four
+> times when the old unconditional re-pin is restored, and round 2 — of that
+> exact head — reported no issues. Full local suite green on `SWIPR iPhone 11
+> Pro`: **233 kit + 55 app + 75 UI = 363 tests, 0 failures**. Six v1-04 Settings
+> screenshots (controls and Undo position × light/dark/AX5) are under
+> `docs/screenshots/milestones/v1-04/`; Settings is still pinned dark, so its
+> light capture matches the dark one. One finding is left for #79: at the largest
+> text size the Settings rows are taller than the screen and the pre-existing
+> "Reset control position" title hyphenates mid-word. Delivered and merged as
+> **PR #90** (merge commit `0151bf6`).
 
 ---
 
@@ -224,21 +261,22 @@
 | Ticket | Codex steps | DeepSeek attempts | DeepSeek fix rounds | Corrections | Merged |
 | --- | --- | --- | --- | --- | --- |
 | Setup — DeepSeek + GitHub Actions guardrails | 3 | 2 | — | Yes | Yes (#40) |
-| [#41 — Setup: persist owner workflow and compact project brief](https://github.com/Jinshuo7/Swiper/issues/41) | 2 | 2 | 1 | Yes — compressed PROJECT-BRIEF.md to ≤2 pages; listed open PRs (incl. prohibited #37); expanded log columns | Yes (#42) |
-| [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/Swiper/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | Yes (#48) |
-| [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/Swiper/issues/44) | 1 | 1 | 0 | No | Yes (#49) |
-| [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/Swiper/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
-| [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/Swiper/issues/46) | — | 1 | 2 | No | Yes (#52) |
-| [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/Swiper/issues/47) | — | 1 | 0 | No | Yes (#53) |
-| [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/Swiper/issues/55) | — | 1 | 0 | No | Yes (#59) |
-| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/Swiper/issues/58) | — | 1 | 1 | No | Yes (#60) |
-| [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/Swiper/issues/56) | — | 1 | 3 | No | Yes (#61) |
-| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/Swiper/issues/57) | — | 1 | 1 | No | Yes (#62) |
-| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/Swiper/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
-| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/Swiper/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
-| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/Swiper/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
-| [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/Swiper/issues/76) | 2 | 1 | 0 | Yes — round 1 found a preference write that could re-pin the session's direction, and a capture dropped inside its own release radius; both fixed in `9680607` with tests verified by breaking the fix, and round 2 reported no findings | Yes (PR #86, `2e56f87`) |
-| [#77 — V1-04c: Neutral decision-dock chrome and side layouts](https://github.com/Jinshuo7/Swiper/issues/77) | 5 | 1 | 4 | Yes — round 1: comments claimed one pair anchor across both layouts while a side column was anchored whole (wording fixed, `8ca20d5`); round 2: that same comment plus an outcome well that tinted its whole surface and strengthened the fill when armed (the pair became the anchor in the side layouts too, and the well tint became a rim at constant strength, `a3b0257`); round 3: the fixed 286 pt bottom dock clipped Undo by 11 pt on a 320 pt layout (fitted pill width, `395916e`); round 4: `docs/TESTING.md` still called that width fixed (wording corrected, `5da18ea`); round 5 on the merged head reported no findings | Yes (PR #88, `7654936`) |
+| [#41 — Setup: persist owner workflow and compact project brief](https://github.com/Jinshuo7/SWIPR/issues/41) | 2 | 2 | 1 | Yes — compressed PROJECT-BRIEF.md to ≤2 pages; listed open PRs (incl. prohibited #37); expanded log columns | Yes (#42) |
+| [#43 — V1-02a: Expose mixed-media metadata through public APIs](https://github.com/Jinshuo7/SWIPR/issues/43) | 2 | 2 | 1 | Yes — added `Codable` to `MediaCategory` (later `MediaFilter`/persisted filter selections need it); added a JSON encode/decode round-trip test for all categories | Yes (#48) |
+| [#44 — V1-02b: Filter a mixed-media pool with pure domain logic](https://github.com/Jinshuo7/SWIPR/issues/44) | 1 | 1 | 0 | No | Yes (#49) |
+| [#45 — V1-02c: Persist and reconcile the fixed filtered session pool](https://github.com/Jinshuo7/SWIPR/issues/45) | 2 | 1 | 0 | No | Yes (#50) |
+| [#46 — V1-02d: Wire Home and editable filters into a fixed session](https://github.com/Jinshuo7/SWIPR/issues/46) | — | 1 | 2 | No | Yes (#52) |
+| [#47 — V1-02e: Show mixed-media still previews and neutral kind badges](https://github.com/Jinshuo7/SWIPR/issues/47) | — | 1 | 0 | No | Yes (#53) |
+| [#55 — V1-03a: Offer both named traversals and complete without wrapping](https://github.com/Jinshuo7/SWIPR/issues/55) | — | 1 | 0 | No | Yes (#59) |
+| [#58 — V1-03d: Make the starting point reachable at the largest text size](https://github.com/Jinshuo7/SWIPR/issues/58) | — | 1 | 1 | No | Yes (#60) |
+| [#56 — V1-03b: Replace an unfinished session only after confirmation](https://github.com/Jinshuo7/SWIPR/issues/56) | — | 1 | 3 | No | Yes (#61) |
+| [#57 — V1-03c: Keep Random deterministic, repeat-free and reconciled](https://github.com/Jinshuo7/SWIPR/issues/57) | — | 1 | 1 | No | Yes (#62) |
+| [#69 — V1-08a: Re-enable the skipped AX5 large-text UI test](https://github.com/Jinshuo7/SWIPR/issues/69) | 3 | 1 | — | Yes — rounds 1–3 asked to refresh `docs/HANDOFF.md`, `docs/IMPLEMENTATION-STATUS.md`, `docs/SPEC.md` and `docs/agents/PROJECT-BRIEF.md` after the skip removal; all are in PR #72 | Yes (#72, `8efd39e`) |
+| [#66 — keep a damaged save file instead of replacing it with empty progress](https://github.com/Jinshuo7/SWIPR/pull/66) | 4 | 1 | 4 | Yes — rounds 1–4 found 7 issues in the legacy-save reader (backup reuse, non-resumable fragments, plan/mode consistency, blank plan IDs); all fixed | Yes (#66, `c2af5f5`) |
+| [#81 — V1-12a: Stabilise the flaky UI app-termination test](https://github.com/Jinshuo7/SWIPR/issues/81) | — | 1 | 2 | No | Yes (PR #83) |
+| [#76 — V1-04b: Wire direct dock movement into the viewer](https://github.com/Jinshuo7/SWIPR/issues/76) | 2 | 1 | 0 | Yes — round 1 found a preference write that could re-pin the session's direction, and a capture dropped inside its own release radius; both fixed in `9680607` with tests verified by breaking the fix, and round 2 reported no findings | Yes (PR #86, `2e56f87`) |
+| [#77 — V1-04c: Neutral decision-dock chrome and side layouts](https://github.com/Jinshuo7/SWIPR/issues/77) | 5 | 1 | 4 | Yes — round 1: comments claimed one pair anchor across both layouts while a side column was anchored whole (wording fixed, `8ca20d5`); round 2: that same comment plus an outcome well that tinted its whole surface and strengthened the fill when armed (the pair became the anchor in the side layouts too, and the well tint became a rim at constant strength, `a3b0257`); round 3: the fixed 286 pt bottom dock clipped Undo by 11 pt on a 320 pt layout (fitted pill width, `395916e`); round 4: `docs/TESTING.md` still called that width fixed (wording corrected, `5da18ea`); round 5 on the merged head reported no findings | Yes (PR #88, `7654936`) |
+| [#78 — V1-04d: Persist Control Position, Show Buttons, Haptics, Undo Position](https://github.com/Jinshuo7/SWIPR/issues/78) | 2 | 1 | 1 | Yes — round 1 (P1): `AppModel.updatePreferences` re-pinned a running session's direction from the saved default on every preference write, so toggling the new Haptics switch could reverse a walk started with an explicit "Newest first"/"Oldest first" and save it; the re-pin is now conditional on `defaultDirection` itself changing (`78d2a92`, test verified by restoring the old behaviour, which fails it four times); round 2 on that exact head reported no issues | Yes (PR #90, `0151bf6`) |
 
 > **Note:** PR #50 touched saved sessions and migration but merged without `needs-strong-review`; the owner reviewed it afterwards with Codex, and the problems found are being fixed in separate tickets.
 >

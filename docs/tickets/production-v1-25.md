@@ -1,10 +1,10 @@
 # Ticket #25 — Make the production-v1 contract durable
 
 **Status: COMPLETE — approved baseline retained and required checks pass.**
-Ticket [#25](https://github.com/Jinshuo7/Swiper/issues/25) remains **open** for
+Ticket [#25](https://github.com/Jinshuo7/SWIPR/issues/25) remains **open** for
 owner review and merge.
 
-Authoritative spec: [issue #24](https://github.com/Jinshuo7/Swiper/issues/24).
+Authoritative spec: [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24).
 Base HEAD: `deeb8179ce2a12a2c7013ee3c0abc6016e863187`.
 
 ## Acceptance criteria — actual status
@@ -108,7 +108,7 @@ visual baseline and the documentation updates listed above.
 
 ## Authoritative read order
 
-1. [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24).
+1. [Issue #24](https://github.com/Jinshuo7/SWIPR/issues/24).
 2. [`docs/SPEC.md`](../SPEC.md) — target contract, not as-built.
 3. [`docs/IMPLEMENTATION-STATUS.md`](../IMPLEMENTATION-STATUS.md) — required vs. built, AX5 blocker.
 4. [`docs/VISION.md`](../VISION.md), [`docs/ROADMAP.md`](../ROADMAP.md).

@@ -1,6 +1,6 @@
 # Behavioural specification (production v1)
 
-> **Authoritative source: [issue #24](https://github.com/Jinshuo7/Swiper/issues/24).**
+> **Authoritative source: [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24).**
 > This document is the in-repo, human-readable contract a production-v1 build
 > must satisfy. It is a **target**: much of it is not built yet. As-built legacy
 > behaviour is tracked separately in

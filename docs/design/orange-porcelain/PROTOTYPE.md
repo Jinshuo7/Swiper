@@ -1,6 +1,6 @@
 > **Exploratory prototype — not production UI.** This document and the
 > `-viewerDockPrototype` build are a throwaway interaction study. They are **not**
-> the production-v1 target in [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
+> the production-v1 target in [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24)
 > / [`docs/SPEC.md`](../../SPEC.md). Known differences from the target:
 > * Default prototype controls are **tinted** red/green and the sockets/links are
 >   **cyan**; the target is neutral adaptive glass with only extremely faint

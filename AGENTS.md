@@ -117,7 +117,7 @@ ticket and a root-cause fix; skipping is never allowed.
 Rules that never change: photos are deleted only through the iOS system
 confirmation, after the in-app Review confirmation; never weaken, skip or delete
 tests, CI, `.github/risky-paths.txt` or the strong-review gate; never force-push;
-never work in the owner's folder; PR #37 stays prohibited.
+PR #37 stays prohibited.
 
 ## Risky PR review workflow (`needs-strong-review`)
 
@@ -126,7 +126,7 @@ Applies to any PR the strong-review gate labels `needs-strong-review`.
 1. When its checks are green, comment exactly `@codex review` with
    `gh pr comment`.
 2. Wait for Codex's review: poll every 5 minutes with `gh pr view --comments`,
-   `gh api repos/Jinshuo7/Swiper/pulls/<n>/reviews`, and `.../comments`. If Codex
+   `gh api repos/Jinshuo7/SWIPR/pulls/<n>/reviews`, and `.../comments`. If Codex
    does not respond, keep working elsewhere and retry hourly.
 3. If Codex reports problems, fix them in the same PR, push without force, wait
    for green checks, then comment `@codex review` again. Up to **5 rounds** per
@@ -169,7 +169,7 @@ Codex reviews must flag, as blocking:
 
 ## Documentation
 
-Production v1 is specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24);
+Production v1 is specified by [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24);
 the in-repo target contract is `docs/SPEC.md`, and `docs/IMPLEMENTATION-STATUS.md`
 separates required v1 from as-built legacy. Keep `docs/VISION.md`, `docs/SPEC.md`,
 `docs/ROADMAP.md`, `docs/TESTING.md`, `docs/LOCALIZATION.md` and `docs/adr/` in
@@ -181,7 +181,7 @@ state while bilingual EN/zh-Hans is a v1 requirement.
 
 ### Issue tracker
 
-Issues live as GitHub issues in `Jinshuo7/Swiper` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live as GitHub issues in `Jinshuo7/SWIPR` (use the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
