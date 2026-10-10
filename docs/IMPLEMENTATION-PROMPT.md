@@ -2,15 +2,15 @@
 
 > **Historical handoff — not the current requirement.** This prompt drove the
 > legacy photo-only build (spec #10, issues #11–#16). The production-v1 target is
-> [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) / [`docs/SPEC.md`](SPEC.md),
+> [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) / [`docs/SPEC.md`](SPEC.md),
 > delivered by tickets #25–#36 ([`docs/ROADMAP.md`](ROADMAP.md)). Read
 > [`docs/IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md) for as-built vs.
 > required. Keep this file only as history.
 
 ## Canonical work
 
-Repository: https://github.com/Jinshuo7/Swiper
-Parent spec: https://github.com/Jinshuo7/Swiper/issues/10
+Repository: https://github.com/Jinshuo7/SWIPR
+Parent spec: https://github.com/Jinshuo7/SWIPR/issues/10
 
 Implementation issues (all labelled ready-for-agent):
 

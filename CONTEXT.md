@@ -4,7 +4,7 @@ The shared language for SWIPR. This file is a glossary only: it defines the
 project's words, never its implementation. It is media-neutral: unless a term
 says otherwise, "item" means any photo, Live Photo or ordinary video. The
 authoritative production-v1 specification is
-[issue #24](https://github.com/Jinshuo7/Swiper/issues/24).
+[issue #24](https://github.com/Jinshuo7/SWIPR/issues/24).
 
 ## Sessions and traversal
 

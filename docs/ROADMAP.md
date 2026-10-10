@@ -1,7 +1,7 @@
 # Roadmap
 
-> **Production v1 is specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24)
-> and delivered as tickets [#25–#36](https://github.com/Jinshuo7/Swiper/issues/24).
+> **Production v1 is specified by [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24)
+> and delivered as tickets [#25–#36](https://github.com/Jinshuo7/SWIPR/issues/24).
 > #24 is authoritative.** The legacy slices below are history, kept for context
 > only; their photo-only scope and grip interaction are superseded.
 
@@ -9,23 +9,23 @@
 
 Delivery is ticket-based, not one whole-spec implementation. Ticket titles are
 the source of truth for their own contents; this file does not restate them.
-Track and sequence them from the [parent spec #24](https://github.com/Jinshuo7/Swiper/issues/24)
+Track and sequence them from the [parent spec #24](https://github.com/Jinshuo7/SWIPR/issues/24)
 and the GitHub issue list, not from this page.
 
 | Ticket | Title |
 | --- | --- |
-| [#25](https://github.com/Jinshuo7/Swiper/issues/25) | V1-01: Make the production-v1 contract durable |
-| [#26](https://github.com/Jinshuo7/Swiper/issues/26) | V1-04: Ship the neutral direct-move decision dock |
-| [#27](https://github.com/Jinshuo7/Swiper/issues/27) | V1-02: Start a filtered mixed-media session |
-| [#28](https://github.com/Jinshuo7/Swiper/issues/28) | V1-05: Play and sort ordinary videos |
-| [#29](https://github.com/Jinshuo7/Swiper/issues/29) | V1-03: Choose a starting point and replace sessions safely |
-| [#30](https://github.com/Jinshuo7/Swiper/issues/30) | V1-06: Review and delete mixed media safely |
-| [#31](https://github.com/Jinshuo7/Swiper/issues/31) | V1-07: Celebrate confirmed cleanup and show impact |
-| [#32](https://github.com/Jinshuo7/Swiper/issues/32) | V1-08: Make the complete journey accessible and adaptive |
-| [#33](https://github.com/Jinshuo7/Swiper/issues/33) | V1-09: Ship complete English and Simplified Chinese experiences |
-| [#34](https://github.com/Jinshuo7/Swiper/issues/34) | V1-11: Prepare the localized App Store identity and listing |
-| [#35](https://github.com/Jinshuo7/Swiper/issues/35) | V1-10: Prove on-device privacy and publish support materials |
-| [#36](https://github.com/Jinshuo7/Swiper/issues/36) | V1-12: Validate and deliver the release candidate |
+| [#25](https://github.com/Jinshuo7/SWIPR/issues/25) | V1-01: Make the production-v1 contract durable |
+| [#26](https://github.com/Jinshuo7/SWIPR/issues/26) | V1-04: Ship the neutral direct-move decision dock |
+| [#27](https://github.com/Jinshuo7/SWIPR/issues/27) | V1-02: Start a filtered mixed-media session |
+| [#28](https://github.com/Jinshuo7/SWIPR/issues/28) | V1-05: Play and sort ordinary videos |
+| [#29](https://github.com/Jinshuo7/SWIPR/issues/29) | V1-03: Choose a starting point and replace sessions safely |
+| [#30](https://github.com/Jinshuo7/SWIPR/issues/30) | V1-06: Review and delete mixed media safely |
+| [#31](https://github.com/Jinshuo7/SWIPR/issues/31) | V1-07: Celebrate confirmed cleanup and show impact |
+| [#32](https://github.com/Jinshuo7/SWIPR/issues/32) | V1-08: Make the complete journey accessible and adaptive |
+| [#33](https://github.com/Jinshuo7/SWIPR/issues/33) | V1-09: Ship complete English and Simplified Chinese experiences |
+| [#34](https://github.com/Jinshuo7/SWIPR/issues/34) | V1-11: Prepare the localized App Store identity and listing |
+| [#35](https://github.com/Jinshuo7/SWIPR/issues/35) | V1-10: Prove on-device privacy and publish support materials |
+| [#36](https://github.com/Jinshuo7/SWIPR/issues/36) | V1-12: Validate and deliver the release candidate |
 
 Every ticket lands on the release candidate commit only when its acceptance
 criteria and required tests/human gates pass. Release is manual after App Review,

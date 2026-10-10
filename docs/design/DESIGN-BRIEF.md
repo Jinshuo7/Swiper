@@ -1,7 +1,7 @@
 # Design handoff: give SWIPR a visual identity
 
 > **Historical brief — not the current contract.** Engineering and behaviour are
-> now specified by [issue #24](https://github.com/Jinshuo7/Swiper/issues/24) /
+> now specified by [issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) /
 > [`docs/SPEC.md`](../SPEC.md): photos, Live Photos and ordinary videos, a neutral
 > media-led viewer, a handle-free dock, light/dark/Xcode-iOS-17 fallback and full
 > English + Simplified Chinese. This brief describes the earlier **dark-only,

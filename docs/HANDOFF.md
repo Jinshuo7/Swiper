@@ -7,15 +7,15 @@
 
 - **CI runner:** `xcode-27` is a **GitHub-hosted** runner using a custom
   `xcode-27` label (jobs run in the "GitHub Actions" runner group;
-  `gh api repos/Jinshuo7/Swiper/actions/runners` returns `total_count 0`).
+  `gh api repos/Jinshuo7/SWIPR/actions/runners` returns `total_count 0`).
   Branch protection on `main` requires the `checks` status, strict (up to date
   with `main`), with force-push and deletion blocked.
 - **Driver mode:** the owner replaced Codex with this Pi driver session
   (deepseek-flash, effort high). See the Roles section of
   `docs/agents/OWNER-INSTRUCTIONS.md`.
-- **Agent base repo:** `/Users/beastmini/GitHub/Jinshuo7/SWIPR-agent`; ticket
-  worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
-  Never touch the owner's folder `/Users/beastmini/GitHub/Jinshuo7/SWIPR`.
+- **Agent base repo:** `/Users/beastmini/GitHub/Jinshuo7/SWIPR` (renamed from
+  `SWIPR-agent`; the old owner folder is gone and this is the main repo now).
+  Ticket worktrees live under `/Users/beastmini/GitHub/Jinshuo7/SWIPR-worktrees/`.
 - **Risky-PR review workflow:** any PR labelled `needs-strong-review` gets up to
   5 `@codex review` rounds (see `AGENTS.md` → *Risky PR review workflow*). The
   owner has **delegated** approval: add `strong-review-passed` and merge ("Create

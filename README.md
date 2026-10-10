@@ -3,7 +3,7 @@
 > **Production-v1 status.** The current target is **photos, Live Photos and
 > ordinary videos** with Home + editable filters, a neutral whole-dock viewer,
 > fixed non-wrapping sessions, complete English + Simplified Chinese, and an App
-> Store release. [Issue #24](https://github.com/Jinshuo7/Swiper/issues/24) is
+> Store release. [Issue #24](https://github.com/Jinshuo7/SWIPR/issues/24) is
 > authoritative; read [`docs/SPEC.md`](docs/SPEC.md) and
 > [`docs/IMPLEMENTATION-STATUS.md`](docs/IMPLEMENTATION-STATUS.md) (as-built vs.
 > required). The body of this README describes the **legacy photo-only build**
