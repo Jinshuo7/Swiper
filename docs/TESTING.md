@@ -336,8 +336,8 @@ xcodebuild test -project SWIPR.xcodeproj -scheme SWIPR \
   whole while the glyphs are cut.
 - What playing found, and what changed:
   * A side rail anchored at its start sat *over* the top strip, and the rail is
-    drawn last: with the rail on the right, tapping "Review · 1" pressed Close.
-    The top strip now steps around the rail's lane, so both stay tappable.
+    drawn last: with the rail on the right, tapping the Review entry pressed
+    Close. The top strip now steps around the rail's lane, so both stay tappable.
   * Start Here promised "walks toward older photos" whatever direction the user
     had chosen, and Settings described the direction choice as applying to the
     next session when Recent deliberately ignores it. Both now say what actually

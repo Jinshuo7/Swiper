@@ -242,15 +242,21 @@ final class PlaySessionUITests: XCTestCase {
     }
 
     /// Advances the fake library until a Live Photo is on screen, so the top
-    /// strip is carrying everything it ever carries.
+    /// strip is carrying everything it ever carries. A plain photo now carries
+    /// no badge at all, so the loop waits for the badge to appear rather than
+    /// reading the label of an element that does not exist.
     private func advanceToALivePhoto(_ app: XCUIApplication) {
         let badge = app.otherElements["viewer.mediaBadge"]
         var steps = 0
-        while badge.label != "Live Photo" && steps < 8 {
+        while steps < 8 {
+            if badge.exists, badge.label == "Live Photo" { break }
             keepCurrent(app)
             steps += 1
         }
-        XCTAssertEqual(badge.label, "Live Photo", "never reached a Live Photo to put a badge in the top strip")
+        XCTAssertTrue(
+            badge.exists && badge.label == "Live Photo",
+            "never reached a Live Photo to put a badge in the top strip"
+        )
     }
 
     // MARK: - Invariants
@@ -1031,5 +1037,310 @@ final class PlaySessionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
         capture("Entry — a session and marks waiting")
+    }
+
+    // MARK: - Playtest round 1 capture
+
+    /// A plain-text dump of every named or hittable element on the current
+    /// screen, with its frame in points. Attached next to the screenshot so the
+    /// playtest report can list exact geometry.
+    private func layoutDump(_ app: XCUIApplication) -> String {
+        var lines: [String] = []
+        let window = app.windows.firstMatch.frame
+        lines.append("WINDOW\t-\twindow\t\(window.minX)\t\(window.minY)\t\(window.width)\t\(window.height)")
+        for element in app.descendants(matching: .any).allElementsBoundByIndex {
+            guard element.exists else { continue }
+            let identifier = element.identifier
+            let label = element.label
+            guard !identifier.isEmpty || !label.isEmpty else { continue }
+            guard !identifier.isEmpty || element.isHittable else { continue }
+            let frame = element.frame
+            let name = identifier.isEmpty ? "-" : identifier
+            lines.append("\(name)\t\(element.elementType.rawValue)\t\(label)\t\(frame.minX)\t\(frame.minY)\t\(frame.width)\t\(frame.height)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Captures one playtest screen: the screenshot and the layout dump under
+    /// the same numbered, descriptive name.
+    private func captureRound(_ name: String, app: XCUIApplication) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        let dump = XCTAttachment(string: layoutDump(app))
+        dump.name = "\(name) — layout"
+        dump.lifetime = .keepAlways
+        add(dump)
+    }
+
+    /// Walks every ordinary screen once in the light appearance, including the
+    /// tutorial, the three dock positions and Home with marks waiting.
+    func testPlaytestRound1Light() {
+        let app = launchApp(showTutorial: true, persistentStore: true, resetStore: true)
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        captureRound("01-home-empty-light", app: app)
+
+        app.buttons["entry.preset.everything"].tap()
+        XCTAssertTrue(app.buttons["filter.continue"].waitForExistence(timeout: 10))
+        captureRound("02-filters-light", app: app)
+
+        app.buttons["filter.continue"].tap()
+        XCTAssertTrue(app.buttons["choosePhoto.newest"].waitForExistence(timeout: 10))
+        captureRound("03-choose-a-photo-light", app: app)
+
+        beginSession(app.buttons["choosePhoto.newest"], in: app)
+        XCTAssertTrue(canvas(app).waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["viewer.tutorial.dismiss"].waitForExistence(timeout: 10))
+        captureRound("04-tutorial-light", app: app)
+        app.buttons["viewer.tutorial.dismiss"].tap()
+        captureRound("05-viewer-dock-bottom-light", app: app)
+
+        markCurrent(app)
+        captureRound("06-viewer-marked-dock-bottom-light", app: app)
+
+        goHome(app)
+        XCTAssertTrue(app.buttons["entry.review"].waitForExistence(timeout: 10))
+        captureRound("07-home-session-and-marks-light", app: app)
+
+        app.buttons["entry.resume"].tap()
+        XCTAssertTrue(canvas(app).waitForExistence(timeout: 10))
+
+        dragDock(app, from: dockStart(app, "control.delete"), to: leftTarget(app))
+        captureRound("08-viewer-dock-left-light", app: app)
+
+        dragDock(app, from: dockStart(app, "control.delete"), to: rightTarget(app))
+        captureRound("09-viewer-dock-right-light", app: app)
+
+        dragDock(app, from: dockStart(app, "control.delete"), to: bottomTarget(app))
+        captureRound("10-viewer-dock-bottom-again-light", app: app)
+
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 10))
+        app.buttons["viewer.review"].tap()
+        XCTAssertTrue(app.buttons["review.delete"].waitForExistence(timeout: 10))
+        captureRound("11-review-light", app: app)
+
+        app.buttons["review.delete"].tap()
+        XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
+        captureRound("12-result-light", app: app)
+        app.buttons["result.done"].tap()
+        goHome(app)
+
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeDeleted"].waitForExistence(timeout: 10))
+        captureRound("13-settings-light", app: app)
+    }
+
+    /// The same journey in the dark appearance (Home and Filters genuinely
+    /// change; the viewer chrome is already dark).
+    func testPlaytestRound1Dark() {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: ["-uiTestingForceDark"]
+        )
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        captureRound("14-home-dark", app: app)
+
+        _ = startViewer(app)
+        captureRound("15-viewer-dock-bottom-dark", app: app)
+
+        markCurrent(app)
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 10))
+        app.buttons["viewer.review"].tap()
+        XCTAssertTrue(app.buttons["review.delete"].waitForExistence(timeout: 10))
+        captureRound("16-review-dark", app: app)
+
+        app.buttons["review.delete"].tap()
+        XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10))
+        captureRound("17-result-dark", app: app)
+        app.buttons["result.done"].tap()
+        goHome(app)
+
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        app.buttons["entry.settings"].tap()
+        XCTAssertTrue(app.staticTexts["settings.statistics.lifetimeDeleted"].waitForExistence(timeout: 10))
+        captureRound("18-settings-dark", app: app)
+    }
+
+    /// The reachable screens at the largest accessibility text size.
+    func testPlaytestRound1Accessibility() {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        )
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        captureRound("19-home-ax5", app: app)
+
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        app.buttons["entry.preset.everything"].tap()
+        XCTAssertTrue(app.buttons["filter.continue"].waitForExistence(timeout: 10))
+        app.buttons["filter.continue"].tap()
+        XCTAssertTrue(app.buttons["choosePhoto.newest"].waitForExistence(timeout: 10))
+        captureRound("20-choose-a-photo-ax5", app: app)
+        app.buttons["choosePhoto.back"].tap()
+        XCTAssertTrue(app.buttons["filter.back"].waitForExistence(timeout: 10))
+        app.buttons["filter.back"].tap()
+
+        _ = startViewer(app)
+        captureRound("21-viewer-dock-bottom-ax5", app: app)
+
+        markCurrent(app)
+        XCTAssertTrue(app.buttons["viewer.review"].waitForExistence(timeout: 10))
+        app.buttons["viewer.review"].tap()
+        assertReachable(app, "review.delete", in: app.buttons, "playtest round 1 review", scrollUpTo: 4)
+        captureRound("22-review-ax5", app: app)
+
+        app.buttons["review.delete"].tap()
+        assertReachable(app, "result.done", in: app.buttons, "playtest round 1 result", scrollUpTo: 4)
+        captureRound("23-result-ax5", app: app)
+    }
+
+    // MARK: - Playtest round 2 capture
+
+    /// The launch argument the app uses to read the mixed three-kind showcase.
+    private let mixedMediaLaunchArgument = "-uiTestingMixedMediaLibrary"
+
+    func testPlaytestRound2Light() {
+        runRound2(suffix: "light", appearance: ["-uiTestingForceLight"])
+    }
+
+    func testPlaytestRound2Dark() {
+        runRound2(suffix: "dark", appearance: ["-uiTestingForceDark"])
+    }
+
+    func testPlaytestRound2Accessibility() {
+        runRound2(
+            suffix: "ax5",
+            appearance: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        )
+    }
+
+    private func runRound2(suffix: String, appearance: [String]) {
+        captureRound2Main(suffix, appearance)
+        captureRound2Swipe("left", suffix, appearance)
+        captureRound2Swipe("right", suffix, appearance)
+    }
+
+    /// One launch covers the badge kinds, both Review-button states, the three
+    /// dock positions, and Home with marks waiting.
+    private func captureRound2Main(_ suffix: String, _ appearance: [String]) {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: appearance + [mixedMediaLaunchArgument]
+        )
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        captureRound("round2-review-0-home-\(suffix)", app: app)
+        XCTAssertFalse(app.buttons["entry.review"].exists, "no marks means no Review button on Home")
+
+        _ = startViewer(app)   // the mixed showcase opens on the plain photo
+        XCTAssertFalse(
+            app.otherElements["viewer.mediaBadge"].waitForExistence(timeout: 2),
+            "a plain photo must not carry a media badge"
+        )
+        captureRound("round2-plain-photo-\(suffix)", app: app)
+        captureRound("round2-review-0-viewer-\(suffix)", app: app)
+        XCTAssertFalse(app.buttons["viewer.review"].exists, "no marks means no Review button in the viewer")
+
+        canvas(app).swipeRight()
+        let badge = app.otherElements["viewer.mediaBadge"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the Live Photo must be named")
+        XCTAssertEqual(badge.label, "Live Photo")
+        captureRound("round2-live-photo-\(suffix)", app: app)
+
+        canvas(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the video must be named")
+        XCTAssertEqual(badge.label, "Video")
+        captureRound("round2-video-\(suffix)", app: app)
+
+        captureRound("round2-dock-bottom-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: leftTarget(app))
+        captureRound("round2-dock-left-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: rightTarget(app))
+        captureRound("round2-dock-right-\(suffix)", app: app)
+        dragDock(app, from: dockStart(app, "control.delete"), to: bottomTarget(app))
+        captureRound("round2-dock-bottom-again-\(suffix)", app: app)
+
+        markCurrent(app)
+        markCurrent(app)
+        let viewerReview = app.buttons["viewer.review"]
+        XCTAssertTrue(viewerReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(viewerReview.label, "2 photos marked for deletion")
+        XCTAssertEqual(viewerReview.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(viewerReview.frame.height, 44, accuracy: 1)
+        captureRound("round2-review-2-viewer-\(suffix)", app: app)
+
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        let homeReview = app.buttons["entry.review"]
+        XCTAssertTrue(homeReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(homeReview.label, "2 photos marked for deletion")
+        XCTAssertEqual(homeReview.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(homeReview.frame.height, 44, accuracy: 1)
+        captureRound("round2-review-2-home-\(suffix)", app: app)
+    }
+
+    /// Freezes the swipe at 60 % of the commit threshold and captures the
+    /// Delete/Keep feedback without a held finger.
+    private func captureRound2Swipe(_ direction: String, _ suffix: String, _ appearance: [String]) {
+        let app = launchApp(
+            persistentStore: true,
+            resetStore: true,
+            extraArguments: appearance + [mixedMediaLaunchArgument, "-uiTestingFreezeSwipe", direction]
+        )
+        _ = startViewer(app)
+
+        let identifier = direction == "left" ? "viewer.dragFeedback.delete" : "viewer.dragFeedback.keep"
+        let well = app.otherElements[identifier]
+        XCTAssertTrue(well.waitForExistence(timeout: 5), "the frozen \(direction) swipe should show its feedback")
+        assertDragFeedbackIsInTheUpperThird(app, well: well)
+        captureRound("round2-swipe-\(direction)-\(suffix)", app: app)
+    }
+
+    /// The drag feedback must sit in the upper third, below the top bar and
+    /// clear of its buttons, so a thumb on the photo can never cover it.
+    private func assertDragFeedbackIsInTheUpperThird(_ app: XCUIApplication, well: XCUIElement) {
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(well.frame.midY, window.height / 3, "the swipe feedback must sit in the upper third")
+        XCTAssertLessThan(well.frame.maxY, window.height / 2, "the swipe feedback must never enter the bottom half")
+        for identifier in ["viewer.close", "viewer.review", "viewer.mediaBadge"] {
+            let fixed = app.descendants(matching: .any)[identifier]
+            guard fixed.exists else { continue }
+            let overlap = well.frame.intersection(fixed.frame)
+            let area = overlap.isNull ? 0 : overlap.width * overlap.height
+            XCTAssertLessThan(area, 1, "the swipe feedback must not cover \(identifier)")
+        }
+    }
+
+    // MARK: - Playtest round 3 Home capture (seeded sample library)
+
+    /// Captures the real Home on the Simulator's seeded sample library, in the
+    /// light and dark appearances, with no progress and with progress plus
+    /// marks. It deliberately does not pass `-uiTestingFakeLibrary`, so the
+    /// cards show the natural sample photos; every other test keeps the fake
+    /// library. It only reads the library and marks in the app — it never
+    /// deletes a photo or asks PhotoKit to change the library.
+    func testPlaytestRound3HomeCapture() {
+        captureSeededHome(appearance: ["-uiTestingForceLight"], suffix: "light")
+        captureSeededHome(appearance: ["-uiTestingForceDark"], suffix: "dark")
+    }
+
+    private func captureSeededHome(appearance: [String], suffix: String) {
+        let app = XCUIApplication()
+        app.launchArguments += appearance
+        AppLaunchHandoff.launch(app, firstScreen: app.buttons["entry.settings"])
+        XCTAssertTrue(app.buttons["entry.preset.everything"].waitForExistence(timeout: 10))
+        captureRound("round3-home-empty-\(suffix)", app: app)
+
+        _ = startViewer(app)
+        canvas(app).swipeRight()   // keep one and advance
+        markCurrent(app)           // mark the next, so Continue + Review are present
+        goHome(app)
+        XCTAssertTrue(app.buttons["entry.resume"].waitForExistence(timeout: 10))
+        captureRound("round3-home-progress-\(suffix)", app: app)
     }
 }

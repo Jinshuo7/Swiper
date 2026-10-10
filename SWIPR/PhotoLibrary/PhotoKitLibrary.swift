@@ -106,10 +106,18 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
     func thumbnail(for id: String, targetSize: CGSize) async -> UIImage? {
         guard let asset = asset(withID: id) else { return nil }
         let options = PHImageRequestOptions()
-        options.deliveryMode = .fastFormat
+        // `.highQualityFormat` rather than `.fastFormat`: the fast single-choice
+        // request can fail with PHPhotosErrorDomain 3303 ("No resource found
+        // matching image request spec") for ordinary stills, which left the Home
+        // cards on their placeholder gradient. The high-quality request is
+        // resized to the requested target, so it stays a thumbnail.
+        options.deliveryMode = .highQualityFormat
         options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
-        return await requestImage(asset: asset, targetSize: targetSize, options: options)
+        // Cards draw their thumbnails with an aspect-fill crop, so ask PhotoKit
+        // for the same: the returned image already covers the target and is
+        // never upscaled to fill the card.
+        return await requestImage(asset: asset, targetSize: targetSize, contentMode: .aspectFill, options: options)
     }
 
     func livePhoto(for id: String, targetSize: CGSize) async -> PHLivePhoto? {
@@ -170,7 +178,12 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
 
     // MARK: - Helpers
 
-    private func requestImage(asset: PHAsset, targetSize: CGSize, options: PHImageRequestOptions) async -> UIImage? {
+    private func requestImage(
+        asset: PHAsset,
+        targetSize: CGSize,
+        contentMode: PHImageContentMode = .aspectFit,
+        options: PHImageRequestOptions
+    ) async -> UIImage? {
         let bridge = AsyncRequestBridge<UIImage>()
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -178,7 +191,7 @@ final class PhotoKitLibrary: NSObject, SWIPRPhotoLibrary, PHPhotoLibraryChangeOb
                 let requestID = imageManager.requestImage(
                     for: asset,
                     targetSize: targetSize,
-                    contentMode: .aspectFit,
+                    contentMode: contentMode,
                     options: options
                 ) { image, info in
                     if info?[PHImageCancelledKey] as? Bool == true {

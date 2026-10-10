@@ -676,9 +676,9 @@ final class SWIPRUITests: XCTestCase {
         XCTAssertNotEqual(photoElement(app).label, markedLabel, "a marked photo stays skipped")
     }
 
-    /// Captures the replacement confirmation in both appearances. The app is
-    /// pinned dark, so the light capture goes through the `-uiTestingForceLight`
-    /// seam; the porcelain card adapts to whichever appearance it is handed.
+    /// Captures the replacement confirmation in both appearances. Both captures
+    /// force their appearance through the seam so they never depend on the
+    /// simulator's setting; the porcelain card adapts to whichever it is handed.
     func testCaptureReplacementConfirmationInEveryAppearance() {
         captureReplacementConfirmation(extraArguments: ["-uiTestingForceLight"], name: "replace-session-light")
         captureReplacementConfirmation(extraArguments: ["-uiTestingForceDark"], name: "replace-session-dark")
@@ -1296,62 +1296,88 @@ final class SWIPRUITests: XCTestCase {
         let review = app.buttons["viewer.review"]
         XCTAssertTrue(review.waitForExistence(timeout: 5))
         XCTAssertEqual(review.label, "1 photo marked for deletion")
-        XCTAssertTrue(app.staticTexts["Review · 1"].exists)
+        XCTAssertEqual(review.frame.width, 44, accuracy: 1, "the Review entry is a round 44 pt control")
+        XCTAssertEqual(review.frame.height, 44, accuracy: 1, "the Review entry is a round 44 pt control")
+        XCTAssertFalse(app.staticTexts["Review · 1"].exists, "the Review entry never shows text")
 
         review.tap()
         XCTAssertTrue(app.staticTexts["Review deletion"].waitForExistence(timeout: 5))
     }
 
-    /// The media badge always names the kind, beneath Review on the trailing
-    /// edge. The fake library cycles a Live Photo every fifth asset (indices 4,
-    /// 9, 14, 19), and Newest starts at index 23 walking older, so the fifth
-    /// fixture is the first Live Photo.
-    func testMediaKindBadgeAlwaysNamesTheCurrentAsset() {
+    /// The Review entry is a round 44 pt control on Home and in the viewer, with
+    /// no "Review" text and the count only in its accessibility label.
+    func testReviewEntryIsARoundFortyFourPointControlOnHomeAndViewer() {
         let app = launchApp()
-        _ = startViewer(app)
+        let photo = startViewer(app)
+        photo.swipeLeft()
+
+        let viewerReview = app.buttons["viewer.review"]
+        XCTAssertTrue(viewerReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(viewerReview.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(viewerReview.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(viewerReview.label, "1 photo marked for deletion")
+
+        app.buttons["viewer.close"].tap()
+        XCTAssertTrue(app.buttons["entry.settings"].waitForExistence(timeout: 10))
+        let homeReview = app.buttons["entry.review"]
+        XCTAssertTrue(homeReview.waitForExistence(timeout: 5))
+        XCTAssertEqual(homeReview.frame.width, 44, accuracy: 1, "the Home Review entry is 44 pt wide")
+        XCTAssertEqual(homeReview.frame.height, 44, accuracy: 1, "the Home Review entry is 44 pt tall")
+        XCTAssertEqual(homeReview.label, "1 photo marked for deletion")
+        XCTAssertFalse(app.staticTexts["Review · 1"].exists, "the Home Review entry never shows text")
+        XCTAssertEqual(
+            homeReview.frame.height,
+            app.buttons["entry.settings"].frame.height,
+            accuracy: 1,
+            "Home's Review entry matches the Settings control's size"
+        )
+    }
+
+    /// The badge names a kind only when the kind needs naming: a plain photo
+    /// carries none, a Live Photo and a video do. The mixed showcase puts a
+    /// photo, then a Live Photo, then a video in front of the demo fixtures.
+    func testMediaKindBadgeNamesOnlyLivePhotoAndVideo() {
+        let app = launchApp(extraArguments: [mixedMediaLaunchArgument])
+        let photo = startViewer(app)
 
         let badge = app.otherElements["viewer.mediaBadge"]
-        XCTAssertTrue(badge.waitForExistence(timeout: 10), "every asset needs a media badge")
-        XCTAssertEqual(badge.label, "Photo", "the first fixture is a still, so the badge must read Photo")
+        XCTAssertFalse(badge.exists, "a plain photo must not carry a media badge")
+        XCTAssertTrue(photo.label.hasPrefix("Photo"), "the first showcase asset is a still")
 
-        var steps = 0
-        while badge.label != "Live Photo" && steps < 6 {
-            photoElement(app).swipeRight()
-            steps += 1
-        }
-
-        XCTAssertEqual(badge.label, "Live Photo", "a Live Photo must be named in the viewer")
+        photoElement(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "a Live Photo must be named")
+        XCTAssertEqual(badge.label, "Live Photo")
         XCTAssertTrue(
             photoElement(app).label.contains("Live Photo"),
             "the spoken description must name the kind too, got \(photoElement(app).label)"
         )
         capture("Viewer — Live Photo labelled")
+
+        photoElement(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "a video must be named")
+        XCTAssertEqual(badge.label, "Video")
     }
 
-    /// The badge is anchored to the trailing edge, directly beneath the Review
-    /// entry, so Review and the media kind read as one quiet column.
-    func testMediaKindBadgeSitsBeneathReview() {
-        let app = launchApp()
-        let photo = startViewer(app)
-        photo.swipeLeft()   // mark this one, so Review appears
+    /// The badge sits in the top bar row, vertically centred with Close, not on
+    /// a second line beneath the Review entry.
+    func testMediaKindBadgeSitsInTheTopBarCentredWithClose() {
+        let app = launchApp(extraArguments: [mixedMediaLaunchArgument])
+        _ = startViewer(app)
+        photoElement(app).swipeRight()   // advance to the Live Photo, which carries a badge
 
-        let review = app.buttons["viewer.review"]
-        XCTAssertTrue(review.waitForExistence(timeout: 5), "Review should appear once something is marked")
+        let close = app.buttons["viewer.close"]
         let badge = app.otherElements["viewer.mediaBadge"]
-        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the media badge should stay visible")
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "the Live Photo badge should be visible")
 
-        XCTAssertGreaterThanOrEqual(
-            badge.frame.minY,
-            review.frame.maxY,
-            "the media badge must sit beneath Review, not beside it"
-        )
         XCTAssertEqual(
-            badge.frame.maxX,
-            review.frame.maxX,
+            badge.frame.midY,
+            close.frame.midY,
             accuracy: 1,
-            "the badge must share Review's trailing edge"
+            "the badge must share Close's centre line, not sit beneath Review"
         )
-        capture("Viewer — media badge beneath Review")
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(badge.frame.maxY, window.height / 3, "the badge belongs in the top bar, upper third")
+        capture("Viewer — media badge in the top bar")
     }
 
     /// A mixed pool shows a complete still preview for all three kinds, at the
@@ -1363,18 +1389,22 @@ final class SWIPRUITests: XCTestCase {
         _ = startViewer(app)
         let window = app.windows.firstMatch.frame
 
-        let expectations: [(label: String, ratio: CGFloat)] = [
-            ("Photo", 4.0 / 3.0),
-            ("Live Photo", 3.0 / 4.0),
-            ("Video", 16.0 / 9.0),
+        let expectations: [(label: String, ratio: CGFloat, showsBadge: Bool)] = [
+            ("Photo", 4.0 / 3.0, false),
+            ("Live Photo", 3.0 / 4.0, true),
+            ("Video", 16.0 / 9.0, true),
         ]
 
         for (index, expected) in expectations.enumerated() {
             let photo = photoElement(app)
             XCTAssertTrue(photo.waitForExistence(timeout: 10), "preview \(index) never appeared")
             let badge = app.otherElements["viewer.mediaBadge"]
-            XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge at step \(index)")
-            XCTAssertEqual(badge.label, expected.label, "step \(index) badge")
+            if expected.showsBadge {
+                XCTAssertTrue(badge.waitForExistence(timeout: 5), "no media badge at step \(index)")
+                XCTAssertEqual(badge.label, expected.label, "step \(index) badge")
+            } else {
+                XCTAssertFalse(badge.exists, "step \(index) is a plain photo and must not carry a badge")
+            }
             XCTAssertTrue(
                 photo.label.hasPrefix(expected.label),
                 "step \(index) spoken kind, got \(photo.label)"
@@ -1414,15 +1444,16 @@ final class SWIPRUITests: XCTestCase {
         _ = startViewer(app)
         let badge = app.otherElements["viewer.mediaBadge"]
 
-        XCTAssertTrue(badge.waitForExistence(timeout: 10), "no media badge for the \(suffix) screenshots")
-        XCTAssertEqual(badge.label, "Photo")
+        XCTAssertFalse(badge.exists, "a plain photo must not carry a media badge for the \(suffix) capture")
         capture("viewer-photo-\(suffix)")
 
         photoElement(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5))
         XCTAssertEqual(badge.label, "Live Photo")
         capture("viewer-live-\(suffix)")
 
         photoElement(app).swipeRight()
+        XCTAssertTrue(badge.waitForExistence(timeout: 5))
         XCTAssertEqual(badge.label, "Video")
         capture("viewer-video-\(suffix)")
     }
@@ -1879,18 +1910,24 @@ final class SWIPRUITests: XCTestCase {
 
     /// The wordmark is centred on the screen, framed by the gear and the review
     /// chip, in every combination of waiting work.
-    func testWordmarkIsCentredBetweenTheGearAndTheChip() {
+    /// The Home top bar is the board's: the compact wordmark leads, the gear
+    /// trails, and the round Review button sits between them.
+    func testWordmarkLeadsAndTheGearTrails() {
         let app = launchApp()
         let photo = startViewer(app)
         photo.swipeLeft()
         app.buttons["viewer.close"].tap()
 
-        let window = app.windows.firstMatch.frame
         let wordmark = app.staticTexts["entry.wordmark"]
         XCTAssertTrue(wordmark.waitForExistence(timeout: 10))
-        XCTAssertEqual(wordmark.frame.midX, window.midX, accuracy: 1, "the wordmark must be centred on the phone")
-        XCTAssertLessThan(app.buttons["entry.settings"].frame.midX, wordmark.frame.midX)
-        XCTAssertGreaterThan(app.buttons["entry.review"].frame.midX, wordmark.frame.midX)
+        let gear = app.buttons["entry.settings"]
+        let review = app.buttons["entry.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+
+        XCTAssertLessThan(wordmark.frame.midX, review.frame.midX, "the wordmark leads the top bar")
+        XCTAssertLessThan(review.frame.midX, gear.frame.midX, "the Review button sits before the gear")
+        XCTAssertLessThan(wordmark.frame.maxX, gear.frame.minX, "the wordmark never reaches the gear")
+        XCTAssertEqual(wordmark.frame.midY, gear.frame.midY, accuracy: 2, "the wordmark shares the gear's centre line")
     }
 
     /// Opening Choose a photo leaves a resumable session alone; choosing a photo

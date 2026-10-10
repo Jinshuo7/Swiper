@@ -119,6 +119,9 @@ struct CircleControl: View {
     /// than the decision controls but keeps a full 44 pt tap region.
     var visualSize: CGFloat = 56
     var hitSize: CGFloat = 56
+    /// A small red count at the control's top-right, used by the Review entry.
+    /// It stays inside the tap region, so the measured frame does not grow.
+    var badgeCount: Int? = nil
     let action: () -> Void
 
     var body: some View {
@@ -130,9 +133,31 @@ struct CircleControl: View {
                 .foregroundStyle(tint)
                 .frame(width: max(visualSize, hitSize), height: max(visualSize, hitSize))
                 .contentShape(Rectangle())
+                .overlay(alignment: .topTrailing) {
+                    if let badgeCount, badgeCount > 0 {
+                        CountBadge(count: badgeCount)
+                    }
+                }
         }
         .accessibilityLabel(label)
         .accessibilityIdentifier(identifier ?? "control.\(label.lowercased())")
+    }
+}
+
+/// A small red count badge for a control's top-right corner. It is never a
+/// separate accessibility element: the control's own label carries the count.
+struct CountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, count > 9 ? 4 : 0)
+            .frame(minWidth: 16, minHeight: 16)
+            .background(Color.red, in: Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1))
+            .accessibilityHidden(true)
     }
 }
 
@@ -195,7 +220,7 @@ struct TopBarButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
                 .foregroundStyle(.white)
         }

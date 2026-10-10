@@ -39,8 +39,9 @@
 >
 > **#47 update (2026-10-02):** the viewer now shows a complete still preview for
 > a Photo, Live Photo or Video and names the kind in a neutral
-> Photo/Live/Video badge beneath Review on the trailing edge. The badge carries a
-> symbol and a word, so its meaning never rests on colour. No Play, duration,
+> Live/Video badge in the top bar, centred with Close. A plain photo carries no
+> badge. The badge carries a symbol and a word, so its meaning never rests on
+> colour. No Play, duration,
 > timeline, mute, Retry or Skip ships — that stays with #28. `FakePhotoLibrary`
 > gained a test-only launch argument (`-uiTestingMixedMediaLibrary`) that adds a
 > photo, a Live Photo and a video on top of the untouched 24-item demo fixture,
